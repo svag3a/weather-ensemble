@@ -105,8 +105,7 @@ export default function App() {
 
         <div className="flex items-center justify-between mb-8">
           <div>
-            <img src="/logo.png" alt="gbgvader.se" className="h-16 w-auto" />
-            <p className="text-slate-400 text-sm mt-1">Göteborg — SMHI · Yr.no · Open-Meteo · OpenWeatherMap</p>
+            <img src="/logo.png" alt="gbgvader.se" className="h-32 w-auto" />
           </div>
           <div className="flex items-center gap-3">
             <select
