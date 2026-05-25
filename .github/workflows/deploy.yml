@@ -16,6 +16,7 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          debug: true
           script: |
             cd ~/weather-ensemble
             git pull
