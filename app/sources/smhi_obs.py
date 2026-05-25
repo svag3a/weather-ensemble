@@ -1,7 +1,16 @@
 """
-SMHI station observations for Göteborg A (station 71420).
-Fetches temperature, wind speed, and precipitation for the latest hour.
-Used as truth source for weight calibration in place of model consensus.
+SMHI multi-station observations for Göteborg.
+Fetches from three stations and computes a composite truth:
+
+  Station       ID     Role          Dist from centre
+  Göteborg A   71420  City / primary      ~2 km
+  Vinga A      71380  Coastal / exposed  ~23 km west
+  Landvetter   72420  Inland / airport   ~19 km east
+
+Composite rules per parameter:
+  Temperature  — GöteborgA 80 %, Landvetter 20 % (Vinga excluded: maritime bias)
+  Wind speed   — GöteborgA 50 %, Vinga 30 %, Landvetter 20 %  (Vinga captures sea winds)
+  Precipitation — weighted average; event threshold applied in _get_truth
 """
 from __future__ import annotations
 
@@ -10,21 +19,28 @@ import httpx
 from datetime import datetime, timezone
 from typing import Optional
 
-STATION_ID = 71420  # Göteborg A
-
 _BASE = "https://opendata-download-metobs.smhi.se/api/version/latest"
 
-_PARAMS = {
-    "temperature": 1,
-    "wind_speed": 4,
-    "precip_mm": 7,
-}
+STATIONS = [
+    {"id": 71420, "name": "Göteborg A", "lat": 57.7156, "lon": 11.9924},
+    {"id": 71380, "name": "Vinga A",    "lat": 57.6322, "lon": 11.6048},
+    {"id": 72420, "name": "Landvetter", "lat": 57.6764, "lon": 12.2919},
+]
+
+_PARAM_TEMP   = 1
+_PARAM_WIND   = 4
+_PARAM_PRECIP = 7
+
+# Composite weights — must sum to ≤ 1.0; missing stations are re-normalised automatically
+_TEMP_WEIGHTS   = {71420: 0.80, 72420: 0.20, 71380: 0.00}
+_WIND_WEIGHTS   = {71420: 0.50, 71380: 0.30, 72420: 0.20}
+_PRECIP_WEIGHTS = {71420: 0.60, 71380: 0.25, 72420: 0.15}
 
 
 async def _fetch_latest_value(
-    client: httpx.AsyncClient, param_id: int
+    client: httpx.AsyncClient, param_id: int, station_id: int
 ) -> Optional[tuple[datetime, float]]:
-    url = f"{_BASE}/parameter/{param_id}/station/{STATION_ID}/period/latest-hour/data.json"
+    url = f"{_BASE}/parameter/{param_id}/station/{station_id}/period/latest-hour/data.json"
     try:
         resp = await client.get(url, timeout=10)
         resp.raise_for_status()
@@ -45,23 +61,64 @@ async def _fetch_latest_value(
     return None
 
 
+def _weighted_avg(readings: dict[int, float], weights: dict[int, float]) -> Optional[float]:
+    """Weighted average of available readings, re-normalising if stations are missing."""
+    total_w = 0.0
+    total_v = 0.0
+    for sid, w in weights.items():
+        if w > 0 and sid in readings:
+            total_v += readings[sid] * w
+            total_w += w
+    if total_w == 0:
+        return None
+    return total_v / total_w
+
+
 async def fetch(client: httpx.AsyncClient) -> Optional[dict]:
     """
-    Returns {"valid_for": datetime, "temperature": float,
-             "wind_speed": float|None, "precip_mm": float|None}
-    or None if temperature observation is unavailable.
+    Fetch observations from all three stations and return a composite truth dict:
+      {"valid_for", "temperature", "wind_speed", "precip_mm", "station_ids"}
+    Returns None if the primary station (Göteborg A) has no temperature reading.
     """
-    temp_res, wind_res, precip_res = await asyncio.gather(
-        _fetch_latest_value(client, _PARAMS["temperature"]),
-        _fetch_latest_value(client, _PARAMS["wind_speed"]),
-        _fetch_latest_value(client, _PARAMS["precip_mm"]),
-    )
-    if temp_res is None:
+    station_ids = [s["id"] for s in STATIONS]
+    params = [_PARAM_TEMP, _PARAM_WIND, _PARAM_PRECIP]
+
+    # Fetch all (station, param) combinations concurrently
+    keys = [(sid, pid) for sid in station_ids for pid in params]
+    coros = [_fetch_latest_value(client, pid, sid) for sid, pid in keys]
+    raw = dict(zip(keys, await asyncio.gather(*coros)))
+
+    # Separate into per-parameter dicts {station_id: value}
+    temp_r:   dict[int, float] = {}
+    wind_r:   dict[int, float] = {}
+    precip_r: dict[int, float] = {}
+    valid_fors: list[datetime] = []
+
+    for sid in station_ids:
+        t = raw.get((sid, _PARAM_TEMP))
+        w = raw.get((sid, _PARAM_WIND))
+        p = raw.get((sid, _PARAM_PRECIP))
+        if t:
+            valid_fors.append(t[0])
+            temp_r[sid] = t[1]
+        if w:
+            wind_r[sid] = w[1]
+        if p:
+            precip_r[sid] = p[1]
+
+    # Require at least the primary city station
+    if 71420 not in temp_r:
         return None
-    valid_for, temperature = temp_res
+
     return {
-        "valid_for": valid_for,
-        "temperature": temperature,
-        "wind_speed": wind_res[1] if wind_res else None,
-        "precip_mm": precip_res[1] if precip_res else None,
+        "valid_for":   valid_fors[0],
+        "temperature": _weighted_avg(temp_r,   _TEMP_WEIGHTS),
+        "wind_speed":  _weighted_avg(wind_r,   _WIND_WEIGHTS),
+        "precip_mm":   _weighted_avg(precip_r, _PRECIP_WEIGHTS),
+        # Diagnostic: which stations contributed to each parameter
+        "station_ids": {
+            "temp":   sorted(temp_r.keys()),
+            "wind":   sorted(wind_r.keys()),
+            "precip": sorted(precip_r.keys()),
+        },
     }

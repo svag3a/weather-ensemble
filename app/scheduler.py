@@ -77,10 +77,17 @@ async def collect_and_update() -> None:
         try:
             obs_data = await smhi_obs.fetch(client)
             if obs_data:
-                logger.info("  observation: %.1f°C, wind %.1f m/s, precip %.1f mm",
-                            obs_data["temperature"],
-                            obs_data["wind_speed"] or 0,
-                            obs_data["precip_mm"] or 0)
+                sids = obs_data.get("station_ids", {})
+                logger.info(
+                    "  observation: %.1f°C, wind %.1f m/s, precip %.1f mm"
+                    "  [temp stations: %s, wind: %s, precip: %s]",
+                    obs_data["temperature"] or 0,
+                    obs_data["wind_speed"] or 0,
+                    obs_data["precip_mm"] or 0,
+                    sids.get("temp", []),
+                    sids.get("wind", []),
+                    sids.get("precip", []),
+                )
         except Exception as exc:
             logger.warning("  smhi_obs fetch failed: %s", exc)
 
