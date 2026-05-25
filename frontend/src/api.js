@@ -18,6 +18,12 @@ export async function fetchWeights() {
   return res.json()
 }
 
+export async function fetchWeightsHistory(days = 30) {
+  const res = await fetch(`${BASE}/weights/history?days=${days}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchLocalForecast(lat, lon, hoursAhead = 48) {
   const res = await fetch(`${BASE}/forecast/local?lat=${lat}&lon=${lon}&hours_ahead=${hoursAhead}`)
   if (!res.ok) throw new Error(await res.text())

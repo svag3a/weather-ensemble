@@ -14,7 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Forecast, Observation
+from app.models import Forecast, Observation, SourceWeight, SourceWeightHistory
 from app.ensemble import update_weights, build_ensemble
 from app.sources import smhi, yr, open_meteo, open_meteo_icon_eu, open_meteo_ecmwf, openweathermap, radar_nowcast, smhi_obs
 
@@ -114,9 +114,34 @@ async def collect_and_update() -> None:
         update_weights(db, truth_time)
 
         build_ensemble(db, issued_at, forecasts_by_source)
+        _maybe_snapshot_weights(db, issued_at.date())
         logger.info("Collection run complete.")
     finally:
         db.close()
+
+
+def _maybe_snapshot_weights(db: Session, today) -> None:
+    """Take a daily snapshot of current source weights if not already done today."""
+    already = db.query(SourceWeightHistory).filter(
+        SourceWeightHistory.snapshot_date == today
+    ).first()
+    if already is not None:
+        return
+
+    rows = db.query(SourceWeight).all()
+    for r in rows:
+        db.add(SourceWeightHistory(
+            snapshot_date=today,
+            source=r.source,
+            lead_hours=r.lead_hours,
+            mae_temperature=r.mae_temperature,
+            mae_precip=r.mae_precip,
+            mae_wind=r.mae_wind,
+            mae_cloud=r.mae_cloud,
+            sample_count=r.sample_count,
+        ))
+    db.commit()
+    logger.info("  Daily weight snapshot saved (%d rows)", len(rows))
 
 
 def create_scheduler() -> AsyncIOScheduler:

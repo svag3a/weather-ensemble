@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import EnsembleForecast, Forecast, SourceWeight
+from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory
 
 router = APIRouter()
 
@@ -134,6 +134,46 @@ def get_weights(db: Session = Depends(get_db)):
             mae_cloud=round(r.mae_cloud, 4),
             sample_count=r.sample_count,
             updated_at=r.updated_at,
+        )
+        for r in rows
+    ]
+
+
+class SourceWeightHistoryOut(BaseModel):
+    snapshot_date: str   # ISO date string "2025-06-01"
+    source: str
+    lead_hours: int
+    mae_temperature: float
+    mae_precip: float
+    mae_wind: float
+    mae_cloud: float
+    sample_count: int
+
+
+@router.get("/weights/history", response_model=list[SourceWeightHistoryOut])
+def get_weights_history(
+    days: int = Query(default=30, ge=1, le=365),
+    db: Session = Depends(get_db),
+):
+    """Daily MAE snapshots for the last N days, for ranking trend visualisation."""
+    from datetime import date, timedelta
+    cutoff = date.today() - timedelta(days=days)
+    rows = (
+        db.query(SourceWeightHistory)
+        .filter(SourceWeightHistory.snapshot_date >= cutoff)
+        .order_by(SourceWeightHistory.snapshot_date, SourceWeightHistory.source)
+        .all()
+    )
+    return [
+        SourceWeightHistoryOut(
+            snapshot_date=r.snapshot_date.isoformat(),
+            source=r.source,
+            lead_hours=r.lead_hours,
+            mae_temperature=round(r.mae_temperature, 4),
+            mae_precip=round(r.mae_precip, 4),
+            mae_wind=round(r.mae_wind, 4),
+            mae_cloud=round(r.mae_cloud, 4),
+            sample_count=r.sample_count,
         )
         for r in rows
     ]

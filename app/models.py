@@ -1,5 +1,5 @@
-from datetime import datetime
-from sqlalchemy import Float, Integer, String, DateTime, UniqueConstraint
+from datetime import datetime, date
+from sqlalchemy import Float, Integer, String, DateTime, Date, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 from app.database import Base
@@ -74,3 +74,22 @@ class Observation(Base):
     temperature: Mapped[float] = mapped_column(Float)
     wind_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     precip_mm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+
+class SourceWeightHistory(Base):
+    """Daily snapshot of source MAE values for trend visualisation."""
+    __tablename__ = "source_weight_history"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    snapshot_date: Mapped[date] = mapped_column(Date, index=True)
+    source: Mapped[str] = mapped_column(String, index=True)
+    lead_hours: Mapped[int] = mapped_column(Integer)
+    mae_temperature: Mapped[float] = mapped_column(Float)
+    mae_precip: Mapped[float] = mapped_column(Float)
+    mae_wind: Mapped[float] = mapped_column(Float)
+    mae_cloud: Mapped[float] = mapped_column(Float)
+    sample_count: Mapped[int] = mapped_column(Integer)
+
+    __table_args__ = (
+        UniqueConstraint("snapshot_date", "source", "lead_hours", name="uq_weight_history"),
+    )

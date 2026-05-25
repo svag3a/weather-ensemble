@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchEnsemble, fetchLocalForecast, fetchSources, fetchWeights, fetchRadarNow, triggerCollect } from './api'
+import { fetchEnsemble, fetchLocalForecast, fetchSources, fetchWeights, fetchWeightsHistory, fetchRadarNow, triggerCollect } from './api'
 import HourlyTimeline from './components/HourlyTimeline'
 import EnsembleForecast from './components/EnsembleForecast'
 import SourceComparison from './components/SourceComparison'
 import SourceRanking from './components/SourceRanking'
+import RankingChart from './components/RankingChart'
 
 function useData(fetcher, deps = []) {
   const [data, setData] = useState(null)
@@ -68,6 +69,7 @@ export default function App() {
   )
   const sources = useData(() => fetchSources(hoursAhead), [hoursAhead])
   const weights = useData(fetchWeights)
+  const weightsHistory = useData(fetchWeightsHistory)
 
   useEffect(() => {
     const refresh = () => {
@@ -174,6 +176,7 @@ export default function App() {
               <EnsembleForecast data={ensemble.data} sources={sources.data} />
               <SourceComparison data={sources.data} />
               <SourceRanking data={weights.data} />
+              <RankingChart history={weightsHistory.data} />
             </div>
           </details>
         </div>
