@@ -116,8 +116,6 @@ function CurrentCard({ fc, radar }) {
   )
 
   const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover)
-  const radarRaining = radar?.raining
-  const isHail = radarRaining && radar.dbz >= 45
 
   return (
     <div className="bg-slate-800 rounded-2xl p-6">
@@ -145,23 +143,7 @@ function CurrentCard({ fc, radar }) {
         </div>
       )}
 
-      {/* Radar status */}
-      {radar != null && (
-        <div className={`mt-3 flex items-center gap-2 text-sm rounded-xl px-3 py-2 ${
-          radarRaining
-            ? 'bg-blue-900/40 text-blue-200'
-            : 'bg-slate-700/50 text-slate-400'
-        }`}>
-          <span>{isHail ? '🧊' : radarRaining ? '🌧' : '☀️'}</span>
-          <span>
-            {radarRaining
-              ? isHail ? 'Hagel möjligt just nu' : 'Regnar just nu på din plats'
-              : 'Torrt just nu på din plats'}
-          </span>
-        </div>
-      )}
-
-      {/* CAPE instability */}
+      {/* CAPE instability — only show when meaningfully elevated */}
       {radar?.cape != null && radar.cape >= 300 && (
         <div className="mt-2 flex items-center gap-2 text-xs text-yellow-300/80 px-3">
           <span>⚡</span>
@@ -270,8 +252,6 @@ export default function MobileApp() {
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
       <div className="px-4 pt-10 pb-10 space-y-3 max-w-lg mx-auto">
-
-        <img src="/logo.png" alt="gbgvader.se" className="h-20 w-auto mb-2" />
 
         <CurrentCard fc={currentFc} radar={radar} />
 
