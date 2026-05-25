@@ -58,7 +58,7 @@ export default function MobileApp() {
       <div className="px-4 pt-10 pb-6 space-y-4">
 
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-white">Göteborg</h1>
+          <img src="/logo.png" alt="gbgvader.se" className="h-10 w-auto" />
           <a href="/" className="text-xs text-slate-600 hover:text-slate-400 transition-colors">
             Admin →
           </a>
