@@ -51,24 +51,25 @@ def _lead_bucket(lead_hours: int) -> int:
 
 def _get_truth(db: Session, valid_for: datetime) -> Optional[dict]:
     """
-    Return truth values for valid_for.
-    Prefers actual SMHI observations; falls back to 1h model consensus.
+    Return truth values for valid_for from real SMHI observations only.
+    Returns None when no observation is available — no model-consensus fallback.
+    precip_outcome is 0.0 or 1.0 (binary) for use with Brier score.
     """
     from app.models import Observation
     obs = db.query(Observation).filter(Observation.valid_for == valid_for).first()
     if obs and obs.temperature is not None:
-        precip_truth = (
-            100.0 if (obs.precip_mm is not None and obs.precip_mm > 0.1)
+        precip_outcome = (
+            1.0 if (obs.precip_mm is not None and obs.precip_mm > 0.1)
             else 0.0 if obs.precip_mm is not None
             else None
         )
         return {
             "temperature": obs.temperature,
-            "precip_probability": precip_truth,
+            "precip_outcome": precip_outcome,   # 0.0 / 1.0 — use Brier score
             "wind_speed": obs.wind_speed,
             "cloud_cover": None,  # not available at this station
         }
-    return compute_consensus_1h(db, valid_for)
+    return None  # no consensus fallback — only real observations count
 
 
 def compute_consensus_1h(db: Session, valid_for: datetime) -> Optional[dict[str, float]]:
@@ -129,9 +130,10 @@ def update_weights(db: Session, valid_for: datetime) -> None:
         if fc.temperature is not None and not isnan(fc.temperature):
             err_t = abs(fc.temperature - consensus["temperature"])
             weight_row.mae_temperature = ALPHA * err_t + (1 - ALPHA) * weight_row.mae_temperature
-        if consensus["precip_probability"] is not None:
-            err_p = abs(fc.precip_probability - consensus["precip_probability"])
-            weight_row.mae_precip = ALPHA * err_p + (1 - ALPHA) * weight_row.mae_precip
+        # Brier score for precipitation: (p/100 - outcome)² where outcome ∈ {0, 1}
+        if consensus.get("precip_outcome") is not None:
+            brier = (fc.precip_probability / 100.0 - consensus["precip_outcome"]) ** 2
+            weight_row.mae_precip = ALPHA * brier + (1 - ALPHA) * weight_row.mae_precip
         if fc.wind_speed is not None and not isnan(fc.wind_speed) and consensus["wind_speed"] is not None:
             err_w = abs(fc.wind_speed - consensus["wind_speed"])
             weight_row.mae_wind = ALPHA * err_w + (1 - ALPHA) * weight_row.mae_wind
@@ -174,11 +176,14 @@ def _get_weights(db: Session, lead_hours: int) -> dict[str, dict]:
     if not rows:
         return {}
 
+    # Epsilon values chosen per-parameter to keep weights numerically stable
+    # and reflect the natural minimum achievable error for each variable.
+    # Precip uses Brier scale (0–1); temp/wind/cloud use physical units.
     raw = {r.source: {
-        "temp":  1.0 / max(r.mae_temperature, 0.01),
-        "precip": 1.0 / max(r.mae_precip, 0.01),
-        "wind":  1.0 / max(r.mae_wind, 0.01),
-        "cloud": 1.0 / max(r.mae_cloud, 0.01),
+        "temp":   1.0 / (r.mae_temperature + 0.5),   # ±0.5 °C floor
+        "precip": 1.0 / (r.mae_precip      + 0.05),  # Brier ≥ 0.05 floor
+        "wind":   1.0 / (r.mae_wind        + 0.3),   # ±0.3 m/s floor
+        "cloud":  1.0 / (r.mae_cloud       + 5.0),   # ±5 % floor
     } for r in rows}
 
     w_temp  = _independence_scale({s: v["temp"]  for s, v in raw.items()})
