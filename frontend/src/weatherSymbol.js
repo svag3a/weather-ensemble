@@ -1,4 +1,54 @@
-export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover) {
+// Göteborg coordinates for sunrise/sunset calculation
+const LAT = 57.706
+const LON = 11.967
+
+/**
+ * Compute sunrise and sunset times (fractional UTC hours) for a given date
+ * using the Spencer equation-of-time + declination approximation.
+ * Accurate to within ~5 minutes for mid-latitudes.
+ */
+function sunTimesUTC(date) {
+  const rad = Math.PI / 180
+
+  // Day of year (1–366)
+  const startOfYear = Date.UTC(date.getUTCFullYear(), 0, 0)
+  const dayOfYear = Math.floor((date - startOfYear) / 86_400_000)
+
+  // Solar declination (degrees)
+  const declination = -23.45 * Math.cos(rad * (360 / 365) * (dayOfYear + 10))
+
+  // Hour angle at sunrise/sunset — 90.833° accounts for refraction + solar disc
+  const cosHA =
+    (Math.cos(rad * 90.833) - Math.sin(rad * LAT) * Math.sin(rad * declination)) /
+    (Math.cos(rad * LAT) * Math.cos(rad * declination))
+
+  if (cosHA > 1)  return { sunrise: 0,  sunset: 0  }  // polar night  → always dark
+  if (cosHA < -1) return { sunrise: 0,  sunset: 24 }  // midnight sun → always light
+
+  const HA = Math.acos(cosHA) / rad  // degrees
+
+  // Equation of time (minutes) — Spencer formula
+  const B   = rad * (360 / 365) * (dayOfYear - 81)
+  const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B)
+
+  // Solar noon in UTC, adjusted for longitude and equation of time
+  const solarNoon = 12 - LON / 15 - eot / 60
+
+  return {
+    sunrise: solarNoon - HA / 15,
+    sunset:  solarNoon + HA / 15,
+  }
+}
+
+function isNight(validFor) {
+  if (!validFor) return false
+  const d = new Date(validFor)
+  const { sunrise, sunset } = sunTimesUTC(d)
+  const utcH = d.getUTCHours() + d.getUTCMinutes() / 60
+  return utcH < sunrise || utcH >= sunset
+}
+
+export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover, validFor = null) {
   const precip = precipProbability ?? 0
   const cloud  = cloudCover ?? 0
   const wind   = windSpeed ?? 0
@@ -6,6 +56,7 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
 
   const windy  = wind > 10
   const frozen = temp <= 0
+  const night  = isNight(validFor)
 
   let symbol, label
   if (precip >= 60) {
@@ -17,11 +68,15 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
   } else if (cloud > 75) {
     symbol = '☁️'; label = 'Mulet'
   } else if (cloud > 50) {
-    symbol = '⛅'; label = 'Halvmulet'
+    // At night the sun isn't peeking through — use plain cloud
+    symbol = night ? '☁️' : '⛅'
+    label  = 'Halvmulet'
   } else if (cloud > 25) {
-    symbol = '🌤'; label = 'Mestadels klart'
+    symbol = night ? '🌙' : '🌤'
+    label  = 'Mestadels klart'
   } else {
-    symbol = '☀️'; label = 'Klart'
+    symbol = night ? '🌙' : '☀️'
+    label  = night ? 'Klar natt' : 'Klart'
   }
 
   if (windy) { symbol += '💨'; label += ', blåsigt' }

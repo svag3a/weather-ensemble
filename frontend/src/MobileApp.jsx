@@ -98,7 +98,7 @@ function getDaySummary(hours) {
 
   // Representative condition: worst precipitation hour, or midday if dry
   const rep = [...hours].sort((a, b) => b.precip_probability - a.precip_probability)[0]
-  const { symbol } = getWeatherInfo(rep.temperature, rep.precip_probability, rep.wind_speed, rep.cloud_cover)
+  const { symbol } = getWeatherInfo(rep.temperature, rep.precip_probability, rep.wind_speed, rep.cloud_cover, rep.valid_for)
 
   const maxPrecipMm = Math.max(...hours.map(h => h.precip_mm ?? 0))
   const drops = rainDrops(maxPrecipMm)
@@ -115,7 +115,7 @@ function CurrentCard({ fc, radar }) {
     </div>
   )
 
-  const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover)
+  const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for)
 
   return (
     <div className="bg-slate-800 rounded-2xl p-6">
@@ -159,7 +159,7 @@ function CurrentCard({ fc, radar }) {
 }
 
 function HourRow({ fc }) {
-  const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover)
+  const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for)
   const drops = rainDrops(fc.precip_mm)
   return (
     <div className="flex items-center gap-3 py-2 border-b border-slate-700/50 last:border-0">

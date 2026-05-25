@@ -94,7 +94,7 @@ function SymbolRow({ data }) {
     <div className="relative" style={{ height: 36 }}>
       <div style={{ marginLeft: 45, marginRight: 8, display: 'flex', height: '100%', alignItems: 'center' }}>
         {data.map((d, i) => {
-          const { symbol, label } = getWeatherInfo(d.temperature, d.precip_probability, d.wind_speed, d.cloud_cover)
+          const { symbol, label } = getWeatherInfo(d.temperature, d.precip_probability, d.wind_speed, d.cloud_cover, d.valid_for)
           return (
             <div key={i} style={{ flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
               {i % 3 === 0 && (

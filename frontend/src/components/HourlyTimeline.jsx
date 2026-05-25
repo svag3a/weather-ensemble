@@ -47,7 +47,7 @@ function HourCard({ fc }) {
   const rain = fc.precip_probability >= RAIN_THRESHOLD
   const wind = fc.wind_speed != null && fc.wind_speed >= WIND_THRESHOLD
   const night = !isDay(fc.valid_for)
-  const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover)
+  const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for)
 
   return (
     <div className="flex flex-col items-center gap-1 px-3 py-3 rounded-xl shrink-0 w-[68px] bg-slate-700/40"
