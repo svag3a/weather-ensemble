@@ -97,8 +97,14 @@ function getDaySummary(hours) {
   const minTemp = temps.length ? Math.round(Math.min(...temps)) : null
   const maxTemp = temps.length ? Math.round(Math.max(...temps)) : null
 
-  // Representative condition: worst precipitation hour, or midday if dry
-  const rep = [...hours].sort((a, b) => b.precip_probability - a.precip_probability)[0]
+  // Representative condition: worst precipitation daytime hour (07–20 UTC).
+  // Falling back to all hours only if no daytime data exists.
+  const daytime = hours.filter(h => {
+    const utcH = new Date(h.valid_for).getUTCHours()
+    return utcH >= 7 && utcH < 20
+  })
+  const pool = daytime.length ? daytime : hours
+  const rep = [...pool].sort((a, b) => b.precip_probability - a.precip_probability)[0]
   const { symbol } = getWeatherInfo(rep.temperature, rep.precip_probability, rep.wind_speed, rep.cloud_cover, rep.valid_for)
 
   const maxPrecipMm = Math.max(...hours.map(h => h.precip_mm ?? 0))
