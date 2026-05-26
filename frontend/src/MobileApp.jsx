@@ -356,10 +356,7 @@ function WeekView() {
 
   return (
     <div className="bg-slate-800 rounded-2xl overflow-hidden">
-      <div className="px-5 py-2 text-slate-500 text-xs border-b border-slate-700">
-        DEBUG: {weekForecast.length} rader · {future.length} framtida · {days.length} dagar
-      </div>
-      {summaries.map(({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind }, i) => {
+{summaries.map(({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind }, i) => {
         const label      = dayLabel(hours[0].valid_for)
         const date       = dateLabel(hours[0].valid_for)
         const showPrecip = totalPrecipMm >= 0.1
