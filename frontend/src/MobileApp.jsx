@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Thermometer, CalendarDays, Layers } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings } from './api'
 import { getWeatherInfo, feelsLike } from './weatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
@@ -496,18 +497,185 @@ const SOURCE_LABELS = {
   ensemble:            'Ensemble',
 }
 
+const SOURCE_COLORS = {
+  smhi:               '#60a5fa',
+  yr:                 '#34d399',
+  open_meteo:         '#f97316',
+  open_meteo_icon_eu: '#fb923c',
+  open_meteo_ecmwf:   '#fbbf24',
+  openweathermap:     '#a78bfa',
+  ensemble:           '#ffffff',
+}
+
 const SOURCE_ORDER = ['smhi', 'yr', 'openweathermap', 'open_meteo', 'open_meteo_icon_eu', 'open_meteo_ecmwf']
+
+// ── ForecastDivergenceChart ───────────────────────────────────────────────────
+
+function buildChartData(sources, ensembleFcs, param) {
+  const field = param === 'temperature' ? 'temperature'
+              : param === 'precip'      ? 'precip_probability'
+              :                           'wind_speed'
+  const now = new Date()
+  const timeMap = new Map()
+
+  for (const [src, fcs] of Object.entries(sources ?? {})) {
+    for (const fc of fcs) {
+      if (parseTS(fc.valid_for) <= now) continue
+      const t = fc.valid_for
+      if (!timeMap.has(t)) timeMap.set(t, { time: t })
+      if (fc[field] != null) timeMap.get(t)[src] = Math.round(fc[field] * 10) / 10
+    }
+  }
+  for (const fc of ensembleFcs ?? []) {
+    if (parseTS(fc.valid_for) <= now) continue
+    const t = fc.valid_for
+    if (!timeMap.has(t)) timeMap.set(t, { time: t })
+    if (fc[field] != null) timeMap.get(t)['ensemble'] = Math.round(fc[field] * 10) / 10
+  }
+  return [...timeMap.entries()]
+    .sort(([a], [b]) => (a < b ? -1 : 1))
+    .map(([, v]) => v)
+}
+
+function DivergenceTooltip({ active, payload, label, unit }) {
+  if (!active || !payload?.length) return null
+  const d = parseTS(label)
+  const timeStr = `${d.toLocaleDateString('sv-SE', { weekday: 'short' })} ${String(d.getHours()).padStart(2, '0')}:00`
+  const sorted = [...payload].sort((a, b) => {
+    if (a.dataKey === 'ensemble') return -1
+    if (b.dataKey === 'ensemble') return 1
+    return (b.value ?? 0) - (a.value ?? 0)
+  })
+  return (
+    <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs shadow-xl">
+      <p className="text-slate-400 mb-2">{timeStr}</p>
+      {sorted.map(p => (
+        <div key={p.dataKey} className="flex items-center gap-2 mb-0.5">
+          <span style={{ color: p.color }} className="text-base leading-none">—</span>
+          <span className="text-slate-300 w-28">{SOURCE_LABELS[p.dataKey] ?? p.dataKey}</span>
+          <span className="font-mono text-white">{p.value}{unit}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ForecastDivergenceChart({ sources, ensembleFcs }) {
+  const [param, setParam] = useState('temperature')
+
+  const chartData = buildChartData(sources, ensembleFcs, param)
+  const srcKeys = [...SOURCE_ORDER.filter(k => sources?.[k]), 'ensemble']
+
+  const yUnit   = param === 'temperature' ? '°' : param === 'precip' ? '%' : ' m/s'
+  const yDomain = param === 'precip' ? [0, 100] : param === 'wind' ? [0, 'auto'] : ['auto', 'auto']
+
+  const xTicks = chartData
+    .filter(d => parseTS(d.time).getHours() % 6 === 0)
+    .map(d => d.time)
+
+  const xTickFormatter = iso => {
+    const d = parseTS(iso)
+    const h = d.getHours()
+    if (h === 0) return d.toLocaleDateString('sv-SE', { weekday: 'short' })
+    return `${String(h).padStart(2, '0')}`
+  }
+
+  const midnights = chartData
+    .filter(d => parseTS(d.time).getHours() === 0)
+    .map(d => d.time)
+
+  if (!chartData.length) return null
+
+  return (
+    <div className="bg-slate-800 rounded-2xl p-5 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-white font-medium text-sm">Källspridning</h2>
+        <div className="flex gap-1">
+          {[['temperature', 'Temp'], ['precip', 'Regn'], ['wind', 'Vind']].map(([p, label]) => (
+            <button
+              key={p}
+              onClick={() => setParam(p)}
+              className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                param === p ? 'bg-slate-600 text-white' : 'text-slate-500 active:text-slate-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <ResponsiveContainer width="100%" height={200}>
+        <LineChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+          <XAxis
+            dataKey="time"
+            ticks={xTicks}
+            tickFormatter={xTickFormatter}
+            tick={{ fill: '#475569', fontSize: 10 }}
+            tickLine={false}
+            axisLine={{ stroke: '#1e293b' }}
+          />
+          <YAxis
+            domain={yDomain}
+            tick={{ fill: '#475569', fontSize: 10 }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={v => `${v}${yUnit}`}
+            width={38}
+          />
+          <Tooltip content={<DivergenceTooltip unit={yUnit} />} />
+          {midnights.map(t => (
+            <ReferenceLine key={t} x={t} stroke="#1e293b" strokeWidth={1} />
+          ))}
+          {srcKeys.filter(k => k !== 'ensemble').map(src => (
+            <Line
+              key={src}
+              type="monotone"
+              dataKey={src}
+              stroke={SOURCE_COLORS[src] ?? '#64748b'}
+              strokeWidth={1.5}
+              dot={false}
+              connectNulls
+            />
+          ))}
+          <Line
+            type="monotone"
+            dataKey="ensemble"
+            stroke="#ffffff"
+            strokeWidth={2.5}
+            dot={false}
+            connectNulls
+          />
+        </LineChart>
+      </ResponsiveContainer>
+
+      {/* Legend */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-1">
+        {srcKeys.map(src => (
+          <div key={src} className="flex items-center gap-1.5">
+            <span
+              className="inline-block w-4 rounded-full"
+              style={{ height: src === 'ensemble' ? 2.5 : 1.5, backgroundColor: SOURCE_COLORS[src] ?? '#64748b' }}
+            />
+            <span className="text-xs text-slate-400">{SOURCE_LABELS[src] ?? src}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // ── EnsembleView ──────────────────────────────────────────────────────────────
 
 function EnsembleView({ ensembleFc }) {
-  const [sources, setSources] = useState(null)
-  const [weights, setWeights] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [sources, setSources]         = useState(null)
+  const [ensembleFcs, setEnsembleFcs] = useState(null)
+  const [weights, setWeights]         = useState(null)
+  const [loading, setLoading]         = useState(true)
 
   useEffect(() => {
-    Promise.all([fetchSources(6), fetchWeights()])
-      .then(([s, w]) => { setSources(s); setWeights(w) })
+    Promise.all([fetchSources(48), fetchWeights(), fetchEnsemble(48)])
+      .then(([s, w, ens]) => { setSources(s); setWeights(w); setEnsembleFcs(ens) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
@@ -611,6 +779,9 @@ function EnsembleView({ ensembleFc }) {
           <div className="px-5 py-4 text-slate-500 text-sm text-center">Ingen källdata tillgänglig.</div>
         )}
       </div>
+
+      {/* Divergence chart */}
+      {sources && <ForecastDivergenceChart sources={sources} ensembleFcs={ensembleFcs ?? []} />}
 
       {/* Weight explanation */}
       {weightsAt1.length > 0 && (
