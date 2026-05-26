@@ -284,6 +284,83 @@ function DayRow({ hours }) {
   )
 }
 
+// ── WeekView ──────────────────────────────────────────────────────────────────
+
+function tempBarColor(avg) {
+  if (avg >= 22) return 'bg-orange-400'
+  if (avg >= 16) return 'bg-yellow-400'
+  if (avg >= 10) return 'bg-green-400'
+  if (avg >=  4) return 'bg-teal-400'
+  if (avg >=  0) return 'bg-blue-300'
+  return 'bg-blue-500'
+}
+
+function TempBar({ dayMin, dayMax, weekMin, weekMax }) {
+  const span = weekMax - weekMin || 1
+  const left  = ((dayMin - weekMin) / span) * 100
+  const width = Math.max(((dayMax - dayMin) / span) * 100, 6)
+  const color = tempBarColor((dayMin + dayMax) / 2)
+  return (
+    <div className="relative h-1.5 bg-slate-700 rounded-full" style={{ minWidth: 80 }}>
+      <div
+        className={`absolute h-full rounded-full ${color}`}
+        style={{ left: `${left}%`, width: `${width}%` }}
+      />
+    </div>
+  )
+}
+
+function WeekView({ days }) {
+  if (!days.length) return (
+    <div className="bg-slate-800 rounded-2xl p-6 text-slate-500 text-center">
+      Hämtar prognos…
+    </div>
+  )
+
+  const summaries = days.map(hours => ({ hours, ...getDaySummary(hours) }))
+  const weekMin = Math.min(...summaries.map(s => s.minTemp ?? 99))
+  const weekMax = Math.max(...summaries.map(s => s.maxTemp ?? -99))
+
+  return (
+    <div className="bg-slate-800 rounded-2xl overflow-hidden">
+      {summaries.map(({ hours, minTemp, maxTemp, symbol, drops }, i) => {
+        const label = dayLabel(hours[0].valid_for)
+        const date  = dateLabel(hours[0].valid_for)
+        return (
+          <div key={i} className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-700/50 last:border-0">
+            {/* Day */}
+            <div className="w-24 shrink-0">
+              <div className="text-white text-sm font-medium leading-tight">{label}</div>
+              <div className="text-slate-500 text-xs">{date}</div>
+            </div>
+
+            {/* Symbol */}
+            <span className="text-2xl w-8 text-center shrink-0">{symbol}</span>
+
+            {/* Min temp */}
+            <span className="text-slate-400 text-xs font-mono w-8 text-right shrink-0">
+              {minTemp != null ? `${minTemp}°` : ''}
+            </span>
+
+            {/* Bar */}
+            <div className="flex-1 px-1">
+              <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
+            </div>
+
+            {/* Max temp */}
+            <span className="text-white text-sm font-mono w-8 shrink-0">
+              {maxTemp != null ? `${maxTemp}°` : '—'}
+            </span>
+
+            {/* Rain */}
+            <span className="text-xs w-10 text-right shrink-0">{drops ?? <span className="text-slate-700">—</span>}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // ── Source name labels ────────────────────────────────────────────────────────
 
 const SOURCE_LABELS = {
@@ -501,6 +578,10 @@ export default function MobileApp() {
           <EnsembleView ensembleFc={currentFc} />
         )}
 
+        {activeTab === 'week' && (
+          <WeekView days={days} />
+        )}
+
       </div>
 
       {/* Bottom tab bar */}
@@ -514,6 +595,15 @@ export default function MobileApp() {
           >
             <span className="text-lg leading-none">🌤</span>
             <span>Nu</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('week')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
+              activeTab === 'week' ? 'text-white' : 'text-slate-500 active:text-slate-300'
+            }`}
+          >
+            <span className="text-lg leading-none">📅</span>
+            <span>Vecka</span>
           </button>
           <button
             onClick={() => setActiveTab('sources')}
