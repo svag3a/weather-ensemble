@@ -3,13 +3,16 @@
  * Looks for meaningful changes in the next 12 hours and returns 1–2 sentences.
  */
 
+// API returns naive UTC strings — append 'Z' to ensure correct UTC parsing.
+const parseTS = iso => new Date(iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z')
+
 function fmt(isoString) {
-  const h = new Date(isoString).getHours()
-  return `kl ${String(h).padStart(2, '0')}:00`
+  const h = parseTS(isoString).getHours()
+  return `kl ${String(h).padStart(2, '0')}:00`
 }
 
 function timeOfDay(isoString) {
-  const h = new Date(isoString).getHours()
+  const h = parseTS(isoString).getHours()
   if (h >= 5  && h < 10) return 'på morgonen'
   if (h >= 10 && h < 13) return 'på förmiddagen'
   if (h >= 13 && h < 17) return 'på eftermiddagen'
@@ -21,7 +24,7 @@ export function generateSummary(forecasts) {
   if (!forecasts?.length) return null
 
   const now = new Date()
-  const future = forecasts.filter(fc => new Date(fc.valid_for) > now)
+  const future = forecasts.filter(fc => parseTS(fc.valid_for) > now)
   if (future.length === 0) return null
 
   const next12 = future.slice(0, 12)
@@ -66,7 +69,7 @@ export function generateSummary(forecasts) {
   const maxWind     = maxWindFc?.wind_speed ?? 0
   if (maxWind >= 10 && maxWind > currentWind + 3 && sentences.length < 2) {
     sentences.push(
-      `Vinden ökar till ${Math.round(maxWind)} m/s ${timeOfDay(maxWindFc.valid_for)}.`
+      `Vinden ökar till ${Math.round(maxWind)} m/s ${timeOfDay(maxWindFc.valid_for)}.`
     )
   }
 
@@ -75,9 +78,9 @@ export function generateSummary(forecasts) {
   if (temps.length >= 3 && sentences.length < 2) {
     const diff = temps[temps.length - 1] - temps[0]
     if (diff <= -4)
-      sentences.push(`Temperaturen sjunker med ${Math.abs(Math.round(diff))} grader under kommande timmar.`)
+      sentences.push(`Temperaturen sjunker med ${Math.abs(Math.round(diff))} grader under kommande timmar.`)
     else if (diff >= 4)
-      sentences.push(`Temperaturen stiger med ${Math.round(diff)} grader under kommande timmar.`)
+      sentences.push(`Temperaturen stiger med ${Math.round(diff)} grader under kommande timmar.`)
   }
 
   // ── Stable fallback ───────────────────────────────────────────────────────
@@ -86,7 +89,7 @@ export function generateSummary(forecasts) {
     if (avgPrecip >= 30) {
       sentences.push('Ostabilt med regnchans de närmaste timmarna.')
     } else {
-      sentences.push('Vädret förblir stabilt de närmaste 6 timmarna.')
+      sentences.push('Vädret förblir stabilt de närmaste 6 timmarna.')
     }
   }
 
@@ -100,7 +103,7 @@ export function generateSummary(forecasts) {
 export function summariseConfidence(forecasts, hours = 6) {
   const now = new Date()
   const slice = forecasts
-    ?.filter(fc => new Date(fc.valid_for) > now)
+    ?.filter(fc => parseTS(fc.valid_for) > now)
     .slice(0, hours)
     .map(fc => fc.confidence)
     .filter(c => c != null)

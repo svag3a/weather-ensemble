@@ -37,19 +37,27 @@ function useRadarLocation() {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+// API returns naive UTC strings ("2026-05-26T13:00:00") without a timezone
+// suffix. Browsers treat those as *local* time, which breaks grouping and
+// display for users outside UTC. Appending 'Z' forces correct UTC parsing.
+function parseTS(iso) {
+  if (!iso) return new Date(NaN)
+  return new Date(iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z')
+}
+
 function isSameDay(a, b) {
-  const da = new Date(a), db = new Date(b)
+  const da = parseTS(a), db = parseTS(b)
   return da.getFullYear() === db.getFullYear()
     && da.getMonth() === db.getMonth()
     && da.getDate() === db.getDate()
 }
 
 function formatHour(iso) {
-  return `${new Date(iso).getHours().toString().padStart(2, '0')}:00`
+  return `${parseTS(iso).getHours().toString().padStart(2, '0')}:00`
 }
 
 function dayLabel(isoString) {
-  const d = new Date(isoString)
+  const d = parseTS(isoString)
   const today = new Date()
   const tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1)
   const sameDay = (a, b) =>
@@ -64,7 +72,7 @@ function dayLabel(isoString) {
 }
 
 function dateLabel(isoString) {
-  return new Date(isoString).toLocaleDateString('sv-SE', {
+  return parseTS(isoString).toLocaleDateString('sv-SE', {
     day: 'numeric', month: 'short',
   })
 }
@@ -101,7 +109,7 @@ function getDaySummary(hours) {
   // Representative condition: worst precipitation daytime hour (07–20 UTC).
   // Falling back to all hours only if no daytime data exists.
   const daytime = hours.filter(h => {
-    const utcH = new Date(h.valid_for).getUTCHours()
+    const utcH = parseTS(h.valid_for).getUTCHours()
     return utcH >= 7 && utcH < 20
   })
   const pool = daytime.length ? daytime : hours
@@ -134,7 +142,7 @@ function ConfidenceBadge({ conf }) {
 
 function SixHourTable({ forecasts }) {
   const now = new Date()
-  const rows = forecasts?.filter(fc => new Date(fc.valid_for) > now).slice(0, 6) ?? []
+  const rows = forecasts?.filter(fc => parseTS(fc.valid_for) > now).slice(0, 6) ?? []
   if (!rows.length) return null
   return (
     <div className="mt-4 border-t border-slate-700 pt-4 space-y-1">
@@ -339,7 +347,7 @@ function WeekView() {
   )
 
   const now     = new Date()
-  const future  = weekForecast.filter(fc => new Date(fc.valid_for) > now)
+  const future  = weekForecast.filter(fc => parseTS(fc.valid_for) > now)
   const days    = groupByDay(future)
   const summaries = days.map(hours => ({ hours, ...getDaySummary(hours) }))
 
@@ -440,7 +448,7 @@ function EnsembleView({ ensembleFc }) {
   const now = new Date()
   const currentBySource = {}
   for (const [src, fcs] of Object.entries(sources)) {
-    const upcoming = fcs.filter(fc => new Date(fc.valid_for) > now)
+    const upcoming = fcs.filter(fc => parseTS(fc.valid_for) > now)
     if (upcoming.length) currentBySource[src] = upcoming[0]
   }
 
@@ -464,7 +472,7 @@ function EnsembleView({ ensembleFc }) {
   const bestWind   = best('mae_wind')
 
   const hourLabel = ensembleFc
-    ? `${new Date(ensembleFc.valid_for).getUTCHours().toString().padStart(2, '0')}:00`
+    ? `${parseTS(ensembleFc.valid_for).getHours().toString().padStart(2, '0')}:00`
     : '—'
 
   return (
@@ -591,7 +599,7 @@ export default function MobileApp() {
   }, [load])
 
   const now = new Date()
-  const future = forecast?.filter(fc => new Date(fc.valid_for) > now) ?? []
+  const future = forecast?.filter(fc => parseTS(fc.valid_for) > now) ?? []
   const currentFc = future[0] ?? null
   const days = groupByDay(future)
 
