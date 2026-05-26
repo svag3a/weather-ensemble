@@ -354,51 +354,86 @@ function WeekView() {
   const weekMin = Math.min(...summaries.map(s => s.minTemp ?? 99))
   const weekMax = Math.max(...summaries.map(s => s.maxTemp ?? -99))
 
+  const cutoff48 = new Date(Date.now() + 48 * 3600 * 1000)
+
   return (
     <div className="bg-slate-800 rounded-2xl overflow-hidden">
-{summaries.map(({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind }, i) => {
-        const label      = dayLabel(hours[0].valid_for)
-        const date       = dateLabel(hours[0].valid_for)
-        const showPrecip = totalPrecipMm >= 0.1
-        const showWind   = maxWind >= 8
+      {summaries.map(({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind }, i) => (
+        <WeekDayRow
+          key={i}
+          hours={hours}
+          minTemp={minTemp}
+          maxTemp={maxTemp}
+          symbol={symbol}
+          totalPrecipMm={totalPrecipMm}
+          maxWind={maxWind}
+          weekMin={weekMin}
+          weekMax={weekMax}
+          isHourly={parseTS(hours[0].valid_for) < cutoff48}
+        />
+      ))}
+    </div>
+  )
+}
 
-        return (
-          <div key={i} className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-700/50 last:border-0">
-            {/* Day name + date */}
-            <div className="w-24 shrink-0">
-              <div className="text-white text-sm font-medium leading-tight">{label}</div>
-              <div className="text-slate-500 text-xs">{date}</div>
-            </div>
+function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, weekMin, weekMax, isHourly }) {
+  const [open, setOpen] = useState(false)
+  const label      = dayLabel(hours[0].valid_for)
+  const date       = dateLabel(hours[0].valid_for)
+  const showPrecip = totalPrecipMm >= 0.1
+  const showWind   = maxWind >= 8
 
-            {/* Symbol */}
-            <span className="text-2xl w-8 text-center shrink-0">{symbol}</span>
+  // For days beyond 48h show only 6-hour snapshots (00, 06, 12, 18 UTC)
+  const detailRows = isHourly
+    ? hours
+    : hours.filter(h => parseTS(h.valid_for).getUTCHours() % 6 === 0)
 
-            {/* Temp bar + secondary info */}
-            <div className="flex-1 min-w-0 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="text-slate-400 text-xs font-mono w-7 text-right shrink-0">
-                  {minTemp != null ? `${minTemp}°` : ''}
-                </span>
-                <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
-                <span className="text-white text-sm font-mono w-7 shrink-0">
-                  {maxTemp != null ? `${maxTemp}°` : '—'}
-                </span>
-              </div>
+  return (
+    <div className="border-b border-slate-700/50 last:border-0">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-slate-700/50 transition-colors"
+      >
+        {/* Day name + date */}
+        <div className="w-24 shrink-0 text-left">
+          <div className="text-white text-sm font-medium leading-tight">{label}</div>
+          <div className="text-slate-500 text-xs">{date}</div>
+        </div>
 
-              {(showPrecip || showWind) && (
-                <div className="flex items-center gap-3 pl-9 text-xs">
-                  {showPrecip && (
-                    <span className="text-blue-300">{totalPrecipMm.toFixed(1)} mm</span>
-                  )}
-                  {showWind && (
-                    <span className="text-slate-400">{Math.round(maxWind)} m/s</span>
-                  )}
-                </div>
-              )}
-            </div>
+        {/* Symbol */}
+        <span className="text-2xl w-8 text-center shrink-0">{symbol}</span>
+
+        {/* Temp bar + secondary info */}
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-xs font-mono w-7 text-right shrink-0">
+              {minTemp != null ? `${minTemp}°` : ''}
+            </span>
+            <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
+            <span className="text-white text-sm font-mono w-7 shrink-0">
+              {maxTemp != null ? `${maxTemp}°` : '—'}
+            </span>
           </div>
-        )
-      })}
+          {(showPrecip || showWind) && (
+            <div className="flex items-center gap-3 pl-9 text-xs">
+              {showPrecip && <span className="text-blue-300">{totalPrecipMm.toFixed(1)} mm</span>}
+              {showWind   && <span className="text-slate-400">{Math.round(maxWind)} m/s</span>}
+            </div>
+          )}
+        </div>
+
+        {/* Chevron */}
+        <span className={`text-slate-600 text-xs ml-1 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+
+      {open && (
+        <div className="px-5 pb-4 border-t border-slate-700/50">
+          {!isHourly && (
+            <p className="text-slate-600 text-xs py-2">Prognos var 6:e timme</p>
+          )}
+          {detailRows.map((fc, j) => <HourRow key={j} fc={fc} />)}
+        </div>
+      )}
     </div>
   )
 }
