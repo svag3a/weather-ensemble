@@ -105,7 +105,8 @@ function getDaySummary(hours) {
   })
   const pool = daytime.length ? daytime : hours
   const rep = [...pool].sort((a, b) => b.precip_probability - a.precip_probability)[0]
-  const { symbol } = getWeatherInfo(rep.temperature, rep.precip_probability, rep.wind_speed, rep.cloud_cover, rep.valid_for)
+  // Pass null for validFor — day summaries always use daytime symbols
+  const { symbol } = getWeatherInfo(rep.temperature, rep.precip_probability, rep.wind_speed, rep.cloud_cover, null)
 
   const maxPrecipMm = Math.max(...hours.map(h => h.precip_mm ?? 0))
   const drops = rainDrops(maxPrecipMm)
