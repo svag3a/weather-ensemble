@@ -127,39 +127,34 @@ function getDaySummary(hours) {
 
 // ── Warnings ─────────────────────────────────────────────────────────────────
 
-const WARNING_STYLES = {
-  Red:        { bg: 'bg-red-900/60',    border: 'border-red-500/60',    icon: '🔴', text: 'text-red-200' },
-  Orange:     { bg: 'bg-orange-900/60', border: 'border-orange-500/60', icon: '🟠', text: 'text-orange-200' },
-  Yellow:     { bg: 'bg-yellow-900/50', border: 'border-yellow-500/50', icon: '🟡', text: 'text-yellow-200' },
-  Meddelande: { bg: 'bg-slate-700/60',  border: 'border-slate-500/40',  icon: 'ℹ️',  text: 'text-slate-300' },
+const WARNING_TRIANGLE_COLOR = {
+  Red:    'text-red-500',
+  Orange: 'text-orange-400',
+  Yellow: 'text-yellow-400',
 }
 
-function WarningBanner({ warnings }) {
-  if (!warnings?.length) return null
-  return (
-    <div className="space-y-2">
-      {warnings.map((w, i) => {
-        const s = WARNING_STYLES[w.level_code] ?? WARNING_STYLES.Meddelande
-        const end = w.end ? parseTS(w.end).toLocaleDateString('sv-SE', {
-          weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
-        }) : null
-        return (
-          <div key={i} className={`rounded-2xl border px-4 py-3 ${s.bg} ${s.border}`}>
-            <div className="flex items-center gap-2">
-              <span className="text-base leading-none">{s.icon}</span>
-              <span className={`font-medium text-sm ${s.text}`}>{w.level_label}: {w.event}</span>
-            </div>
-            {w.description && (
-              <p className={`mt-1.5 text-xs leading-relaxed ${s.text} opacity-80`}>{w.description}</p>
-            )}
-            {end && (
-              <p className={`mt-1 text-xs ${s.text} opacity-60`}>Gäller till {end}</p>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
+// Returns the highest-severity active warning that overlaps with the given day,
+// or null if none (Meddelande is informational only — no triangle shown).
+function warningForDay(hours, warnings) {
+  if (!warnings?.length || !hours?.length) return null
+  const dayStart = parseTS(hours[0].valid_for)
+  const dayEnd   = parseTS(hours[hours.length - 1].valid_for)
+
+  for (const w of warnings) {          // already sorted highest severity first
+    if (!WARNING_TRIANGLE_COLOR[w.level_code]) continue  // skip Meddelande
+    const wStart = w.start ? new Date(w.start) : null
+    const wEnd   = w.end   ? new Date(w.end)   : null
+    const overlaps = (!wStart || wStart <= dayEnd) && (!wEnd || wEnd >= dayStart)
+    if (overlaps) return w
+  }
+  return null
+}
+
+function WarningTriangle({ warning }) {
+  if (!warning) return null
+  const color = WARNING_TRIANGLE_COLOR[warning.level_code]
+  if (!color) return null
+  return <span className={`text-xs ${color}`} title={`${warning.level_label}: ${warning.event}`}>▲</span>
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -297,11 +292,12 @@ function HourRow({ fc }) {
   )
 }
 
-function DayRow({ hours }) {
+function DayRow({ hours, warnings }) {
   const [open, setOpen] = useState(false)
   const { minTemp, maxTemp, symbol, drops } = getDaySummary(hours)
-  const label = dayLabel(hours[0].valid_for)
-  const date = dateLabel(hours[0].valid_for)
+  const label   = dayLabel(hours[0].valid_for)
+  const date    = dateLabel(hours[0].valid_for)
+  const warning = warningForDay(hours, warnings)
 
   return (
     <div className="bg-slate-800 rounded-2xl overflow-hidden">
@@ -325,6 +321,9 @@ function DayRow({ hours }) {
 
         {/* Rain */}
         <span className="text-xs w-10 text-center">{drops ?? <span className="text-slate-700">—</span>}</span>
+
+        {/* Warning triangle */}
+        <span className="w-4 text-center"><WarningTriangle warning={warning} /></span>
 
         {/* Chevron */}
         <span className={`text-slate-600 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
@@ -365,7 +364,7 @@ function TempBar({ dayMin, dayMax, weekMin, weekMax }) {
   )
 }
 
-function WeekView() {
+function WeekView({ warnings }) {
   const [weekForecast, setWeekForecast] = useState(null)
   const [loading, setLoading]           = useState(true)
 
@@ -407,18 +406,20 @@ function WeekView() {
           weekMin={weekMin}
           weekMax={weekMax}
           isHourly={parseTS(hours[0].valid_for) < cutoff48}
+          warnings={warnings}
         />
       ))}
     </div>
   )
 }
 
-function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, weekMin, weekMax, isHourly }) {
+function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, weekMin, weekMax, isHourly, warnings }) {
   const [open, setOpen] = useState(false)
   const label      = dayLabel(hours[0].valid_for)
   const date       = dateLabel(hours[0].valid_for)
   const showPrecip = totalPrecipMm >= 0.1
   const showWind   = maxWind >= 8
+  const warning    = warningForDay(hours, warnings)
 
   // For days beyond 48h show only 6-hour snapshots (00, 06, 12, 18 UTC)
   const detailRows = isHourly
@@ -459,8 +460,11 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
           )}
         </div>
 
+        {/* Warning triangle */}
+        <span className="w-4 text-center shrink-0"><WarningTriangle warning={warning} /></span>
+
         {/* Chevron */}
-        <span className={`text-slate-600 text-xs ml-1 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
+        <span className={`text-slate-600 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>
 
       {open && (
@@ -689,10 +693,9 @@ export default function MobileApp() {
 
         {activeTab === 'now' && (
           <>
-            <WarningBanner warnings={warnings} />
             <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
             {days.map((hours, i) => (
-              <DayRow key={i} hours={hours} />
+              <DayRow key={i} hours={hours} warnings={warnings} />
             ))}
           </>
         )}
@@ -702,7 +705,7 @@ export default function MobileApp() {
         )}
 
         {activeTab === 'week' && (
-          <WeekView />
+          <WeekView warnings={warnings} />
         )}
 
       </div>
