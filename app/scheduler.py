@@ -16,18 +16,23 @@ from sqlalchemy.orm import Session
 from app.database import SessionLocal
 from app.models import Forecast, Observation, SourceWeight, SourceWeightHistory
 from app.ensemble import update_weights, build_ensemble
-from app.sources import smhi, yr, open_meteo, open_meteo_icon_eu, open_meteo_ecmwf, openweathermap, radar_nowcast, smhi_obs
+from app.sources import (
+    smhi, yr, open_meteo, open_meteo_icon_eu, open_meteo_ecmwf,
+    open_meteo_ukmo, open_meteo_knmi, openweathermap, radar_nowcast, smhi_obs,
+)
 
 logger = logging.getLogger(__name__)
 
 SOURCES = {
-    smhi.SOURCE_NAME: smhi.fetch,
-    yr.SOURCE_NAME: yr.fetch,
-    open_meteo.SOURCE_NAME: open_meteo.fetch,
+    smhi.SOURCE_NAME:               smhi.fetch,
+    yr.SOURCE_NAME:                 yr.fetch,
+    open_meteo.SOURCE_NAME:         open_meteo.fetch,
     open_meteo_icon_eu.SOURCE_NAME: open_meteo_icon_eu.fetch,
-    open_meteo_ecmwf.SOURCE_NAME: open_meteo_ecmwf.fetch,
-    openweathermap.SOURCE_NAME: openweathermap.fetch,
-    radar_nowcast.SOURCE_NAME: radar_nowcast.fetch,
+    open_meteo_ecmwf.SOURCE_NAME:   open_meteo_ecmwf.fetch,
+    open_meteo_ukmo.SOURCE_NAME:    open_meteo_ukmo.fetch,
+    open_meteo_knmi.SOURCE_NAME:    open_meteo_knmi.fetch,
+    openweathermap.SOURCE_NAME:     openweathermap.fetch,
+    radar_nowcast.SOURCE_NAME:      radar_nowcast.fetch,
 }
 
 

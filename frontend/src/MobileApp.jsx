@@ -490,9 +490,11 @@ const SOURCE_LABELS = {
   smhi:                'SMHI',
   yr:                  'Yr.no',
   openweathermap:      'OpenWeatherMap',
-  open_meteo:          'Open-Meteo',
+  open_meteo:          'Open-Meteo GFS',
   open_meteo_icon_eu:  'Open-Meteo ICON EU',
   open_meteo_ecmwf:    'Open-Meteo ECMWF',
+  open_meteo_ukmo:     'UKMO',
+  open_meteo_knmi:     'KNMI HARMONIE',
   radar_nowcast:       'Radar',
   ensemble:            'Ensemble',
 }
@@ -504,10 +506,16 @@ const SOURCE_COLORS = {
   open_meteo_icon_eu: '#fb923c',
   open_meteo_ecmwf:   '#fbbf24',
   openweathermap:     '#a78bfa',
+  open_meteo_ukmo:    '#e879f9',
+  open_meteo_knmi:    '#2dd4bf',
   ensemble:           '#ffffff',
 }
 
-const SOURCE_ORDER = ['smhi', 'yr', 'openweathermap', 'open_meteo', 'open_meteo_icon_eu', 'open_meteo_ecmwf']
+const SOURCE_ORDER = [
+  'smhi', 'yr', 'openweathermap',
+  'open_meteo', 'open_meteo_icon_eu', 'open_meteo_ecmwf',
+  'open_meteo_ukmo', 'open_meteo_knmi',
+]
 
 // ── ForecastDivergenceChart ───────────────────────────────────────────────────
 
