@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Thermometer, CalendarDays, Layers } from 'lucide-react'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights } from './api'
 import { getWeatherInfo, feelsLike } from './weatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
@@ -597,28 +598,28 @@ export default function MobileApp() {
           <button
             onClick={() => setActiveTab('now')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'now' ? 'text-white' : 'text-slate-500 active:text-slate-300'
+              activeTab === 'now' ? 'text-white' : 'text-slate-500'
             }`}
           >
-            <span className="text-lg leading-none">🌤</span>
+            <Thermometer size={22} strokeWidth={1.5} />
             <span>Nu</span>
           </button>
           <button
             onClick={() => setActiveTab('week')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'week' ? 'text-white' : 'text-slate-500 active:text-slate-300'
+              activeTab === 'week' ? 'text-white' : 'text-slate-500'
             }`}
           >
-            <span className="text-lg leading-none">📅</span>
+            <CalendarDays size={22} strokeWidth={1.5} />
             <span>Vecka</span>
           </button>
           <button
             onClick={() => setActiveTab('sources')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'sources' ? 'text-white' : 'text-slate-500 active:text-slate-300'
+              activeTab === 'sources' ? 'text-white' : 'text-slate-500'
             }`}
           >
-            <span className="text-lg leading-none">📊</span>
+            <Layers size={22} strokeWidth={1.5} />
             <span>Källor</span>
           </button>
         </div>
