@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow } from './api'
-import { getWeatherInfo } from './weatherSymbol'
+import { getWeatherInfo, feelsLike } from './weatherSymbol'
+import { generateSummary, summariseConfidence } from './summary'
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
@@ -108,7 +109,52 @@ function getDaySummary(hours) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function CurrentCard({ fc, radar }) {
+function ConfidenceBadge({ conf }) {
+  if (!conf) return null
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${conf.bg} ${conf.color}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${
+        conf.level === 'hög' ? 'bg-green-400' :
+        conf.level === 'medel' ? 'bg-yellow-400' : 'bg-red-400'
+      }`} />
+      Säkerhet: {conf.level}
+    </span>
+  )
+}
+
+function SixHourTable({ forecasts }) {
+  const now = new Date()
+  const rows = forecasts?.filter(fc => new Date(fc.valid_for) > now).slice(0, 6) ?? []
+  if (!rows.length) return null
+  return (
+    <div className="mt-4 border-t border-slate-700 pt-4 space-y-1">
+      {rows.map((fc, i) => {
+        const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for)
+        const drops = rainDrops(fc.precip_mm)
+        return (
+          <div key={i} className="flex items-center gap-3 py-0.5">
+            <span className="text-slate-400 font-mono text-xs w-12 shrink-0">{formatHour(fc.valid_for)}</span>
+            <span className="text-lg w-6 text-center leading-none">{symbol}</span>
+            <span className="text-white text-sm font-medium w-8">
+              {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+            </span>
+            <span className={`text-xs w-10 ${fc.precip_probability >= 40 ? 'text-blue-300' : 'text-slate-500'}`}>
+              {Math.round(fc.precip_probability)}%
+            </span>
+            <span className="text-slate-400 text-xs flex-1">
+              {fc.wind_speed != null && fc.wind_speed >= 3
+                ? `${Math.round(fc.wind_speed)} m/s ${windDirArrow(fc.wind_direction)}`
+                : ''}
+            </span>
+            <span className="text-xs w-8 text-right">{drops ?? ''}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function CurrentCard({ fc, radar, allForecasts }) {
   if (!fc) return (
     <div className="bg-slate-800 rounded-2xl p-6 text-slate-500 text-center">
       Hämtar prognos…
@@ -116,25 +162,31 @@ function CurrentCard({ fc, radar }) {
   )
 
   const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for)
+  const feels = feelsLike(fc.temperature, fc.wind_speed)
+  const conf = summariseConfidence(allForecasts)
+  const summary = generateSummary(allForecasts)
 
   return (
     <div className="bg-slate-800 rounded-2xl p-6">
-      <div className="flex items-center justify-between">
-        {/* Left: symbol + label */}
+      {/* Temp + symbol */}
+      <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
           <span className="text-6xl leading-none">{symbol}</span>
           <span className="text-slate-400 text-sm mt-2">{label}</span>
         </div>
-
-        {/* Right: temperature */}
-        <span className="text-7xl font-thin text-white leading-none">
-          {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
-        </span>
+        <div className="text-right">
+          <div className="text-7xl font-thin text-white leading-none">
+            {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+          </div>
+          {feels != null && (
+            <div className="text-slate-400 text-sm mt-1">Känns som {feels}°</div>
+          )}
+        </div>
       </div>
 
       {/* Wind */}
       {fc.wind_speed != null && fc.wind_speed >= 3 && (
-        <div className="mt-4 flex items-center gap-2 text-slate-300 text-sm">
+        <div className="mt-3 flex items-center gap-2 text-slate-300 text-sm">
           <span>💨</span>
           <span>
             {Math.round(fc.wind_speed)} m/s {windDirArrow(fc.wind_direction)}
@@ -143,9 +195,9 @@ function CurrentCard({ fc, radar }) {
         </div>
       )}
 
-      {/* CAPE instability — only show when meaningfully elevated */}
+      {/* CAPE */}
       {radar?.cape != null && radar.cape >= 300 && (
-        <div className="mt-2 flex items-center gap-2 text-xs text-yellow-300/80 px-3">
+        <div className="mt-2 flex items-center gap-2 text-xs text-yellow-300/80">
           <span>⚡</span>
           <span>
             {radar.cape >= 2500 ? 'Extremt instabil luft — hagel/åska sannolikt'
@@ -154,6 +206,17 @@ function CurrentCard({ fc, radar }) {
           </span>
         </div>
       )}
+
+      {/* Confidence badge + summary */}
+      <div className="mt-4 flex flex-col gap-2">
+        <ConfidenceBadge conf={conf} />
+        {summary && (
+          <p className="text-slate-300 text-sm leading-relaxed">{summary}</p>
+        )}
+      </div>
+
+      {/* 6-hour table */}
+      <SixHourTable forecasts={allForecasts} />
     </div>
   )
 }
@@ -253,7 +316,7 @@ export default function MobileApp() {
     <div className="min-h-screen bg-slate-900 text-slate-100">
       <div className="px-4 pt-10 pb-10 space-y-3 max-w-lg mx-auto">
 
-        <CurrentCard fc={currentFc} radar={radar} />
+        <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
 
         {days.map((hours, i) => (
           <DayRow key={i} hours={hours} />

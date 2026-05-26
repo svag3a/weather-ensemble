@@ -44,6 +44,32 @@ SOURCE_GROUPS: dict[str, str] = {
 }
 
 
+def _weighted_std(pairs: list[tuple[float, float]]) -> Optional[float]:
+    """Weighted standard deviation of (value, weight) pairs. Returns None if < 2 sources."""
+    if len(pairs) < 2:
+        return None
+    total_w = sum(w for _, w in pairs)
+    if total_w == 0:
+        return None
+    mean = sum(v * w for v, w in pairs) / total_w
+    variance = sum(w * (v - mean) ** 2 for v, w in pairs) / total_w
+    return math.sqrt(variance)
+
+
+def _compute_confidence(temps: list, precips: list) -> float:
+    """
+    0.0–1.0 confidence based on model spread (weighted std dev).
+    High agreement → high confidence.
+      temp_std = 0°C  → 1.0,  temp_std ≥ 3°C → 0.0
+      precip_std = 0% → 1.0,  precip_std ≥ 30% → 0.0
+    """
+    temp_std   = _weighted_std(temps)   or 0.0
+    precip_std = _weighted_std(precips) or 0.0
+    conf_temp   = max(0.0, 1.0 - temp_std   / 3.0)
+    conf_precip = max(0.0, 1.0 - precip_std / 30.0)
+    return round(0.6 * conf_temp + 0.4 * conf_precip, 3)
+
+
 def _lead_bucket(lead_hours: int) -> int:
     """Snap a lead time to the nearest bucket for weight lookup."""
     return min(LEAD_BUCKETS, key=lambda b: abs(b - lead_hours))
@@ -281,6 +307,7 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
 
         ens_wind_dir = circular_wavg(wind_dirs)
         ens_precip_mm = sum(precip_mms) / len(precip_mms) if precip_mms else None
+        ens_confidence = _compute_confidence(temps, precips)
 
         # Physical consistency: precipitation requires cloud cover
         if ens_precip is not None and ens_cloud is not None:
@@ -309,6 +336,7 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
                 cloud_cover=c,
                 wind_direction=wd,
                 precip_mm=pm,
+                confidence=ens_confidence,
             ))
             # Also track ensemble as a source so its MAE is measured in the ranking
             ens_fc_exists = (

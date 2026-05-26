@@ -30,6 +30,7 @@ def init_db():
         ("forecasts", "precip_mm", "FLOAT"),
         ("ensemble_forecasts", "wind_direction", "FLOAT"),
         ("ensemble_forecasts", "precip_mm", "FLOAT"),
+        ("ensemble_forecasts", "confidence", "FLOAT"),
     ]
     with engine.connect() as conn:
         for table, col, col_type in new_cols:

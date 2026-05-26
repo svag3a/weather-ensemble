@@ -87,3 +87,22 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
 export function getSymbol(...args) {
   return getWeatherInfo(...args).symbol
 }
+
+/**
+ * "Känns som"-temperatur.
+ * Wind chill (Canadian formula) when T ≤ 10°C and wind > 1.3 m/s.
+ * Returns null when the adjustment is negligible (< 1°C difference).
+ */
+export function feelsLike(tempC, windMs) {
+  if (tempC == null) return null
+  const v = (windMs ?? 0) * 3.6  // m/s → km/h
+  if (tempC <= 10 && v > 4.8) {
+    const wc = Math.round(
+      13.12 + 0.6215 * tempC
+      - 11.37 * Math.pow(v, 0.16)
+      + 0.3965 * tempC * Math.pow(v, 0.16)
+    )
+    return Math.abs(wc - Math.round(tempC)) >= 1 ? wc : null
+  }
+  return null
+}

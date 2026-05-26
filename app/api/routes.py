@@ -21,6 +21,7 @@ class ForecastOut(BaseModel):
     wind_direction: Optional[float] = None
     cloud_cover: Optional[float] = None
     precip_mm: Optional[float] = None
+    confidence: Optional[float] = None
 
 
 class SourceWeightOut(BaseModel):
@@ -71,6 +72,7 @@ def get_ensemble_forecast(
             wind_direction=r.wind_direction,
             cloud_cover=r.cloud_cover,
             precip_mm=r.precip_mm,
+            confidence=r.confidence,
         )
         for r in rows
     ]
@@ -244,6 +246,7 @@ async def get_local_forecast(
             wind_direction=r.wind_direction,
             cloud_cover=r.cloud_cover,
             precip_mm=r.precip_mm,
+            confidence=r.confidence,
         ))
 
     return result

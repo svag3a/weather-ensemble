@@ -59,6 +59,7 @@ class EnsembleForecast(Base):
     cloud_cover: Mapped[float] = mapped_column(Float, nullable=True)
     wind_direction: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     precip_mm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("computed_at", "valid_for", name="uq_ensemble"),
