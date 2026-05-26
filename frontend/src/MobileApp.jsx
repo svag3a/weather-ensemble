@@ -386,7 +386,7 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
   // For days beyond 48h show only 6-hour snapshots (00, 06, 12, 18 UTC)
   const detailRows = isHourly
     ? hours
-    : hours.filter(h => parseTS(h.valid_for).getUTCHours() % 6 === 0)
+    : hours.filter(h => parseTS(h.valid_for).getHours() % 6 === 0)
 
   return (
     <div className="border-b border-slate-700/50 last:border-0">
