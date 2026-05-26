@@ -111,8 +111,10 @@ function getDaySummary(hours) {
 
   const maxPrecipMm = Math.max(...hours.map(h => h.precip_mm ?? 0))
   const drops = rainDrops(maxPrecipMm)
+  const totalPrecipMm = hours.reduce((s, h) => s + (h.precip_mm ?? 0), 0)
+  const maxWind = Math.max(...hours.map(h => h.wind_speed ?? 0))
 
-  return { minTemp, maxTemp, symbol, drops }
+  return { minTemp, maxTemp, symbol, drops, totalPrecipMm, maxWind }
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -318,25 +320,43 @@ function TempBar({ dayMin, dayMax, weekMin, weekMax }) {
   )
 }
 
-function WeekView({ days }) {
-  if (!days.length) return (
-    <div className="bg-slate-800 rounded-2xl p-6 text-slate-500 text-center">
-      Hämtar prognos…
-    </div>
+function WeekView() {
+  const [weekForecast, setWeekForecast] = useState(null)
+  const [loading, setLoading]           = useState(true)
+
+  useEffect(() => {
+    fetchEnsemble(168)
+      .then(setWeekForecast)
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return (
+    <div className="bg-slate-800 rounded-2xl p-6 text-slate-500 text-center">Hämtar prognos…</div>
+  )
+  if (!weekForecast) return (
+    <div className="bg-slate-800 rounded-2xl p-6 text-slate-400 text-center text-sm">Kunde inte hämta prognos.</div>
   )
 
+  const now     = new Date()
+  const future  = weekForecast.filter(fc => new Date(fc.valid_for) > now)
+  const days    = groupByDay(future)
   const summaries = days.map(hours => ({ hours, ...getDaySummary(hours) }))
+
   const weekMin = Math.min(...summaries.map(s => s.minTemp ?? 99))
   const weekMax = Math.max(...summaries.map(s => s.maxTemp ?? -99))
 
   return (
     <div className="bg-slate-800 rounded-2xl overflow-hidden">
-      {summaries.map(({ hours, minTemp, maxTemp, symbol, drops }, i) => {
-        const label = dayLabel(hours[0].valid_for)
-        const date  = dateLabel(hours[0].valid_for)
+      {summaries.map(({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind }, i) => {
+        const label      = dayLabel(hours[0].valid_for)
+        const date       = dateLabel(hours[0].valid_for)
+        const showPrecip = totalPrecipMm >= 0.1
+        const showWind   = maxWind >= 8
+
         return (
           <div key={i} className="flex items-center gap-3 px-5 py-3.5 border-b border-slate-700/50 last:border-0">
-            {/* Day */}
+            {/* Day name + date */}
             <div className="w-24 shrink-0">
               <div className="text-white text-sm font-medium leading-tight">{label}</div>
               <div className="text-slate-500 text-xs">{date}</div>
@@ -345,23 +365,29 @@ function WeekView({ days }) {
             {/* Symbol */}
             <span className="text-2xl w-8 text-center shrink-0">{symbol}</span>
 
-            {/* Min temp */}
-            <span className="text-slate-400 text-xs font-mono w-8 text-right shrink-0">
-              {minTemp != null ? `${minTemp}°` : ''}
-            </span>
+            {/* Temp bar + secondary info */}
+            <div className="flex-1 min-w-0 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-slate-400 text-xs font-mono w-7 text-right shrink-0">
+                  {minTemp != null ? `${minTemp}°` : ''}
+                </span>
+                <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
+                <span className="text-white text-sm font-mono w-7 shrink-0">
+                  {maxTemp != null ? `${maxTemp}°` : '—'}
+                </span>
+              </div>
 
-            {/* Bar */}
-            <div className="flex-1 px-1">
-              <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
+              {(showPrecip || showWind) && (
+                <div className="flex items-center gap-3 pl-9 text-xs">
+                  {showPrecip && (
+                    <span className="text-blue-300">{totalPrecipMm.toFixed(1)} mm</span>
+                  )}
+                  {showWind && (
+                    <span className="text-slate-400">{Math.round(maxWind)} m/s</span>
+                  )}
+                </div>
+              )}
             </div>
-
-            {/* Max temp */}
-            <span className="text-white text-sm font-mono w-8 shrink-0">
-              {maxTemp != null ? `${maxTemp}°` : '—'}
-            </span>
-
-            {/* Rain */}
-            <span className="text-xs w-10 text-right shrink-0">{drops ?? <span className="text-slate-700">—</span>}</span>
           </div>
         )
       })}
@@ -587,7 +613,7 @@ export default function MobileApp() {
         )}
 
         {activeTab === 'week' && (
-          <WeekView days={days} />
+          <WeekView />
         )}
 
       </div>
