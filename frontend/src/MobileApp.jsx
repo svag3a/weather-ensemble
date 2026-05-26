@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Thermometer, CalendarDays, Layers } from 'lucide-react'
+import { Thermometer, CalendarDays, Layers, TriangleAlert } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect } from './api'
 import { getWeatherInfo, feelsLike } from './weatherSymbol'
@@ -484,6 +484,75 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
   )
 }
 
+// ── WarningsView ──────────────────────────────────────────────────────────────
+
+const WARNING_LEVEL_STYLE = {
+  Red:       { border: 'border-red-500',    bg: 'bg-red-500/10',    badge: 'bg-red-500/20 text-red-400' },
+  Orange:    { border: 'border-orange-400', bg: 'bg-orange-400/10', badge: 'bg-orange-400/20 text-orange-300' },
+  Yellow:    { border: 'border-yellow-400', bg: 'bg-yellow-400/10', badge: 'bg-yellow-400/20 text-yellow-300' },
+  Meddelande:{ border: 'border-slate-500',  bg: 'bg-slate-700/40',  badge: 'bg-slate-600/50 text-slate-300' },
+}
+
+function formatWarningPeriod(start, end) {
+  const fmt = iso => {
+    if (!iso) return null
+    const d = new Date(iso)
+    return d.toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' })
+      + ' ' + String(d.getHours()).padStart(2, '0') + ':00'
+  }
+  const s = fmt(start), e = fmt(end)
+  if (s && e) return `${s} – ${e}`
+  if (s)      return `Från ${s}`
+  if (e)      return `Till ${e}`
+  return null
+}
+
+function WarningCard({ warning }) {
+  const style = WARNING_LEVEL_STYLE[warning.level_code] ?? WARNING_LEVEL_STYLE.Meddelande
+  const period = formatWarningPeriod(warning.start, warning.end)
+
+  return (
+    <div className={`rounded-2xl border-l-4 p-5 space-y-3 ${style.border} ${style.bg}`}>
+      <div className="flex items-start justify-between gap-3">
+        <span className="text-white font-medium">{warning.event}</span>
+        <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${style.badge}`}>
+          {warning.level_label}
+        </span>
+      </div>
+      {period && (
+        <p className="text-slate-400 text-xs">{period}</p>
+      )}
+      {warning.description && (
+        <p className="text-slate-300 text-sm leading-relaxed">{warning.description}</p>
+      )}
+    </div>
+  )
+}
+
+function WarningsView({ warnings }) {
+  if (!warnings.length) {
+    return (
+      <div className="bg-slate-800 rounded-2xl p-8 flex flex-col items-center gap-3 text-center">
+        <span className="text-3xl">✓</span>
+        <p className="text-white font-medium">Inga aktiva varningar</p>
+        <p className="text-slate-500 text-sm">Inga SMHI-varningar gäller just nu för Göteborg.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-slate-500 text-xs px-1">
+        Aktiva SMHI-varningar för Göteborg · Västra Götalands län
+      </p>
+      {warnings.map((w, i) => <WarningCard key={i} warning={w} />)}
+      <p className="text-slate-600 text-xs px-1 pt-1">
+        Uppdateras var 30:e minut · Källa: SMHI IBW
+      </p>
+    </div>
+  )
+}
+
 // ── CollectButton ─────────────────────────────────────────────────────────────
 
 function CollectButton() {
@@ -925,6 +994,10 @@ export default function MobileApp() {
           <WeekView warnings={warnings} />
         )}
 
+        {activeTab === 'warnings' && (
+          <WarningsView warnings={warnings} />
+        )}
+
       </div>
 
       {/* Bottom tab bar */}
@@ -947,6 +1020,20 @@ export default function MobileApp() {
           >
             <CalendarDays size={22} strokeWidth={1.5} />
             <span>Vecka</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('warnings')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
+              activeTab === 'warnings' ? 'text-white' : 'text-slate-500'
+            }`}
+          >
+            <div className="relative">
+              <TriangleAlert size={22} strokeWidth={1.5} />
+              {warnings.some(w => WARNING_TRIANGLE_COLOR[w.level_code]) && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange-400" />
+              )}
+            </div>
+            <span>Varningar</span>
           </button>
           <button
             onClick={() => setActiveTab('sources')}
