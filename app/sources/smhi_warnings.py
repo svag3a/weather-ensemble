@@ -13,6 +13,22 @@ _URL = "https://opendata-download-warnings.smhi.se/ibww/api/version/1/warning.js
 # County id for Västra Götalands län
 _COUNTY_ID = 14
 
+# Weather-relevant event codes for an urban Göteborg weather app.
+# Excludes non-weather events (water shortage) and sea/mountain-specific events.
+_RELEVANT_EVENTS = {
+    "THUNDER",           # Åskoväder
+    "WIND",              # Vind
+    "STRONG_COOLING",    # Stark kyleffekt
+    "SNOW",              # Snöfall
+    "BLACK_ICE",         # Isbeläggning
+    "RAIN",              # Regn
+    "HIGH_TEMPERATURES", # Höga temperaturer
+    "HIGH_SEALEVEL",     # Högt vattenstånd (relevant for Göteborg coast)
+    "HIGH_FLOW",         # Höga flöden
+    "FLOODING",          # Översvämning
+    "FIRE",              # Brandrisk
+}
+
 # Map warning level codes to sortable severity (higher = more severe)
 _LEVEL_SEVERITY = {
     "Red":       3,
@@ -60,6 +76,10 @@ async def fetch_warnings(client: httpx.AsyncClient) -> list[dict]:
 
     for warning in data:
         if not _affects_county(warning, _COUNTY_ID):
+            continue
+
+        event_code = warning.get("event", {}).get("code", "")
+        if event_code not in _RELEVANT_EVENTS:
             continue
 
         event_sv = warning.get("event", {}).get("sv", "Okänd händelse")
