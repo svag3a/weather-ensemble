@@ -39,13 +39,13 @@ function useRadarLocation() {
 
 function isSameDay(a, b) {
   const da = new Date(a), db = new Date(b)
-  return da.getUTCFullYear() === db.getUTCFullYear()
-    && da.getUTCMonth() === db.getUTCMonth()
-    && da.getUTCDate() === db.getUTCDate()
+  return da.getFullYear() === db.getFullYear()
+    && da.getMonth() === db.getMonth()
+    && da.getDate() === db.getDate()
 }
 
 function formatHour(iso) {
-  return `${new Date(iso).getUTCHours().toString().padStart(2, '0')}:00`
+  return `${new Date(iso).getHours().toString().padStart(2, '0')}:00`
 }
 
 function dayLabel(isoString) {
@@ -53,19 +53,19 @@ function dayLabel(isoString) {
   const today = new Date()
   const tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1)
   const sameDay = (a, b) =>
-    a.getUTCFullYear() === b.getFullYear() &&
-    a.getUTCMonth() === b.getMonth() &&
-    a.getUTCDate() === b.getDate()
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
 
   if (sameDay(d, today))    return 'Idag'
   if (sameDay(d, tomorrow)) return 'Imorgon'
-  return d.toLocaleDateString('sv-SE', { weekday: 'long', timeZone: 'UTC' })
+  return d.toLocaleDateString('sv-SE', { weekday: 'long' })
     .replace(/^\w/, c => c.toUpperCase())
 }
 
 function dateLabel(isoString) {
   return new Date(isoString).toLocaleDateString('sv-SE', {
-    day: 'numeric', month: 'short', timeZone: 'UTC',
+    day: 'numeric', month: 'short',
   })
 }
 

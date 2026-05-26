@@ -4,12 +4,12 @@
  */
 
 function fmt(isoString) {
-  const h = new Date(isoString).getUTCHours()
+  const h = new Date(isoString).getHours()
   return `kl ${String(h).padStart(2, '0')}:00`
 }
 
 function timeOfDay(isoString) {
-  const h = new Date(isoString).getUTCHours()
+  const h = new Date(isoString).getHours()
   if (h >= 5  && h < 10) return 'på morgonen'
   if (h >= 10 && h < 13) return 'på förmiddagen'
   if (h >= 13 && h < 17) return 'på eftermiddagen'
