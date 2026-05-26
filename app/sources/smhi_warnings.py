@@ -13,6 +13,9 @@ _URL = "https://opendata-download-warnings.smhi.se/ibww/api/version/1/warning.js
 # County id for Västra Götalands län
 _COUNTY_ID = 14
 
+# Göteborg city centre coordinates
+_GBG_LON, _GBG_LAT = 11.967, 57.707
+
 # Weather-relevant event codes for an urban Göteborg weather app.
 # Excludes non-weather events (water shortage) and sea/mountain-specific events.
 _RELEVANT_EVENTS = {
@@ -62,6 +65,39 @@ def _affects_county(warning: dict, county_id: int) -> bool:
     return False
 
 
+def _point_in_polygon(lon: float, lat: float, ring: list) -> bool:
+    """Ray casting algorithm — ring is a list of [lon, lat] pairs."""
+    inside = False
+    n = len(ring)
+    j = n - 1
+    for i in range(n):
+        xi, yi = ring[i][0], ring[i][1]
+        xj, yj = ring[j][0], ring[j][1]
+        if ((yi > lat) != (yj > lat)) and (lon < (xj - xi) * (lat - yi) / (yj - yi) + xi):
+            inside = not inside
+        j = i
+    return inside
+
+
+def _geometry_contains(geometry: dict, lon: float, lat: float) -> bool:
+    """Check if a GeoJSON Polygon or MultiPolygon contains the point."""
+    gtype = geometry.get("type")
+    coords = geometry.get("coordinates", [])
+    if gtype == "Polygon":
+        return _point_in_polygon(lon, lat, coords[0])
+    if gtype == "MultiPolygon":
+        return any(_point_in_polygon(lon, lat, poly[0]) for poly in coords)
+    return False
+
+
+def _warning_area_covers_point(wa: dict, lon: float, lat: float) -> bool:
+    """True if the warningArea's polygon covers the given point."""
+    geometry = wa.get("area", {}).get("geometry")
+    if not geometry:
+        return True  # no polygon data — fall back to county-level match
+    return _geometry_contains(geometry, lon, lat)
+
+
 async def fetch_warnings(client: httpx.AsyncClient) -> list[dict]:
     """
     Return active warnings for Västra Götalands län, sorted by severity (highest first).
@@ -87,6 +123,9 @@ async def fetch_warnings(client: httpx.AsyncClient) -> list[dict]:
         for wa in warning.get("warningAreas", []):
             # Only include if this specific area covers county 14
             if not any(a.get("id") == _COUNTY_ID for a in wa.get("affectedAreas", [])):
+                continue
+            # Polygon check: only show if Göteborg is inside the warning polygon
+            if not _warning_area_covers_point(wa, _GBG_LON, _GBG_LAT):
                 continue
 
             start = _parse_dt(wa.get("approximateStart"))
