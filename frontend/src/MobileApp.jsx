@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchLocalForecast, fetchEnsemble, fetchRadarNow } from './api'
+import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights } from './api'
 import { getWeatherInfo, feelsLike } from './weatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
 
@@ -284,10 +284,182 @@ function DayRow({ hours }) {
   )
 }
 
+// ── Source name labels ────────────────────────────────────────────────────────
+
+const SOURCE_LABELS = {
+  smhi:                'SMHI',
+  yr:                  'Yr.no',
+  openweathermap:      'OpenWeatherMap',
+  open_meteo:          'Open-Meteo',
+  open_meteo_icon_eu:  'Open-Meteo ICON EU',
+  open_meteo_ecmwf:    'Open-Meteo ECMWF',
+  radar_nowcast:       'Radar',
+  ensemble:            'Ensemble',
+}
+
+const SOURCE_ORDER = ['smhi', 'yr', 'openweathermap', 'open_meteo', 'open_meteo_icon_eu', 'open_meteo_ecmwf']
+
+// ── EnsembleView ──────────────────────────────────────────────────────────────
+
+function EnsembleView({ ensembleFc }) {
+  const [sources, setSources] = useState(null)
+  const [weights, setWeights] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([fetchSources(6), fetchWeights()])
+      .then(([s, w]) => { setSources(s); setWeights(w) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) return (
+    <div className="bg-slate-800 rounded-2xl p-6 text-slate-500 text-center">
+      Hämtar källor…
+    </div>
+  )
+
+  if (!sources) return (
+    <div className="bg-slate-800 rounded-2xl p-6 text-slate-400 text-center text-sm">
+      Kunde inte hämta källdata.
+    </div>
+  )
+
+  // Get first future forecast per source
+  const now = new Date()
+  const currentBySource = {}
+  for (const [src, fcs] of Object.entries(sources)) {
+    const upcoming = fcs.filter(fc => new Date(fc.valid_for) > now)
+    if (upcoming.length) currentBySource[src] = upcoming[0]
+  }
+
+  // Weights at lead bucket 1 (near-term)
+  const weightsAt1 = weights?.filter(w => w.lead_hours === 1) ?? []
+  const bySource = Object.fromEntries(weightsAt1.map(w => [w.source, w]))
+
+  const displayOrder = SOURCE_ORDER.filter(s => currentBySource[s])
+
+  // Best source per parameter (lowest MAE)
+  const best = (param) => {
+    let bestSrc = null, bestVal = Infinity
+    for (const src of displayOrder) {
+      const val = bySource[src]?.[param]
+      if (val != null && val < bestVal) { bestVal = val; bestSrc = src }
+    }
+    return { src: bestSrc, val: bestVal }
+  }
+  const bestTemp   = best('mae_temperature')
+  const bestPrecip = best('mae_precip')
+  const bestWind   = best('mae_wind')
+
+  const hourLabel = ensembleFc
+    ? `${new Date(ensembleFc.valid_for).getUTCHours().toString().padStart(2, '0')}:00`
+    : '—'
+
+  return (
+    <div className="space-y-3">
+      {/* Comparison table */}
+      <div className="bg-slate-800 rounded-2xl overflow-hidden">
+        <div className="px-5 pt-4 pb-3 border-b border-slate-700">
+          <h2 className="text-white font-medium text-sm">Källjämförelse — kl {hourLabel}</h2>
+          <p className="text-slate-500 text-xs mt-0.5">Närmaste timme per källa</p>
+        </div>
+
+        {/* Header row */}
+        <div className="flex items-center gap-2 px-5 py-2 text-slate-500 text-xs">
+          <span className="flex-1">Källa</span>
+          <span className="w-12 text-right">Temp</span>
+          <span className="w-12 text-right">Regn%</span>
+          <span className="w-14 text-right">Vind</span>
+        </div>
+
+        {/* Ensemble row */}
+        {ensembleFc && (
+          <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-700/50 border-y border-slate-600/50">
+            <span className="flex-1 text-white text-sm font-medium">Ensemble ★</span>
+            <span className="w-12 text-right text-white text-sm font-mono">
+              {ensembleFc.temperature != null ? `${Math.round(ensembleFc.temperature)}°` : '—'}
+            </span>
+            <span className={`w-12 text-right text-sm font-mono ${ensembleFc.precip_probability >= 40 ? 'text-blue-300' : 'text-slate-300'}`}>
+              {Math.round(ensembleFc.precip_probability)}%
+            </span>
+            <span className="w-14 text-right text-slate-300 text-sm font-mono">
+              {ensembleFc.wind_speed != null ? `${Math.round(ensembleFc.wind_speed)} m/s` : '—'}
+            </span>
+          </div>
+        )}
+
+        {/* Source rows */}
+        {displayOrder.map(src => {
+          const fc = currentBySource[src]
+          return (
+            <div key={src} className="flex items-center gap-2 px-5 py-2 border-b border-slate-700/40 last:border-0">
+              <span className="flex-1 text-slate-300 text-sm">{SOURCE_LABELS[src] ?? src}</span>
+              <span className="w-12 text-right text-slate-300 text-sm font-mono">
+                {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+              </span>
+              <span className={`w-12 text-right text-sm font-mono ${fc.precip_probability >= 40 ? 'text-blue-300' : 'text-slate-500'}`}>
+                {Math.round(fc.precip_probability)}%
+              </span>
+              <span className="w-14 text-right text-slate-500 text-sm font-mono">
+                {fc.wind_speed != null ? `${Math.round(fc.wind_speed)} m/s` : '—'}
+              </span>
+            </div>
+          )
+        })}
+
+        {displayOrder.length === 0 && (
+          <div className="px-5 py-4 text-slate-500 text-sm text-center">Ingen källdata tillgänglig.</div>
+        )}
+      </div>
+
+      {/* Weight explanation */}
+      {weightsAt1.length > 0 && (
+        <div className="bg-slate-800 rounded-2xl p-5 space-y-3">
+          <h2 className="text-white font-medium text-sm">Nuvarande vikter (0–6 h)</h2>
+          <div className="space-y-2 text-sm">
+            {bestTemp.src && (
+              <div className="flex items-start gap-2">
+                <span className="text-slate-400 shrink-0">🌡</span>
+                <span className="text-slate-300">
+                  <span className="text-white font-medium">{SOURCE_LABELS[bestTemp.src]}</span>
+                  {' '}har lägst temperaturavvikelse ({bestTemp.val.toFixed(2)} °C MAE)
+                </span>
+              </div>
+            )}
+            {bestPrecip.src && (
+              <div className="flex items-start gap-2">
+                <span className="text-slate-400 shrink-0">🌧</span>
+                <span className="text-slate-300">
+                  <span className="text-white font-medium">{SOURCE_LABELS[bestPrecip.src]}</span>
+                  {' '}har lägst Brier score för regn ({bestPrecip.val.toFixed(3)})
+                </span>
+              </div>
+            )}
+            {bestWind.src && (
+              <div className="flex items-start gap-2">
+                <span className="text-slate-400 shrink-0">💨</span>
+                <span className="text-slate-300">
+                  <span className="text-white font-medium">{SOURCE_LABELS[bestWind.src]}</span>
+                  {' '}har lägst vindavvikelse ({bestWind.val.toFixed(2)} m/s MAE)
+                </span>
+              </div>
+            )}
+          </div>
+          <p className="text-slate-600 text-xs pt-1">
+            Ensemblen viktar varje källa efter historisk träffsäkerhet. Bättre källa → högre vikt.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MobileApp() {
   const [forecast, setForecast] = useState(null)
+  const [activeTab, setActiveTab] = useState('now')
   const { radar, coords } = useRadarLocation()
 
   const load = useCallback(async () => {
@@ -313,15 +485,46 @@ export default function MobileApp() {
   const days = groupByDay(future)
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100">
-      <div className="px-4 pt-10 pb-10 space-y-3 max-w-lg mx-auto">
+    <div className="min-h-screen bg-slate-900 text-slate-100 pb-20">
+      <div className="px-4 pt-10 pb-4 space-y-3 max-w-lg mx-auto">
 
-        <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
+        {activeTab === 'now' && (
+          <>
+            <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
+            {days.map((hours, i) => (
+              <DayRow key={i} hours={hours} />
+            ))}
+          </>
+        )}
 
-        {days.map((hours, i) => (
-          <DayRow key={i} hours={hours} />
-        ))}
+        {activeTab === 'sources' && (
+          <EnsembleView ensembleFc={currentFc} />
+        )}
 
+      </div>
+
+      {/* Bottom tab bar */}
+      <div className="fixed bottom-0 left-0 right-0 bg-slate-800/95 backdrop-blur border-t border-slate-700 safe-bottom">
+        <div className="flex max-w-lg mx-auto">
+          <button
+            onClick={() => setActiveTab('now')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
+              activeTab === 'now' ? 'text-white' : 'text-slate-500 active:text-slate-300'
+            }`}
+          >
+            <span className="text-lg leading-none">🌤</span>
+            <span>Nu</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('sources')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
+              activeTab === 'sources' ? 'text-white' : 'text-slate-500 active:text-slate-300'
+            }`}
+          >
+            <span className="text-lg leading-none">📊</span>
+            <span>Källor</span>
+          </button>
+        </div>
       </div>
     </div>
   )
