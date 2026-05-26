@@ -36,6 +36,12 @@ export async function fetchRadarNow(lat, lon) {
   return res.json()
 }
 
+export async function fetchWarnings() {
+  const res = await fetch(`${BASE}/warnings`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function triggerCollect() {
   const res = await fetch(`${BASE}/collect`, { method: 'POST' })
   if (!res.ok) throw new Error(await res.text())

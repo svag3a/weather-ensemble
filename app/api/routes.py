@@ -269,6 +269,15 @@ async def radar_now(
     return {**radar, "cape": cape}
 
 
+@router.get("/warnings")
+async def get_warnings():
+    """Active SMHI weather warnings for Västra Götalands län (covers Göteborg)."""
+    import httpx
+    from app.sources.smhi_warnings import fetch_warnings
+    async with httpx.AsyncClient() as client:
+        return await fetch_warnings(client)
+
+
 @router.post("/collect", status_code=202)
 async def trigger_collection():
     """Manually trigger a collection run (useful during development)."""

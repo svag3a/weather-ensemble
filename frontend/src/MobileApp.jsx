@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Thermometer, CalendarDays, Layers } from 'lucide-react'
-import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights } from './api'
+import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings } from './api'
 import { getWeatherInfo, feelsLike } from './weatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
 
@@ -123,6 +123,43 @@ function getDaySummary(hours) {
   const maxWind = Math.max(...hours.map(h => h.wind_speed ?? 0))
 
   return { minTemp, maxTemp, symbol, drops, totalPrecipMm, maxWind }
+}
+
+// ── Warnings ─────────────────────────────────────────────────────────────────
+
+const WARNING_STYLES = {
+  Red:        { bg: 'bg-red-900/60',    border: 'border-red-500/60',    icon: '🔴', text: 'text-red-200' },
+  Orange:     { bg: 'bg-orange-900/60', border: 'border-orange-500/60', icon: '🟠', text: 'text-orange-200' },
+  Yellow:     { bg: 'bg-yellow-900/50', border: 'border-yellow-500/50', icon: '🟡', text: 'text-yellow-200' },
+  Meddelande: { bg: 'bg-slate-700/60',  border: 'border-slate-500/40',  icon: 'ℹ️',  text: 'text-slate-300' },
+}
+
+function WarningBanner({ warnings }) {
+  if (!warnings?.length) return null
+  return (
+    <div className="space-y-2">
+      {warnings.map((w, i) => {
+        const s = WARNING_STYLES[w.level_code] ?? WARNING_STYLES.Meddelande
+        const end = w.end ? parseTS(w.end).toLocaleDateString('sv-SE', {
+          weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+        }) : null
+        return (
+          <div key={i} className={`rounded-2xl border px-4 py-3 ${s.bg} ${s.border}`}>
+            <div className="flex items-center gap-2">
+              <span className="text-base leading-none">{s.icon}</span>
+              <span className={`font-medium text-sm ${s.text}`}>{w.level_label}: {w.event}</span>
+            </div>
+            {w.description && (
+              <p className={`mt-1.5 text-xs leading-relaxed ${s.text} opacity-80`}>{w.description}</p>
+            )}
+            {end && (
+              <p className={`mt-1 text-xs ${s.text} opacity-60`}>Gäller till {end}</p>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -613,8 +650,16 @@ function EnsembleView({ ensembleFc }) {
 
 export default function MobileApp() {
   const [forecast, setForecast] = useState(null)
+  const [warnings, setWarnings] = useState([])
   const [activeTab, setActiveTab] = useState('now')
   const { radar, coords } = useRadarLocation()
+
+  useEffect(() => {
+    const loadWarnings = () => fetchWarnings().then(setWarnings).catch(() => {})
+    loadWarnings()
+    const interval = setInterval(loadWarnings, 30 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
 
   const load = useCallback(async () => {
     try {
@@ -644,6 +689,7 @@ export default function MobileApp() {
 
         {activeTab === 'now' && (
           <>
+            <WarningBanner warnings={warnings} />
             <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
             {days.map((hours, i) => (
               <DayRow key={i} hours={hours} />
