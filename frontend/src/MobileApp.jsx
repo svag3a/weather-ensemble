@@ -274,12 +274,16 @@ function CurrentCard({ fc, radar, allForecasts }) {
 function HourRow({ fc }) {
   const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for)
   const drops = rainDrops(fc.precip_mm)
+  const fl = feelsLike(fc.temperature, fc.wind_speed)
   return (
     <div className="flex items-center gap-3 py-2 border-b border-slate-700/50 last:border-0">
       <span className="text-slate-400 font-mono text-xs w-12 shrink-0">{formatHour(fc.valid_for)}</span>
       <span className="text-xl w-7 text-center">{symbol}</span>
-      <span className="text-white font-medium w-10">
-        {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+      <span className="flex items-baseline gap-1 w-20 shrink-0">
+        <span className="text-white font-medium">
+          {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+        </span>
+        {fl != null && <span className="text-slate-500 text-xs">({fl}°)</span>}
       </span>
       {fc.wind_speed != null && fc.wind_speed >= 3
         ? <span className="text-slate-400 text-xs flex-1">
