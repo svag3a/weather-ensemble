@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Thermometer, CalendarDays, Layers } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings } from './api'
+import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect } from './api'
 import { getWeatherInfo, feelsLike } from './weatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
 
@@ -484,6 +484,37 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
   )
 }
 
+// ── CollectButton ─────────────────────────────────────────────────────────────
+
+function CollectButton() {
+  const [state, setState] = useState('idle') // idle | loading | done | error
+
+  const trigger = async () => {
+    setState('loading')
+    try {
+      await triggerCollect()
+      setState('done')
+      setTimeout(() => setState('idle'), 4000)
+    } catch {
+      setState('error')
+      setTimeout(() => setState('idle'), 3000)
+    }
+  }
+
+  return (
+    <button
+      onClick={trigger}
+      disabled={state === 'loading'}
+      className="w-full text-center text-xs text-slate-600 py-2 active:text-slate-400 transition-colors disabled:opacity-50"
+    >
+      {state === 'idle'    && '↻ Hämta nu'}
+      {state === 'loading' && 'Hämtar…'}
+      {state === 'done'    && '✓ Klar — ladda om om en stund'}
+      {state === 'error'   && '✗ Misslyckades'}
+    </button>
+  )
+}
+
 // ── Source name labels ────────────────────────────────────────────────────────
 
 const SOURCE_LABELS = {
@@ -790,6 +821,9 @@ function EnsembleView({ ensembleFc }) {
 
       {/* Divergence chart */}
       {sources && <ForecastDivergenceChart sources={sources} ensembleFcs={ensembleFcs ?? []} />}
+
+      {/* Manual collect trigger */}
+      <CollectButton />
 
       {/* Weight explanation */}
       {weightsAt1.length > 0 && (
