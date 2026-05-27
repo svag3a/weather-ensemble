@@ -113,7 +113,9 @@ export default function RankingChart({ history }) {
   }
 
   const { chartData, sources } = buildChartData(history)
-  const nSources = sources.length
+  // Fixed scale = all configured sources, so the axis never rescales
+  // as new sources accumulate history data over time.
+  const nSources = Object.keys(SOURCE_LABELS).length
 
   if (chartData.length < 2) {
     return (
