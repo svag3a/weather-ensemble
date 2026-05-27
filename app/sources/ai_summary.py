@@ -144,7 +144,6 @@ def _build_periods(hours: list) -> list:
             "temp_max":   round(max(temps)) if temps else None,
             "precip_max": round(max(precips)) if precips else 0,
             "wind_max":   round(max(winds), 1) if winds else 0,
-            "confidence": _confidence_label(sum(confs) / len(confs)),
         })
     return result
 
