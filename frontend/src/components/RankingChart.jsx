@@ -138,7 +138,7 @@ export default function RankingChart({ history }) {
     const label = src ? (SOURCE_LABELS[src] ?? src) : `#${payload.value}`
     const color = src ? (SOURCE_COLORS[src] ?? '#94a3b8') : '#475569'
     return (
-      <text x={x} y={y} dy={4} textAnchor="end" fill={color} fontSize={11}>
+      <text x={x} y={y} dy={4} textAnchor="end" fill={color} fontSize={10}>
         {label}
       </text>
     )
@@ -151,8 +151,8 @@ export default function RankingChart({ history }) {
         Placering per dag baserat på viktat MAE — #1 är bäst · Ensemble är streckad
       </p>
 
-      <ResponsiveContainer width="100%" height={260}>
-        <LineChart data={chartData} margin={{ top: 4, right: 8, left: 60, bottom: 0 }}>
+      <ResponsiveContainer width="100%" height={300}>
+        <LineChart data={chartData} margin={{ top: 4, right: 8, left: 4, bottom: 0 }}>
           <XAxis
             dataKey="date"
             tick={{ fill: '#94a3b8', fontSize: 11 }}
@@ -166,7 +166,8 @@ export default function RankingChart({ history }) {
             tick={<YAxisTick />}
             tickLine={false}
             axisLine={false}
-            width={64}
+            interval={0}
+            width={80}
           />
           <Tooltip content={<CustomTooltip />} />
           {sources.map(src => (
