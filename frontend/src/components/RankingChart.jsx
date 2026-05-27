@@ -148,7 +148,7 @@ export default function RankingChart({ history }) {
     <div className="bg-slate-800 rounded-xl p-6">
       <h2 className="text-lg font-semibold text-white mb-1">Ranking över tid</h2>
       <p className="text-xs text-slate-500 mb-5">
-        Placering per dag baserat på viktat MAE — #1 är bäst · Ensemble är streckad
+        Placering per dag baserat på viktat MAE — #1 är bäst
       </p>
 
       <ResponsiveContainer width="100%" height={300}>
@@ -177,7 +177,6 @@ export default function RankingChart({ history }) {
               dataKey={src}
               stroke={SOURCE_COLORS[src] ?? '#94a3b8'}
               strokeWidth={src === 'ensemble' ? 2 : 1.5}
-              strokeDasharray={src === 'ensemble' ? '5 3' : undefined}
               dot={false}
               connectNulls
             />
