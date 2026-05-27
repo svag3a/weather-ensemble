@@ -222,7 +222,9 @@ async def generate_summary(db: Session, target_date: date, period: str) -> Optio
     if cached:
         age_h = (now - cached.generated_at.replace(tzinfo=timezone.utc)).total_seconds() / 3600
         if age_h < _CACHE_TTL_HOURS:
-            return json.loads(cached.payload)
+            data = json.loads(cached.payload)
+            data["_generated_at"] = cached.generated_at.isoformat()
+            return data
 
     # Build input
     hours = _hours_for_date(db, target_date)
@@ -285,15 +287,17 @@ async def generate_summary(db: Session, target_date: date, period: str) -> Optio
         return None
 
     # Cache
+    generated_at = now.replace(tzinfo=None)
     if cached:
-        cached.generated_at = now.replace(tzinfo=None)
+        cached.generated_at = generated_at
         cached.payload = json.dumps(payload, ensure_ascii=False)
     else:
         db.add(AiSummary(
-            generated_at=now.replace(tzinfo=None),
+            generated_at=generated_at,
             valid_date=target_date,
             period=period,
             payload=json.dumps(payload, ensure_ascii=False),
         ))
     db.commit()
+    payload["_generated_at"] = generated_at.isoformat()
     return payload

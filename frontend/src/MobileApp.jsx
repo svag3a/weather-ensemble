@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles } from 'lucide-react'
+import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary } from './api'
 import { getWeatherInfo, feelsLike } from './weatherSymbol'
@@ -978,6 +978,15 @@ const EVENT_ICON = {
   heat:             '☀️',
 }
 
+function formatGeneratedAt(iso) {
+  if (!iso) return null
+  const d = new Date(iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z')
+  const diffMin = Math.round((Date.now() - d) / 60000)
+  if (diffMin < 1)  return 'just nu'
+  if (diffMin < 60) return `${diffMin} min sedan`
+  return `kl ${d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`
+}
+
 function AnalysView() {
   const [period, setPeriod] = useState('today')
   const [summary, setSummary] = useState(null)
@@ -1064,16 +1073,18 @@ function AnalysView() {
 
             {/* Confidence */}
             <div className="bg-slate-800 rounded-2xl p-4 flex items-start gap-3">
-              <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${confStyle.bg} ${confStyle.color}`}>
-                {confStyle.label}
-              </span>
-              <p className="text-slate-400 text-xs leading-relaxed">{summary.confidence?.reason}</p>
+              <ShieldCheck size={15} className={`shrink-0 mt-0.5 ${confStyle.color}`} />
+              <div className="flex-1 min-w-0">
+                <span className={`text-xs font-medium ${confStyle.color}`}>{confStyle.label}</span>
+                <p className="text-slate-400 text-xs leading-relaxed mt-0.5">{summary.confidence?.reason}</p>
+              </div>
             </div>
 
             {/* Key events */}
             {summary.key_events?.length > 0 && (
               <div className="bg-slate-800 rounded-2xl overflow-hidden">
-                <div className="px-5 pt-4 pb-2 border-b border-slate-700">
+                <div className="px-5 pt-4 pb-2 border-b border-slate-700 flex items-center gap-2">
+                  <Zap size={14} className="text-slate-400 shrink-0" />
                   <h3 className="text-white text-sm font-medium">Händelser</h3>
                 </div>
                 {summary.key_events.map((ev, i) => (
@@ -1096,7 +1107,8 @@ function AnalysView() {
             {/* Periods */}
             {summary.periods?.length > 0 && (
               <div className="bg-slate-800 rounded-2xl overflow-hidden">
-                <div className="px-5 pt-4 pb-2 border-b border-slate-700">
+                <div className="px-5 pt-4 pb-2 border-b border-slate-700 flex items-center gap-2">
+                  <Clock size={14} className="text-slate-400 shrink-0" />
                   <h3 className="text-white text-sm font-medium">Under dagen</h3>
                 </div>
                 {summary.periods.map((p, i) => {
@@ -1118,7 +1130,10 @@ function AnalysView() {
             {/* Insights */}
             {summary.insights?.length > 0 && (
               <div className="bg-slate-800 rounded-2xl p-5 space-y-3">
-                <h3 className="text-white text-sm font-medium">Modellinsikter</h3>
+                <div className="flex items-center gap-2">
+                  <TrendingUp size={14} className="text-slate-400 shrink-0" />
+                  <h3 className="text-white text-sm font-medium">Modellinsikter</h3>
+                </div>
                 {summary.insights.map((ins, i) => (
                   <div key={i} className="space-y-0.5">
                     <div className="text-slate-300 text-xs font-medium">{ins.title}</div>
@@ -1131,7 +1146,10 @@ function AnalysView() {
             {/* Practical advice */}
             {summary.practical_advice?.main && (
               <div className="bg-slate-700/50 rounded-2xl p-4 space-y-2">
-                <p className="text-white text-sm">{summary.practical_advice.main}</p>
+                <div className="flex items-start gap-2">
+                  <Lightbulb size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                  <p className="text-white text-sm">{summary.practical_advice.main}</p>
+                </div>
                 {summary.practical_advice.tips?.map((tip, i) => (
                   <p key={i} className="text-slate-400 text-xs">· {tip}</p>
                 ))}
@@ -1139,7 +1157,7 @@ function AnalysView() {
             )}
 
             <p className="text-slate-600 text-xs px-1">
-              Genererad av Claude Haiku · Uppdateras var 2:e timme
+              Genererad av Claude Haiku{summary._generated_at ? ` · ${formatGeneratedAt(summary._generated_at)}` : ''} · Uppdateras var 2:e timme
             </p>
           </>
         )
