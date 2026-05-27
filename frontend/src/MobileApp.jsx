@@ -622,7 +622,7 @@ const SOURCE_COLORS = {
   smhi:               '#60a5fa',
   yr:                 '#34d399',
   open_meteo:         '#f97316',
-  open_meteo_icon_eu: '#fb923c',
+  open_meteo_icon_eu: '#22d3ee',
   open_meteo_ecmwf:   '#fbbf24',
   openweathermap:     '#a78bfa',
   open_meteo_ukmo:    '#e879f9',

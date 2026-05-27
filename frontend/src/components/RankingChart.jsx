@@ -19,7 +19,7 @@ const SOURCE_COLORS = {
   smhi:               '#60a5fa',
   yr:                 '#34d399',
   open_meteo:         '#f97316',
-  open_meteo_icon_eu: '#fb923c',
+  open_meteo_icon_eu: '#22d3ee',
   open_meteo_ecmwf:   '#fbbf24',
   open_meteo_ukmo:    '#e879f9',
   open_meteo_knmi:    '#2dd4bf',
@@ -73,17 +73,12 @@ function buildChartData(history) {
       scores[src] = compositeScore(synth)
     }
 
-    // Rank: 1 = lowest (best) composite score; exclude 'ensemble' from ranking
-    const ranked = Object.entries(scores)
-      .filter(([src]) => src !== 'ensemble')
-      .sort((a, b) => a[1] - b[1])
+    // Rank all sources together (including ensemble) — guarantees unique ranks,
+    // no duplicate #1 when scores are tied (stable insertion-order tiebreak).
     const point = { date: dateStr.slice(5) } // "MM-DD"
-    ranked.forEach(([src], i) => { point[src] = i + 1 })
-    if (scores['ensemble'] !== undefined) {
-      // Include ensemble rank among all sources for reference
-      const allRanked = Object.entries(scores).sort((a, b) => a[1] - b[1])
-      point['ensemble'] = allRanked.findIndex(([s]) => s === 'ensemble') + 1
-    }
+    Object.entries(scores)
+      .sort((a, b) => a[1] - b[1])
+      .forEach(([src], i) => { point[src] = i + 1 })
     chartData.push(point)
   }
 
@@ -118,7 +113,7 @@ export default function RankingChart({ history }) {
   }
 
   const { chartData, sources } = buildChartData(history)
-  const nSources = sources.filter(s => s !== 'ensemble').length
+  const nSources = sources.length
 
   if (chartData.length < 2) {
     return (
