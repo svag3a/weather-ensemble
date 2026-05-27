@@ -8,6 +8,7 @@ services:
     environment:
       - DATABASE_URL=sqlite:////data/weather.db
       - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     restart: unless-stopped
 
 volumes:

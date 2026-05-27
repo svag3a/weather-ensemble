@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from sqlalchemy import Float, Integer, String, DateTime, Date, UniqueConstraint
+from sqlalchemy import Float, Integer, String, DateTime, Date, UniqueConstraint, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 from app.database import Base
@@ -75,6 +75,19 @@ class Observation(Base):
     temperature: Mapped[float] = mapped_column(Float)
     wind_speed: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     precip_mm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
+
+class AiSummary(Base):
+    __tablename__ = "ai_summaries"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    generated_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    valid_date: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    period: Mapped[str] = mapped_column(String, nullable=False)  # "today" or "tomorrow"
+    payload: Mapped[str] = mapped_column(Text, nullable=False)   # JSON string
+
+    __table_args__ = (
+        UniqueConstraint("valid_date", "period", name="uq_ai_summary"),
+    )
 
 
 class SourceWeightHistory(Base):

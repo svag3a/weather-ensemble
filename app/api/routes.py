@@ -278,6 +278,25 @@ async def get_warnings():
         return await fetch_warnings(client)
 
 
+@router.get("/summary")
+async def get_summary(
+    period: str = Query(default="today", regex="^(today|tomorrow)$"),
+    db: Session = Depends(get_db),
+):
+    """AI-generated weather summary for today or tomorrow. Cached 2h."""
+    from datetime import date, timedelta
+    from app.sources.ai_summary import generate_summary
+
+    target_date = date.today() if period == "today" else date.today() + timedelta(days=1)
+    result = await generate_summary(db, target_date, period)
+    if result is None:
+        raise HTTPException(
+            status_code=503,
+            detail="AI summary unavailable — ANTHROPIC_API_KEY not set or generation failed"
+        )
+    return result
+
+
 @router.post("/collect", status_code=202)
 async def trigger_collection():
     """Manually trigger a collection run (useful during development)."""

@@ -42,6 +42,12 @@ export async function fetchWarnings() {
   return res.json()
 }
 
+export async function fetchSummary(period = 'today') {
+  const res = await fetch(`${BASE}/summary?period=${period}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function triggerCollect() {
   const res = await fetch(`${BASE}/collect`, { method: 'POST' })
   if (!res.ok) throw new Error(await res.text())

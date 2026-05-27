@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Thermometer, CalendarDays, Layers, TriangleAlert } from 'lucide-react'
+import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect } from './api'
+import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary } from './api'
 import { getWeatherInfo, feelsLike } from './weatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
 
@@ -955,6 +955,199 @@ function EnsembleView({ ensembleFc }) {
   )
 }
 
+// ── AnalysView ────────────────────────────────────────────────────────────────
+
+const ALERT_STYLE = {
+  none:    { bg: 'bg-slate-800',      border: '',                    dot: 'bg-slate-500' },
+  watch:   { bg: 'bg-slate-800',      border: 'border-yellow-500/40', dot: 'bg-yellow-400' },
+  warning: { bg: 'bg-orange-900/30',  border: 'border-orange-500/40', dot: 'bg-orange-400' },
+  alert:   { bg: 'bg-red-900/30',     border: 'border-red-500/40',    dot: 'bg-red-500' },
+}
+
+const CONF_STYLE = {
+  high:   { label: 'Hög säkerhet',     color: 'text-green-400',  bg: 'bg-green-400/10' },
+  medium: { label: 'Måttlig säkerhet', color: 'text-yellow-400', bg: 'bg-yellow-400/10' },
+  low:    { label: 'Låg säkerhet',     color: 'text-red-400',    bg: 'bg-red-400/10' },
+}
+
+const EVENT_ICON = {
+  rain_window:      '🌧',
+  wind_event:       '💨',
+  clearing:         '🌤',
+  temperature_drop: '🌡',
+  heat:             '☀️',
+}
+
+function AnalysView() {
+  const [period, setPeriod] = useState('today')
+  const [summary, setSummary] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [detailOpen, setDetailOpen] = useState(false)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    setSummary(null)
+    setDetailOpen(false)
+    fetchSummary(period)
+      .then(setSummary)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [period])
+
+  return (
+    <div className="space-y-3">
+      {/* Period toggle */}
+      <div className="flex gap-2">
+        {[['today', 'Idag'], ['tomorrow', 'Imorgon']].map(([p, label]) => (
+          <button
+            key={p}
+            onClick={() => setPeriod(p)}
+            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+              period === p ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-500'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {loading && (
+        <div className="bg-slate-800 rounded-2xl p-8 text-slate-500 text-center text-sm">
+          Genererar sammanfattning…
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-slate-800 rounded-2xl p-6 text-slate-400 text-center text-sm">
+          Kunde inte generera sammanfattning.
+        </div>
+      )}
+
+      {summary && (() => {
+        const alertStyle = ALERT_STYLE[summary.ui?.alert_level] ?? ALERT_STYLE.none
+        const confStyle  = CONF_STYLE[summary.confidence?.level] ?? CONF_STYLE.medium
+
+        return (
+          <>
+            {/* Hero card */}
+            <div className={`rounded-2xl p-5 space-y-3 ${alertStyle.bg} ${alertStyle.border ? `border ${alertStyle.border}` : ''}`}>
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="text-white font-semibold text-lg leading-snug flex-1">
+                  {summary.summary?.headline}
+                </h2>
+                {summary.ui?.hero_badge && (
+                  <span className={`shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ${confStyle.bg} ${confStyle.color}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${alertStyle.dot}`} />
+                    {summary.ui.hero_badge}
+                  </span>
+                )}
+              </div>
+
+              <p className="text-slate-300 text-sm leading-relaxed">{summary.summary?.short}</p>
+
+              {summary.summary?.detailed && (
+                <>
+                  {detailOpen && (
+                    <p className="text-slate-400 text-sm leading-relaxed">{summary.summary.detailed}</p>
+                  )}
+                  <button
+                    onClick={() => setDetailOpen(o => !o)}
+                    className="text-xs text-slate-500 active:text-slate-300 transition-colors"
+                  >
+                    {detailOpen ? '↑ Mindre' : '↓ Läs mer'}
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Confidence */}
+            <div className="bg-slate-800 rounded-2xl p-4 flex items-start gap-3">
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${confStyle.bg} ${confStyle.color}`}>
+                {confStyle.label}
+              </span>
+              <p className="text-slate-400 text-xs leading-relaxed">{summary.confidence?.reason}</p>
+            </div>
+
+            {/* Key events */}
+            {summary.key_events?.length > 0 && (
+              <div className="bg-slate-800 rounded-2xl overflow-hidden">
+                <div className="px-5 pt-4 pb-2 border-b border-slate-700">
+                  <h3 className="text-white text-sm font-medium">Händelser</h3>
+                </div>
+                {summary.key_events.map((ev, i) => (
+                  <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
+                    <span className="text-xl shrink-0 mt-0.5">{EVENT_ICON[ev.type] ?? '⚡'}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-white text-sm font-medium">{ev.title}</span>
+                        {ev.from && ev.to && (
+                          <span className="text-slate-500 text-xs">{ev.from}–{ev.to}</span>
+                        )}
+                      </div>
+                      <p className="text-slate-400 text-xs mt-0.5 leading-relaxed">{ev.description}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Periods */}
+            {summary.periods?.length > 0 && (
+              <div className="bg-slate-800 rounded-2xl overflow-hidden">
+                <div className="px-5 pt-4 pb-2 border-b border-slate-700">
+                  <h3 className="text-white text-sm font-medium">Under dagen</h3>
+                </div>
+                {summary.periods.map((p, i) => {
+                  const cs = CONF_STYLE[p.confidence] ?? CONF_STYLE.medium
+                  return (
+                    <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
+                      <div className="w-20 shrink-0">
+                        <div className="text-white text-xs font-medium">{p.name}</div>
+                        <div className="text-slate-500 text-xs">{p.from}–{p.to}</div>
+                      </div>
+                      <p className="text-slate-300 text-xs leading-relaxed flex-1">{p.description}</p>
+                      <span className={`shrink-0 text-xs ${cs.color}`}>●</span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Insights */}
+            {summary.insights?.length > 0 && (
+              <div className="bg-slate-800 rounded-2xl p-5 space-y-3">
+                <h3 className="text-white text-sm font-medium">Modellinsikter</h3>
+                {summary.insights.map((ins, i) => (
+                  <div key={i} className="space-y-0.5">
+                    <div className="text-slate-300 text-xs font-medium">{ins.title}</div>
+                    <p className="text-slate-500 text-xs leading-relaxed">{ins.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Practical advice */}
+            {summary.practical_advice?.main && (
+              <div className="bg-slate-700/50 rounded-2xl p-4 space-y-2">
+                <p className="text-white text-sm">{summary.practical_advice.main}</p>
+                {summary.practical_advice.tips?.map((tip, i) => (
+                  <p key={i} className="text-slate-400 text-xs">· {tip}</p>
+                ))}
+              </div>
+            )}
+
+            <p className="text-slate-600 text-xs px-1">
+              Genererad av Claude Haiku · Uppdateras var 2:e timme
+            </p>
+          </>
+        )
+      })()}
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MobileApp() {
@@ -1013,6 +1206,10 @@ export default function MobileApp() {
           <WeekView warnings={warnings} />
         )}
 
+        {activeTab === 'analysis' && (
+          <AnalysView />
+        )}
+
         {activeTab === 'warnings' && (
           <WarningsView warnings={warnings} />
         )}
@@ -1039,6 +1236,15 @@ export default function MobileApp() {
           >
             <CalendarDays size={22} strokeWidth={1.5} />
             <span>Vecka</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('analysis')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
+              activeTab === 'analysis' ? 'text-white' : 'text-slate-500'
+            }`}
+          >
+            <Sparkles size={22} strokeWidth={1.5} />
+            <span>Analys</span>
           </button>
           <button
             onClick={() => setActiveTab('warnings')}
