@@ -42,7 +42,12 @@ function sunTimesUTC(date) {
 
 function isNight(validFor) {
   if (!validFor) return false
-  const d = new Date(validFor)
+  // API returns naive UTC strings — append 'Z' so the browser parses them as
+  // UTC rather than local time, which would shift the day/night boundary by 2h.
+  const iso = typeof validFor === 'string' && !validFor.endsWith('Z') && !validFor.includes('+')
+    ? validFor + 'Z'
+    : validFor
+  const d = new Date(iso)
   const { sunrise, sunset } = sunTimesUTC(d)
   const utcH = d.getUTCHours() + d.getUTCMinutes() / 60
   return utcH < sunrise || utcH >= sunset

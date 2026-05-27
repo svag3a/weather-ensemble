@@ -174,20 +174,31 @@ function ConfidenceBadge({ conf }) {
 }
 
 function SixHourTable({ forecasts }) {
+  const [expanded, setExpanded] = useState(false)
   const now = new Date()
-  const rows = forecasts?.filter(fc => parseTS(fc.valid_for) > now).slice(0, 6) ?? []
+  const future = forecasts?.filter(fc => parseTS(fc.valid_for) > now) ?? []
+
+  // All remaining hours of today (local calendar day)
+  const todayHours = future.filter(fc => isSameDay(fc.valid_for, now.toISOString()))
+  const rows = expanded ? todayHours : future.slice(0, 6)
+
   if (!rows.length) return null
+
   return (
     <div className="mt-4 border-t border-slate-700 pt-4 space-y-1">
       {rows.map((fc, i) => {
         const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for)
         const drops = rainDrops(fc.precip_mm)
+        const fl = feelsLike(fc.temperature, fc.wind_speed)
         return (
           <div key={i} className="flex items-center gap-3 py-0.5">
             <span className="text-slate-400 font-mono text-xs w-12 shrink-0">{formatHour(fc.valid_for)}</span>
             <span className="text-lg w-6 text-center leading-none">{symbol}</span>
-            <span className="text-white text-sm font-medium w-8">
-              {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+            <span className="flex items-baseline gap-1 w-20 shrink-0">
+              <span className="text-white text-sm font-medium">
+                {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+              </span>
+              {fl != null && <span className="text-slate-500 text-xs">({fl}°)</span>}
             </span>
             <span className={`text-xs w-10 ${fc.precip_probability >= 40 ? 'text-blue-300' : 'text-slate-500'}`}>
               {Math.round(fc.precip_probability)}%
@@ -201,6 +212,14 @@ function SixHourTable({ forecasts }) {
           </div>
         )
       })}
+      {todayHours.length > 6 && (
+        <button
+          onClick={() => setExpanded(o => !o)}
+          className="w-full text-center text-xs text-slate-600 pt-2 pb-1 active:text-slate-400 transition-colors"
+        >
+          {expanded ? '↑ Visa färre' : `↓ Visa hela dagen`}
+        </button>
+      )}
     </div>
   )
 }
@@ -980,7 +999,7 @@ export default function MobileApp() {
         {activeTab === 'now' && (
           <>
             <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
-            {days.map((hours, i) => (
+            {days.slice(1).map((hours, i) => (
               <DayRow key={i} hours={hours} warnings={warnings} />
             ))}
           </>
