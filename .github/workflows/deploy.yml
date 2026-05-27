@@ -18,4 +18,4 @@ jobs:
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=20 \
             ubuntu@${{ secrets.EC2_HOST }} \
-            "cd ~/weather-ensemble && git pull && docker compose up -d --build"
+            "cd ~/weather-ensemble && git pull && echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' > .env && docker compose up -d --build"
