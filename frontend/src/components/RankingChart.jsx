@@ -125,15 +125,34 @@ export default function RankingChart({ history }) {
     )
   }
 
+  // Build rank → source mapping from the latest data point for Y-axis labels
+  const latestPoint = chartData[chartData.length - 1]
+  const rankToSource = {}
+  for (const src of sources) {
+    const rank = latestPoint?.[src]
+    if (rank != null) rankToSource[rank] = src
+  }
+
+  const YAxisTick = ({ x, y, payload }) => {
+    const src = rankToSource[payload.value]
+    const label = src ? (SOURCE_LABELS[src] ?? src) : `#${payload.value}`
+    const color = src ? (SOURCE_COLORS[src] ?? '#94a3b8') : '#475569'
+    return (
+      <text x={x} y={y} dy={4} textAnchor="end" fill={color} fontSize={11}>
+        {label}
+      </text>
+    )
+  }
+
   return (
     <div className="bg-slate-800 rounded-xl p-6">
       <h2 className="text-lg font-semibold text-white mb-1">Ranking över tid</h2>
       <p className="text-xs text-slate-500 mb-5">
-        Placering per dag baserat på viktat MAE — #1 är bäst · Ensemble visas som streckad linje
+        Placering per dag baserat på viktat MAE — #1 är bäst · Ensemble är streckad
       </p>
 
       <ResponsiveContainer width="100%" height={260}>
-        <LineChart data={chartData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+        <LineChart data={chartData} margin={{ top: 4, right: 8, left: 60, bottom: 0 }}>
           <XAxis
             dataKey="date"
             tick={{ fill: '#94a3b8', fontSize: 11 }}
@@ -144,19 +163,12 @@ export default function RankingChart({ history }) {
             reversed
             domain={[1, nSources]}
             ticks={Array.from({ length: nSources }, (_, i) => i + 1)}
-            tick={{ fill: '#94a3b8', fontSize: 11 }}
+            tick={<YAxisTick />}
             tickLine={false}
             axisLine={false}
-            tickFormatter={v => `#${v}`}
+            width={64}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Legend
-            formatter={v => (
-              <span style={{ color: SOURCE_COLORS[v] ?? '#94a3b8', fontSize: 11 }}>
-                {SOURCE_LABELS[v] ?? v}
-              </span>
-            )}
-          />
           {sources.map(src => (
             <Line
               key={src}
