@@ -25,6 +25,7 @@ REGLER:
 4. Naturligt, levande svenska — inte tabelluppläsning av siffror
 5. practical_advice.tips: lägg bara till om det faktiskt är ovanligt eller kräver agerande
 6. Returnera EXAKT JSON-strukturen nedan — inget annat, ingen kommentar, inga kodblock
+7. Använd ENBART vanliga, korrekta svenska ord — inga påhittade sammansättningar, kontrollera stavning
 
 OUTPUT-SCHEMA:
 {
@@ -262,6 +263,7 @@ async def generate_summary(db: Session, target_date: date, period: str) -> Optio
         message = await client.messages.create(
             model="claude-haiku-4-5",
             max_tokens=1500,
+            temperature=0.2,
             system=_SYSTEM_PROMPT,
             messages=[{
                 "role": "user",
