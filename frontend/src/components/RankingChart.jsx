@@ -3,14 +3,16 @@ import {
 } from 'recharts'
 
 const SOURCE_LABELS = {
-  smhi: 'SMHI',
-  yr: 'Yr.no',
-  open_meteo: 'Open-Meteo',
+  smhi:               'SMHI',
+  yr:                 'Yr.no',
+  open_meteo:         'OM GFS',
   open_meteo_icon_eu: 'OM ICON-EU',
-  open_meteo_ecmwf: 'OM ECMWF',
-  openweathermap: 'OWM',
-  radar_nowcast: 'Radar',
-  ensemble: 'Ensemble ★',
+  open_meteo_ecmwf:   'OM ECMWF',
+  open_meteo_ukmo:    'UKMO',
+  open_meteo_knmi:    'KNMI',
+  openweathermap:     'OWM',
+  radar_nowcast:      'Radar',
+  ensemble:           'Ensemble ★',
 }
 
 const SOURCE_COLORS = {
@@ -19,9 +21,11 @@ const SOURCE_COLORS = {
   open_meteo:         '#f97316',
   open_meteo_icon_eu: '#fb923c',
   open_meteo_ecmwf:   '#fbbf24',
+  open_meteo_ukmo:    '#e879f9',
+  open_meteo_knmi:    '#2dd4bf',
   openweathermap:     '#a78bfa',
   radar_nowcast:      '#f43f5e',
-  ensemble:           '#ffffff',
+  ensemble:           '#e2e8f0',
 }
 
 // Composite MAE score: lower = better (used to determine rank)
@@ -128,7 +132,7 @@ export default function RankingChart({ history }) {
     <div className="bg-slate-800 rounded-xl p-6">
       <h2 className="text-lg font-semibold text-white mb-1">Ranking över tid</h2>
       <p className="text-xs text-slate-500 mb-5">
-        Placering per dag baserat på viktat MAE — #1 är bäst
+        Placering per dag baserat på viktat MAE — #1 är bäst · Ensemble visas som streckad linje
       </p>
 
       <ResponsiveContainer width="100%" height={260}>

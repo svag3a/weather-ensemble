@@ -39,6 +39,8 @@ SOURCE_GROUPS: dict[str, str] = {
     "open_meteo":         "open_meteo_family",
     "open_meteo_icon_eu": "open_meteo_family",
     "open_meteo_ecmwf":   "open_meteo_family",
+    "open_meteo_ukmo":    "open_meteo_ukmo",    # UKMO: independent model, own group
+    "open_meteo_knmi":    "open_meteo_knmi",    # KNMI: independent model, own group
     "radar_nowcast":      "radar_nowcast",
     "ensemble":           "ensemble",
 }
