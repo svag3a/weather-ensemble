@@ -50,8 +50,13 @@ _LEVEL_LABEL = {
 }
 
 # Normalise level codes to canonical Swedish form before returning to frontend
+# SMHI API returns English codes in varying case (Message, MESSAGE, etc.)
 _CODE_NORMALIZE = {
-    "Message": "Meddelande",
+    "Message":    "Meddelande",
+    "MESSAGE":    "Meddelande",
+    "RED":        "Red",
+    "ORANGE":     "Orange",
+    "YELLOW":     "Yellow",
 }
 
 

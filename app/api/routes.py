@@ -297,43 +297,6 @@ async def get_summary(
     return result
 
 
-@router.get("/debug/warnings-raw")
-async def debug_warnings_raw():
-    """Diagnostic: raw SMHI warning areas for county 14 with polygon status. Remove when done."""
-    import httpx
-    from app.sources.smhi_warnings import _COUNTY_ID, _GBG_LON, _GBG_LAT, _geometry_contains
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "https://opendata-download-warnings.smhi.se/ibww/api/version/1/warning.json",
-            timeout=10,
-        )
-        data = resp.json()
-
-    results = []
-    for warning in data:
-        county_ids = [
-            a.get("id")
-            for wa in warning.get("warningAreas", [])
-            for a in wa.get("affectedAreas", [])
-        ]
-        if _COUNTY_ID not in county_ids:
-            continue
-        for wa in warning.get("warningAreas", []):
-            if not any(a.get("id") == _COUNTY_ID for a in wa.get("affectedAreas", [])):
-                continue
-            geometry = wa.get("area", {}).get("geometry")
-            has_polygon = geometry is not None
-            gbg_inside = _geometry_contains(geometry, _GBG_LON, _GBG_LAT) if has_polygon else None
-            results.append({
-                "event": warning.get("event", {}).get("code"),
-                "level": wa.get("warningLevel", {}).get("code"),
-                "has_polygon": has_polygon,
-                "gbg_inside": gbg_inside,
-                "affected_counties": [a.get("id") for a in wa.get("affectedAreas", [])],
-            })
-    return results
-
-
 @router.post("/collect", status_code=202)
 async def trigger_collection():
     """Manually trigger a collection run (useful during development)."""
