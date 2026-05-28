@@ -1210,7 +1210,7 @@ export default function MobileApp() {
         {activeTab === 'now' && (
           <>
             <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
-            {days.slice(1).filter(hours => hours.length >= 20).map((hours, i) => (
+            {days.slice(1).filter(hours => hours.length >= 23).map((hours, i) => (
               <DayRow key={i} hours={hours} warnings={warnings} />
             ))}
           </>

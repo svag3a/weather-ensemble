@@ -297,6 +297,31 @@ async def get_summary(
     return result
 
 
+@router.get("/debug/ensemble-range")
+def debug_ensemble_range(db: Session = Depends(get_db)):
+    """Diagnostic: how many hours of ensemble data exist. Remove when done."""
+    from sqlalchemy import func
+    latest_run = (
+        db.query(EnsembleForecast.computed_at)
+        .order_by(EnsembleForecast.computed_at.desc())
+        .first()
+    )
+    if not latest_run:
+        return {"error": "no data"}
+    first_vf = db.query(func.min(EnsembleForecast.valid_for)).filter(
+        EnsembleForecast.computed_at == latest_run[0]).scalar()
+    last_vf = db.query(func.max(EnsembleForecast.valid_for)).filter(
+        EnsembleForecast.computed_at == latest_run[0]).scalar()
+    count = db.query(EnsembleForecast).filter(
+        EnsembleForecast.computed_at == latest_run[0]).count()
+    return {
+        "computed_at": latest_run[0].isoformat(),
+        "first_valid_for": first_vf.isoformat() if first_vf else None,
+        "last_valid_for": last_vf.isoformat() if last_vf else None,
+        "total_hours": count,
+    }
+
+
 @router.post("/collect", status_code=202)
 async def trigger_collection():
     """Manually trigger a collection run (useful during development)."""
