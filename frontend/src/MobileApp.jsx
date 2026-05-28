@@ -1168,6 +1168,32 @@ function AnalysView() {
   )
 }
 
+// ── Swipe navigation ──────────────────────────────────────────────────────────
+
+const TAB_ORDER = ['now', 'week', 'analysis', 'warnings', 'sources']
+
+function useSwipeNav(activeTab, setActiveTab) {
+  const start = useRef(null)
+
+  const onTouchStart = useCallback(e => {
+    start.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }, [])
+
+  const onTouchEnd = useCallback(e => {
+    if (!start.current) return
+    const dx = e.changedTouches[0].clientX - start.current.x
+    const dy = e.changedTouches[0].clientY - start.current.y
+    start.current = null
+    // Require clearly horizontal swipe: >50px and more horizontal than vertical
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return
+    const idx = TAB_ORDER.indexOf(activeTab)
+    if (dx < 0 && idx < TAB_ORDER.length - 1) setActiveTab(TAB_ORDER[idx + 1])
+    if (dx > 0 && idx > 0)                    setActiveTab(TAB_ORDER[idx - 1])
+  }, [activeTab, setActiveTab])
+
+  return { onTouchStart, onTouchEnd }
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MobileApp() {
@@ -1175,6 +1201,7 @@ export default function MobileApp() {
   const [warnings, setWarnings] = useState([])
   const [activeTab, setActiveTab] = useState('now')
   const { radar, coords } = useRadarLocation()
+  const swipeHandlers = useSwipeNav(activeTab, setActiveTab)
 
   useEffect(() => {
     const loadWarnings = () => fetchWarnings().then(setWarnings).catch(() => {})
@@ -1207,7 +1234,7 @@ export default function MobileApp() {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 pb-20">
-      <div className="px-4 pt-10 pb-4 space-y-3 max-w-lg mx-auto">
+      <div className="px-4 pt-10 pb-4 space-y-3 max-w-lg mx-auto" {...swipeHandlers}>
 
         {activeTab === 'now' && (
           <>
