@@ -120,6 +120,7 @@ async def collect_and_update() -> None:
 
         build_ensemble(db, issued_at, forecasts_by_source)
         _maybe_snapshot_weights(db, issued_at.date())
+        await _pregen_ai_summaries(db)
         logger.info("Collection run complete.")
     finally:
         db.close()
@@ -147,6 +148,24 @@ def _maybe_snapshot_weights(db: Session, today) -> None:
         ))
     db.commit()
     logger.info("  Daily weight snapshot saved (%d rows)", len(rows))
+
+
+async def _pregen_ai_summaries(db: Session) -> None:
+    """Pre-generate and cache AI summaries for today and tomorrow after each collection run."""
+    import os
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        return
+    from datetime import date, timedelta
+    from app.sources.ai_summary import generate_summary
+    for period, target_date in [
+        ("today",    date.today()),
+        ("tomorrow", date.today() + timedelta(days=1)),
+    ]:
+        try:
+            await generate_summary(db, target_date, period)
+            logger.info("  AI summary ready for %s", period)
+        except Exception as exc:
+            logger.warning("  AI summary pre-generation failed for %s: %s", period, exc)
 
 
 def create_scheduler() -> AsyncIOScheduler:

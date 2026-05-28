@@ -1026,7 +1026,7 @@ function AnalysView() {
 
       {loading && (
         <div className="bg-slate-800 rounded-2xl p-8 text-slate-500 text-center text-sm">
-          Genererar sammanfattning…
+          Hämtar analys…
         </div>
       )}
 
@@ -1049,7 +1049,7 @@ function AnalysView() {
                   {summary.summary?.headline}
                 </h2>
                 {summary.ui?.hero_badge && (
-                  <span className={`shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full ${confStyle.bg} ${confStyle.color}`}>
+                  <span className="shrink-0 flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-slate-700 text-slate-300">
                     <span className={`w-1.5 h-1.5 rounded-full ${alertStyle.dot}`} />
                     {summary.ui.hero_badge}
                   </span>
