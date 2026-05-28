@@ -297,6 +297,45 @@ async def get_summary(
     return result
 
 
+@router.get("/debug/precip")
+def debug_precip(
+    rows: int = Query(default=48, ge=1, le=200),
+    db: Session = Depends(get_db),
+):
+    """Diagnostic: last N observations + mae_precip per source. Remove when done."""
+    from app.models import Observation
+    obs = (
+        db.query(Observation)
+        .order_by(Observation.valid_for.desc())
+        .limit(rows)
+        .all()
+    )
+    weights = db.query(SourceWeight).order_by(SourceWeight.source, SourceWeight.lead_hours).all()
+    return {
+        "observations": [
+            {
+                "valid_for": o.valid_for.isoformat(),
+                "precip_mm": o.precip_mm,
+                "outcome": (
+                    1.0 if o.precip_mm is not None and o.precip_mm > 0.1
+                    else 0.0 if o.precip_mm is not None
+                    else None
+                ),
+            }
+            for o in obs
+        ],
+        "mae_precip_by_source": [
+            {
+                "source": w.source,
+                "lead_hours": w.lead_hours,
+                "mae_precip": round(w.mae_precip, 4),
+                "sample_count": w.sample_count,
+            }
+            for w in weights
+        ],
+    }
+
+
 @router.post("/collect", status_code=202)
 async def trigger_collection():
     """Manually trigger a collection run (useful during development)."""
