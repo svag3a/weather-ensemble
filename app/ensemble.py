@@ -147,10 +147,10 @@ def update_weights(db: Session, valid_for: datetime) -> None:
             weight_row = SourceWeight(
                 source=fc.source,
                 lead_hours=bucket,
-                mae_temperature=1.0,
-                mae_precip=1.0,
-                mae_wind=1.0,
-                mae_cloud=1.0,
+                mae_temperature=2.0,   # typical first-guess temp error ≈ 2°C
+                mae_precip=0.20,       # climatological Brier baseline for Göteborg
+                mae_wind=3.0,          # typical first-guess wind error ≈ 3 m/s
+                mae_cloud=20.0,        # typical first-guess cloud error ≈ 20%
                 sample_count=0,
             )
             db.add(weight_row)
