@@ -409,7 +409,9 @@ function WeekView({ warnings }) {
   const now     = new Date()
   const future  = weekForecast.filter(fc => parseTS(fc.valid_for) > now)
   const days    = groupByDay(future)
-  const summaries = days.map(hours => ({ hours, ...getDaySummary(hours) }))
+  const summaries = days
+    .filter((hours, i) => i === 0 || hours.length >= 23)
+    .map(hours => ({ hours, ...getDaySummary(hours) }))
 
   const weekMin = Math.min(...summaries.map(s => s.minTemp ?? 99))
   const weekMax = Math.max(...summaries.map(s => s.maxTemp ?? -99))
