@@ -180,7 +180,7 @@ function SixHourTable({ forecasts }) {
 
   // All remaining hours of today (local calendar day)
   const todayHours = future.filter(fc => isSameDay(fc.valid_for, now.toISOString()))
-  const rows = expanded ? todayHours : future.slice(0, 6)
+  const rows = expanded ? todayHours : todayHours.slice(0, 6)
 
   if (!rows.length) return null
 
@@ -1184,8 +1184,8 @@ export default function MobileApp() {
   const load = useCallback(async () => {
     try {
       setForecast(coords
-        ? await fetchLocalForecast(coords.lat, coords.lon, 48)
-        : await fetchEnsemble(48))
+        ? await fetchLocalForecast(coords.lat, coords.lon, 72)
+        : await fetchEnsemble(72))
     } catch {}
   }, [coords])
 
@@ -1210,7 +1210,7 @@ export default function MobileApp() {
         {activeTab === 'now' && (
           <>
             <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
-            {days.slice(1).map((hours, i) => (
+            {days.slice(1).filter(hours => hours.length >= 20).map((hours, i) => (
               <DayRow key={i} hours={hours} warnings={warnings} />
             ))}
           </>
