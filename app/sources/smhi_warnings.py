@@ -34,10 +34,11 @@ _RELEVANT_EVENTS = {
 
 # Map warning level codes to sortable severity (higher = more severe)
 _LEVEL_SEVERITY = {
-    "Red":       3,
-    "Orange":    2,
-    "Yellow":    1,
+    "Red":        3,
+    "Orange":     2,
+    "Yellow":     1,
     "Meddelande": 0,
+    "Message":    0,   # English alias returned by some SMHI warning types
 }
 
 _LEVEL_LABEL = {
@@ -45,6 +46,12 @@ _LEVEL_LABEL = {
     "Orange":     "Orange varning",
     "Yellow":     "Gul varning",
     "Meddelande": "Meddelande",
+    "Message":    "Meddelande",  # normalise English alias
+}
+
+# Normalise level codes to canonical Swedish form before returning to frontend
+_CODE_NORMALIZE = {
+    "Message": "Meddelande",
 }
 
 
@@ -142,6 +149,7 @@ async def fetch_warnings(client: httpx.AsyncClient) -> list[dict]:
                 continue
 
             level_code  = wa.get("warningLevel", {}).get("code", "Meddelande")
+            level_code  = _CODE_NORMALIZE.get(level_code, level_code)
             level_label = _LEVEL_LABEL.get(level_code, level_code)
             severity    = _LEVEL_SEVERITY.get(level_code, 0)
 
