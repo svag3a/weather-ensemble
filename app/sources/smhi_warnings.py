@@ -91,10 +91,16 @@ def _geometry_contains(geometry: dict, lon: float, lat: float) -> bool:
 
 
 def _warning_area_covers_point(wa: dict, lon: float, lat: float) -> bool:
-    """True if the warningArea's polygon covers the given point."""
+    """True if the warningArea's polygon covers the given point.
+    Returns False if no polygon is available — without geographic data we
+    cannot verify the warning applies to this point, so we suppress it.
+    This prevents county-level warnings (e.g. fire risk for eastern Sweden)
+    from leaking through when Västra Götaland appears in the county list
+    but the actual affected area is far from Göteborg.
+    """
     geometry = wa.get("area", {}).get("geometry")
     if not geometry:
-        return True  # no polygon data — fall back to county-level match
+        return False
     return _geometry_contains(geometry, lon, lat)
 
 
