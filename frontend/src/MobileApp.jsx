@@ -29,8 +29,12 @@ function useReverseGeocode(coords) {
       .then(r => r.json())
       .then(data => {
         const a = data.address ?? {}
-        const suburb = a.suburb || a.city_district || a.neighbourhood || a.quarter || null
-        const place  = a.amenity || a.tourism || a.leisure || a.building || a.road || null
+        // city_district = official Göteborg stadsdel (Centrum, Majorna-Linné, …)
+        // suburb        = more specific area within it (Otterhällan, Haga, …)
+        const suburb = a.city_district || a.suburb || a.neighbourhood || a.quarter || null
+        const place  = a.amenity || a.tourism || a.leisure
+                     || (a.suburb !== suburb ? a.suburb : null)
+                     || a.building || a.road || null
         if (suburb || place) setLocation({ suburb, place })
       })
       .catch(() => {})
