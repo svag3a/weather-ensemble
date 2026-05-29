@@ -8,6 +8,37 @@ import { generateSummary, summariseConfidence } from './summary'
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
+function useReverseGeocode(coords) {
+  const [location, setLocation] = useState(null)
+  const lastCoords = useRef(null)
+
+  useEffect(() => {
+    if (!coords) return
+    // Skip if coords haven't moved more than ~100 m
+    if (lastCoords.current) {
+      const dlat = Math.abs(coords.lat - lastCoords.current.lat)
+      const dlon = Math.abs(coords.lon - lastCoords.current.lon)
+      if (dlat < 0.001 && dlon < 0.001) return
+    }
+    lastCoords.current = coords
+
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lon}&format=json&accept-language=sv`,
+      { headers: { 'Accept-Language': 'sv' } }
+    )
+      .then(r => r.json())
+      .then(data => {
+        const a = data.address ?? {}
+        const suburb = a.suburb || a.city_district || a.neighbourhood || a.quarter || null
+        const place  = a.amenity || a.tourism || a.leisure || a.building || a.road || null
+        if (suburb || place) setLocation({ suburb, place })
+      })
+      .catch(() => {})
+  }, [coords])
+
+  return location
+}
+
 function useRadarLocation() {
   const [radar, setRadar] = useState(null)
   const [coords, setCoords] = useState(null)
@@ -1230,6 +1261,7 @@ export default function MobileApp() {
   const [activeTab, setActiveTab] = useState('now')
   const [slideDir, setSlideDir] = useState(1)
   const { radar, coords } = useRadarLocation()
+  const geoLocation = useReverseGeocode(coords)
 
   // Direction-aware tab change: drives the slide animation
   const changeTab = useCallback((newTab) => {
@@ -1290,6 +1322,14 @@ export default function MobileApp() {
 
               {activeTab === 'now' && (
                 <>
+                  {geoLocation && (
+                    <div className="flex items-center gap-1.5 px-1 text-slate-500 text-xs">
+                      <span>📍</span>
+                      <span>
+                        {[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}
+                      </span>
+                    </div>
+                  )}
                   <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
                   {days.slice(1).filter(hours => hours.length >= 23).map((hours, i) => (
                     <DayRow key={i} hours={hours} warnings={warnings} />
