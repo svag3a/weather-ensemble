@@ -379,25 +379,32 @@ function TempBar({ dayMin, dayMax, weekMin, weekMax }) {
   const left  = ((dayMin - weekMin) / span) * 100
   const width = Math.max(((dayMax - dayMin) / span) * 100, 6)
 
-  // Gradient spans the full week range so every bar shares the same colour scale.
-  // background-size stretches the gradient to track width; background-position
-  // shifts it so the visible slice matches the day's temperature range.
+  // The gradient always covers the full week range (weekMin→weekMax colours).
+  // A clipping wrapper sits at the bar's position; inside it a full-track-width
+  // gradient div is shifted left so its origin aligns with the track's left edge.
+  // This guarantees the same temperature always maps to the same horizontal colour
+  // position across all days — gradients are visually parallel.
   const c1 = tempToColor(weekMin)
   const c2 = tempToColor(weekMax)
-  const bg = c1 === c2 ? c1 : `linear-gradient(to right, ${c1}, ${c2})`
+  const bg  = c1 === c2 ? c1 : `linear-gradient(to right, ${c1}, ${c2})`
 
   return (
     <div className="relative h-1.5 bg-slate-700 rounded-full" style={{ minWidth: 80 }}>
+      {/* Clipping wrapper — positioned at the day's temperature range */}
       <div
-        className="absolute h-full rounded-full"
-        style={{
-          left:               `${left}%`,
-          width:              `${width}%`,
-          background:         bg,
-          backgroundSize:     `${10000 / width}% 100%`,
-          backgroundPosition: `${-(left / width) * 100}% 0`,
-        }}
-      />
+        className="absolute h-full rounded-full overflow-hidden"
+        style={{ left: `${left}%`, width: `${width}%` }}
+      >
+        {/* Full-track gradient, shifted back to track origin */}
+        <div
+          className="absolute h-full"
+          style={{
+            left:       `${-(left / width) * 100}%`,
+            width:      `${10000 / width}%`,
+            background: bg,
+          }}
+        />
+      </div>
     </div>
   )
 }
