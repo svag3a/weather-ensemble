@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary } from './api'
@@ -364,25 +365,27 @@ function DayRow({ hours, warnings }) {
 
 // ── WeekView ──────────────────────────────────────────────────────────────────
 
-function tempBarColor(avg) {
-  if (avg >= 22) return 'bg-orange-400'
-  if (avg >= 16) return 'bg-yellow-400'
-  if (avg >= 10) return 'bg-green-400'
-  if (avg >=  4) return 'bg-teal-400'
-  if (avg >=  0) return 'bg-blue-300'
-  return 'bg-blue-500'
+function tempToColor(t) {
+  if (t >= 22) return '#fb923c'   // orange-400
+  if (t >= 16) return '#facc15'   // yellow-400
+  if (t >= 10) return '#4ade80'   // green-400
+  if (t >=  4) return '#2dd4bf'   // teal-400
+  if (t >=  0) return '#93c5fd'   // blue-300
+  return '#60a5fa'                // blue-400
 }
 
 function TempBar({ dayMin, dayMax, weekMin, weekMax }) {
-  const span = weekMax - weekMin || 1
+  const span  = weekMax - weekMin || 1
   const left  = ((dayMin - weekMin) / span) * 100
   const width = Math.max(((dayMax - dayMin) / span) * 100, 6)
-  const color = tempBarColor((dayMin + dayMax) / 2)
+  const c1 = tempToColor(dayMin)
+  const c2 = tempToColor(dayMax)
+  const bg  = c1 === c2 ? c1 : `linear-gradient(to right, ${c1}, ${c2})`
   return (
     <div className="relative h-1.5 bg-slate-700 rounded-full" style={{ minWidth: 80 }}>
       <div
-        className={`absolute h-full rounded-full ${color}`}
-        style={{ left: `${left}%`, width: `${width}%` }}
+        className="absolute h-full rounded-full"
+        style={{ left: `${left}%`, width: `${width}%`, background: bg }}
       />
     </div>
   )
@@ -1172,6 +1175,13 @@ function AnalysView() {
 
 const TAB_ORDER = ['now', 'week', 'analysis', 'warnings', 'sources']
 
+// slideDir: 1 = forward (enter from right), -1 = backward (enter from left)
+const slideVariants = {
+  enter:  (dir) => ({ x: dir > 0 ? '100%' : '-100%' }),
+  center: { x: 0 },
+  exit:   (dir) => ({ x: dir > 0 ? '-100%' : '100%' }),
+}
+
 function useSwipeNav(activeTab, setActiveTab) {
   const start = useRef(null)
 
@@ -1200,8 +1210,18 @@ export default function MobileApp() {
   const [forecast, setForecast] = useState(null)
   const [warnings, setWarnings] = useState([])
   const [activeTab, setActiveTab] = useState('now')
+  const [slideDir, setSlideDir] = useState(1)
   const { radar, coords } = useRadarLocation()
-  const swipeHandlers = useSwipeNav(activeTab, setActiveTab)
+
+  // Direction-aware tab change: drives the slide animation
+  const changeTab = useCallback((newTab) => {
+    const curIdx = TAB_ORDER.indexOf(activeTab)
+    const newIdx = TAB_ORDER.indexOf(newTab)
+    setSlideDir(newIdx >= curIdx ? 1 : -1)
+    setActiveTab(newTab)
+  }, [activeTab])
+
+  const swipeHandlers = useSwipeNav(activeTab, changeTab)
 
   useEffect(() => {
     const loadWarnings = () => fetchWarnings().then(setWarnings).catch(() => {})
@@ -1233,41 +1253,58 @@ export default function MobileApp() {
   const days = groupByDay(future)
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 pb-20">
-      <div className="px-4 pt-10 pb-4 space-y-3 max-w-lg mx-auto" {...swipeHandlers}>
+    <div className="fixed inset-0 bg-slate-900 text-slate-100 flex flex-col">
 
-        {activeTab === 'now' && (
-          <>
-            <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
-            {days.slice(1).filter(hours => hours.length >= 23).map((hours, i) => (
-              <DayRow key={i} hours={hours} warnings={warnings} />
-            ))}
-          </>
-        )}
+      {/* Animated content area */}
+      <div className="flex-1 relative overflow-x-hidden min-h-0" {...swipeHandlers}>
+        <AnimatePresence mode="sync" custom={slideDir}>
+          <motion.div
+            key={activeTab}
+            custom={slideDir}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ type: 'tween', duration: 0.28, ease: 'easeInOut' }}
+            className="absolute inset-0 overflow-y-auto"
+          >
+            <div className="px-4 pt-10 pb-4 space-y-3 max-w-lg mx-auto">
 
-        {activeTab === 'sources' && (
-          <EnsembleView ensembleFc={currentFc} />
-        )}
+              {activeTab === 'now' && (
+                <>
+                  <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
+                  {days.slice(1).filter(hours => hours.length >= 23).map((hours, i) => (
+                    <DayRow key={i} hours={hours} warnings={warnings} />
+                  ))}
+                </>
+              )}
 
-        {activeTab === 'week' && (
-          <WeekView warnings={warnings} />
-        )}
+              {activeTab === 'week' && (
+                <WeekView warnings={warnings} />
+              )}
 
-        {activeTab === 'analysis' && (
-          <AnalysView />
-        )}
+              {activeTab === 'analysis' && (
+                <AnalysView />
+              )}
 
-        {activeTab === 'warnings' && (
-          <WarningsView warnings={warnings} />
-        )}
+              {activeTab === 'warnings' && (
+                <WarningsView warnings={warnings} />
+              )}
 
+              {activeTab === 'sources' && (
+                <EnsembleView ensembleFc={currentFc} />
+              )}
+
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
 
       {/* Bottom tab bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-slate-800/95 backdrop-blur border-t border-slate-700 safe-bottom">
+      <div className="bg-slate-800/95 backdrop-blur border-t border-slate-700 safe-bottom">
         <div className="flex max-w-lg mx-auto">
           <button
-            onClick={() => setActiveTab('now')}
+            onClick={() => changeTab('now')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
               activeTab === 'now' ? 'text-white' : 'text-slate-500'
             }`}
@@ -1276,7 +1313,7 @@ export default function MobileApp() {
             <span>Nu</span>
           </button>
           <button
-            onClick={() => setActiveTab('week')}
+            onClick={() => changeTab('week')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
               activeTab === 'week' ? 'text-white' : 'text-slate-500'
             }`}
@@ -1285,7 +1322,7 @@ export default function MobileApp() {
             <span>Vecka</span>
           </button>
           <button
-            onClick={() => setActiveTab('analysis')}
+            onClick={() => changeTab('analysis')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
               activeTab === 'analysis' ? 'text-white' : 'text-slate-500'
             }`}
@@ -1294,7 +1331,7 @@ export default function MobileApp() {
             <span>Analys</span>
           </button>
           <button
-            onClick={() => setActiveTab('warnings')}
+            onClick={() => changeTab('warnings')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
               activeTab === 'warnings' ? 'text-white' : 'text-slate-500'
             }`}
@@ -1308,7 +1345,7 @@ export default function MobileApp() {
             <span>Varningar</span>
           </button>
           <button
-            onClick={() => setActiveTab('sources')}
+            onClick={() => changeTab('sources')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
               activeTab === 'sources' ? 'text-white' : 'text-slate-500'
             }`}
