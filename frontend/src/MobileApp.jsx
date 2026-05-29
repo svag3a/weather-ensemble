@@ -378,14 +378,25 @@ function TempBar({ dayMin, dayMax, weekMin, weekMax }) {
   const span  = weekMax - weekMin || 1
   const left  = ((dayMin - weekMin) / span) * 100
   const width = Math.max(((dayMax - dayMin) / span) * 100, 6)
-  const c1 = tempToColor(dayMin)
-  const c2 = tempToColor(dayMax)
-  const bg  = c1 === c2 ? c1 : `linear-gradient(to right, ${c1}, ${c2})`
+
+  // Gradient spans the full week range so every bar shares the same colour scale.
+  // background-size stretches the gradient to track width; background-position
+  // shifts it so the visible slice matches the day's temperature range.
+  const c1 = tempToColor(weekMin)
+  const c2 = tempToColor(weekMax)
+  const bg = c1 === c2 ? c1 : `linear-gradient(to right, ${c1}, ${c2})`
+
   return (
     <div className="relative h-1.5 bg-slate-700 rounded-full" style={{ minWidth: 80 }}>
       <div
         className="absolute h-full rounded-full"
-        style={{ left: `${left}%`, width: `${width}%`, background: bg }}
+        style={{
+          left:               `${left}%`,
+          width:              `${width}%`,
+          background:         bg,
+          backgroundSize:     `${10000 / width}% 100%`,
+          backgroundPosition: `${-(left / width) * 100}% 0`,
+        }}
       />
     </div>
   )
