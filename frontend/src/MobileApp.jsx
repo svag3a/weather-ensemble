@@ -138,21 +138,39 @@ function groupByDay(forecasts) {
   return days
 }
 
+function median(arr) {
+  if (!arr.length) return 0
+  const s = [...arr].sort((a, b) => a - b)
+  const m = Math.floor(s.length / 2)
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+
+function percentile75(arr) {
+  if (!arr.length) return 0
+  const s = [...arr].sort((a, b) => a - b)
+  return s[Math.floor(s.length * 0.75)]
+}
+
 function getDaySummary(hours) {
   const temps = hours.map(h => h.temperature).filter(t => t != null)
   const minTemp = temps.length ? Math.round(Math.min(...temps)) : null
   const maxTemp = temps.length ? Math.round(Math.max(...temps)) : null
 
-  // Representative condition: worst precipitation daytime hour (07–20 UTC).
-  // Falling back to all hours only if no daytime data exists.
+  // Representative condition over daytime hours (07–20 UTC).
+  // Cloud cover: median — reflects the typical condition, not the worst.
+  // Precip probability: 75th percentile — catches a rain window without
+  //   letting one bad hour represent the whole day.
   const daytime = hours.filter(h => {
     const utcH = parseTS(h.valid_for).getUTCHours()
     return utcH >= 7 && utcH < 20
   })
   const pool = daytime.length ? daytime : hours
-  const rep = [...pool].sort((a, b) => b.precip_probability - a.precip_probability)[0]
+  const repCloud  = median(pool.map(h => h.cloud_cover ?? 0))
+  const repPrecip = percentile75(pool.map(h => h.precip_probability ?? 0))
+  const repTemp   = median(pool.map(h => h.temperature ?? 10))
+  const repWind   = median(pool.map(h => h.wind_speed ?? 0))
   // Pass null for validFor — day summaries always use daytime symbols
-  const { symbol } = getWeatherInfo(rep.temperature, rep.precip_probability, rep.wind_speed, rep.cloud_cover, null)
+  const { symbol } = getWeatherInfo(repTemp, repPrecip, repWind, repCloud, null)
 
   const maxPrecipMm = Math.max(...hours.map(h => h.precip_mm ?? 0))
   const drops = rainDrops(maxPrecipMm)
