@@ -423,6 +423,50 @@ def include_source(source: str, db: Session = Depends(get_db)):
     return {"status": "included", "source": source}
 
 
+@router.get("/debug/weights-diag")
+def debug_weights_diag(db: Session = Depends(get_db)):
+    """Diagnose why update_weights may not be running."""
+    from datetime import timedelta
+    from sqlalchemy import func
+    from app.models import Observation
+
+    now = datetime.now(timezone.utc)
+    issued_at = now.replace(minute=0, second=0, microsecond=0)
+    truth_time = (issued_at - timedelta(hours=1)).replace(tzinfo=None)
+
+    # Check observation for truth_time
+    obs = db.query(Observation).filter(Observation.valid_for == truth_time).first()
+
+    # Recent observations
+    recent_obs = db.query(Observation).order_by(Observation.valid_for.desc()).limit(5).all()
+
+    # Forecasts matching truth_time
+    from app.models import Forecast
+    fc_count = db.query(func.count(Forecast.id)).filter(
+        Forecast.valid_for == truth_time,
+        Forecast.lead_hours != 1
+    ).scalar()
+
+    # Sample forecast valid_for values near truth_time
+    sample_fcs = db.query(Forecast.valid_for, Forecast.source, Forecast.lead_hours).filter(
+        Forecast.valid_for >= truth_time - timedelta(hours=2),
+        Forecast.valid_for <= truth_time + timedelta(hours=2),
+        Forecast.lead_hours != 1
+    ).limit(10).all()
+
+    return {
+        "now_utc": now.isoformat(),
+        "truth_time": truth_time.isoformat(),
+        "obs_for_truth_time": obs.valid_for.isoformat() if obs else None,
+        "obs_temperature": obs.temperature if obs else None,
+        "recent_observations": [{"valid_for": o.valid_for.isoformat(), "temp": o.temperature} for o in recent_obs],
+        "forecasts_matching_truth_time": fc_count,
+        "sample_forecasts_near_truth": [
+            {"valid_for": str(f[0]), "source": f[1], "lead_hours": f[2]} for f in sample_fcs
+        ],
+    }
+
+
 @router.post("/collect", status_code=202)
 async def trigger_collection():
     """Manually trigger a collection run (useful during development)."""
