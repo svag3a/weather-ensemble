@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
@@ -153,6 +153,55 @@ function getImageStyle(fc, validFor) {
   ].filter(Boolean).join(' ')
 
   return { filter, overlay }
+}
+
+// ── Weather particles ─────────────────────────────────────────────────────────
+
+function WeatherParticles({ precip = 0, temperature = 10 }) {
+  const isSnow = temperature < 1
+  const count  = precip >= 80 ? 55 : precip >= 60 ? 35 : precip >= 30 ? 15 : 0
+
+  const particles = useMemo(() =>
+    Array.from({ length: count }, (_, i) => ({
+      id:       i,
+      left:     Math.random() * 110 - 5,          // -5 % … 105 %
+      delay:    Math.random() * 3,                 // s
+      duration: isSnow ? 3 + Math.random() * 2    // snow: 3–5 s
+                       : 0.5 + Math.random() * 0.5, // rain: 0.5–1 s
+      opacity:  0.35 + Math.random() * 0.45,
+      width:    isSnow ? 2 + Math.random() * 3 : 1,  // px
+      height:   isSnow ? null : 10 + Math.random() * 10, // px
+      drift:    isSnow ? (Math.random() - 0.5) * 40 : 0,  // px horizontal
+    })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [count, isSnow],
+  )
+
+  if (!count) return null
+
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className={isSnow ? 'absolute rounded-full bg-white' : 'absolute rounded-full bg-blue-100/70'}
+          style={{
+            left:            `${p.left}%`,
+            top:             '-2%',
+            width:           p.width,
+            height:          isSnow ? p.width : p.height,
+            opacity:         p.opacity,
+            animationName:   isSnow ? 'snow-fall' : 'rain-fall',
+            animationDuration: `${p.duration}s`,
+            animationDelay:  `${p.delay}s`,
+            animationTimingFunction: 'linear',
+            animationIterationCount: 'infinite',
+            '--snow-drift':  `${p.drift}px`,
+          }}
+        />
+      ))}
+    </div>
+  )
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1430,6 +1479,10 @@ export default function MobileApp() {
             {imageStyle.overlay && (
               <div className="absolute inset-0 transition-all duration-1000" style={{ background: imageStyle.overlay }} />
             )}
+            <WeatherParticles
+              precip={currentFc?.precip_probability ?? 0}
+              temperature={currentFc?.temperature ?? 10}
+            />
             {/* Subtle darkening so cards stay readable */}
             <div className="absolute inset-0 bg-slate-900/30" />
           </div>

@@ -6,3 +6,17 @@ body {
   color: #e2e8f0;
   font-family: system-ui, sans-serif;
 }
+
+@keyframes rain-fall {
+  0%   { transform: translateY(-20px) translateX(0);      opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { transform: translateY(105vh) translateX(18px);   opacity: 0; }
+}
+
+@keyframes snow-fall {
+  0%   { transform: translateY(-10px) translateX(0);               opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(105vh) translateX(var(--snow-drift)); opacity: 0; }
+}
