@@ -361,7 +361,7 @@ function SixHourTable({ forecasts }) {
   )
 }
 
-const GLASS = 'bg-slate-900/60 backdrop-blur-md border border-white/10'
+const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
 function CurrentCard({ fc, radar, allForecasts }) {
   if (!fc) return (
