@@ -361,9 +361,11 @@ function SixHourTable({ forecasts }) {
   )
 }
 
+const GLASS = 'bg-slate-900/60 backdrop-blur-md border border-white/10'
+
 function CurrentCard({ fc, radar, allForecasts }) {
   if (!fc) return (
-    <div className="bg-slate-800 rounded-2xl p-6 text-slate-500 text-center">
+    <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>
       Hämtar prognos…
     </div>
   )
@@ -374,7 +376,7 @@ function CurrentCard({ fc, radar, allForecasts }) {
   const summary = generateSummary(allForecasts)
 
   return (
-    <div className="bg-slate-800 rounded-2xl p-6">
+    <div className={`${GLASS} rounded-2xl p-6`}>
       {/* Temp + symbol */}
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
@@ -461,10 +463,10 @@ function DayRow({ hours, warnings }) {
   const warning = warningForDay(hours, warnings)
 
   return (
-    <div className="bg-slate-800 rounded-2xl overflow-hidden">
+    <div className={`${GLASS} rounded-2xl overflow-hidden`}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 px-5 py-4 active:bg-slate-700/50 transition-colors"
+        className="w-full flex items-center gap-3 px-5 py-4 active:bg-white/5 transition-colors"
       >
         {/* Day name + date */}
         <div className="flex-1 text-left">
@@ -1415,6 +1417,24 @@ export default function MobileApp() {
 
       {/* Animated content area */}
       <div className="flex-1 relative overflow-x-hidden min-h-0" {...swipeHandlers}>
+
+        {/* Background city image — sits at z-0 behind the scrollable content */}
+        {activeTab === 'now' && bgImage && (
+          <div className="absolute inset-0 z-0">
+            <img
+              src={bgImage.url}
+              alt={bgImage.label}
+              className="w-full h-full object-cover transition-all duration-1000"
+              style={{ filter: imageStyle.filter }}
+            />
+            {imageStyle.overlay && (
+              <div className="absolute inset-0 transition-all duration-1000" style={{ background: imageStyle.overlay }} />
+            )}
+            {/* Subtle darkening so cards stay readable */}
+            <div className="absolute inset-0 bg-slate-900/30" />
+          </div>
+        )}
+
         <AnimatePresence mode="sync" custom={slideDir}>
           <motion.div
             key={activeTab}
@@ -1424,31 +1444,16 @@ export default function MobileApp() {
             animate="center"
             exit="exit"
             transition={{ type: 'tween', duration: 0.28, ease: 'easeInOut' }}
-            className="absolute inset-0 overflow-y-auto"
+            className="absolute inset-0 overflow-y-auto z-10"
           >
             <div className="px-4 pt-10 pb-4 space-y-3 max-w-lg mx-auto">
 
               {activeTab === 'now' && (
                 <>
-                  {bgImage && (
-                    <div className="relative -mx-4 -mt-10 h-52 mb-1 overflow-hidden">
-                      <img src={bgImage.url} alt={bgImage.label} className="w-full h-full object-cover transition-all duration-1000" style={{ filter: imageStyle.filter }} />
-                      {imageStyle.overlay && <div className="absolute inset-0 transition-all duration-1000" style={{ background: imageStyle.overlay }} />}
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent" />
-                      {geoLocation && (
-                        <div className="absolute bottom-3 left-4 flex items-center gap-1.5 text-white/70 text-xs drop-shadow">
-                          <span>📍</span>
-                          <span>{[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {!bgImage && geoLocation && (
-                    <div className="flex items-center gap-1.5 px-1 text-slate-500 text-xs">
+                  {geoLocation && (
+                    <div className="flex items-center gap-1.5 px-1 text-white/50 text-xs">
                       <span>📍</span>
-                      <span>
-                        {[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}
-                      </span>
+                      <span>{[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}</span>
                     </div>
                   )}
                   <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
