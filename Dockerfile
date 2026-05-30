@@ -1,12 +1,5 @@
-# Stage 1: build frontend
-FROM node:20-alpine AS frontend-builder
-WORKDIR /app/frontend
-COPY frontend/package*.json ./
-RUN npm ci
-COPY frontend/ ./
-RUN npm run build
-
-# Stage 2: backend + built frontend
+# Frontend is built in GitHub Actions and copied to the server before docker build.
+# This keeps the Docker build lightweight (Python only) and avoids OOM on small instances.
 FROM python:3.11-slim
 WORKDIR /app
 
@@ -16,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
-COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+COPY frontend/dist ./frontend/dist
 
 EXPOSE 8000
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

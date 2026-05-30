@@ -8,14 +8,43 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to EC2
+      - uses: actions/checkout@v4
+
+      # Build frontend in CI — avoids OOM on the small EC2 instance
+      - name: Build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
+
+      # Pull latest code on server (updates Dockerfile etc, won't touch dist/)
+      - name: Pull latest code
+        run: |
           ssh -i ~/.ssh/deploy_key \
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=20 \
             ubuntu@${{ secrets.EC2_HOST }} \
-            "cd ~/weather-ensemble && git pull && echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' > .env && docker compose up -d --build"
+            "cd ~/weather-ensemble && git pull && echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' > .env"
+
+      # Copy pre-built frontend (dist is gitignored, git pull won't overwrite it)
+      - name: Copy frontend dist to server
+        run: |
+          scp -i ~/.ssh/deploy_key -r \
+            frontend/dist \
+            ubuntu@${{ secrets.EC2_HOST }}:~/weather-ensemble/frontend/
+
+      # Rebuild and restart — Docker now only builds Python layer, no Node.js
+      - name: Restart app
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=20 \
+            ubuntu@${{ secrets.EC2_HOST }} \
+            "cd ~/weather-ensemble && docker compose up -d --build"
