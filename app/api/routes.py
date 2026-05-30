@@ -463,26 +463,25 @@ def debug_weights_diag(db: Session = Depends(get_db)):
     issued_dates = sorted(set(str(f[2])[:10] for f in exact_fcs))
     lead_dist = Counter(f[1] for f in exact_fcs)
 
-    # Try running update_weights now and report result
-    from app.ensemble import update_weights as _uw
+    # Diagnose _get_truth directly
+    from app.ensemble import _get_truth
     import traceback
-    update_result = "not_run"
-    update_error = None
+    truth_result = None
+    truth_error = None
     try:
-        _uw(db, truth_time)
-        # Check if anything changed
-        from app.models import SourceWeight as SW
-        after_count = db.query(SW).filter(SW.source == "smhi").count()
-        after_sample = db.query(SW).filter(SW.source == "smhi", SW.lead_hours == 3).first()
-        update_result = f"ran ok — smhi rows={after_count}, smhi bucket3 samples={after_sample.sample_count if after_sample else 'N/A'}"
+        truth_result = _get_truth(db, truth_time)
     except Exception as e:
-        update_error = traceback.format_exc()
+        truth_error = traceback.format_exc()
+
+    # Also check truth_time type and repr
+    truth_type = str(type(truth_time))
 
     return {
         "now_utc": now.isoformat(),
         "truth_time": truth_time.isoformat(),
-        "update_weights_result": update_result,
-        "update_weights_error": update_error,
+        "truth_time_type": truth_type,
+        "get_truth_result": truth_result,
+        "get_truth_error": truth_error,
         "obs_for_truth_time": obs.valid_for.isoformat() if obs else None,
         "obs_temperature": obs.temperature if obs else None,
         "recent_observations": [{"valid_for": o.valid_for.isoformat(), "temp": o.temperature} for o in recent_obs],
