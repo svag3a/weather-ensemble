@@ -72,6 +72,14 @@ function useRadarLocation() {
   return { radar, coords }
 }
 
+function currentTimeSlot() {
+  const h = new Date().getHours()
+  if (h < 6)  return 'night'
+  if (h < 12) return 'morning'
+  if (h < 18) return 'day'
+  return 'evening'
+}
+
 function useCityBackground(coords) {
   const [images, setImages] = useState([])
 
@@ -81,13 +89,27 @@ function useCityBackground(coords) {
 
   if (!coords || !images.length) return null
 
-  let nearest = null
-  let minDist = Infinity
+  // Group images by label and find nearest location
+  const groups = {}
   for (const img of images) {
-    const d = (img.lat - coords.lat) ** 2 + (img.lon - coords.lon) ** 2
-    if (d < minDist) { minDist = d; nearest = img }
+    if (!groups[img.label]) groups[img.label] = { lat: img.lat, lon: img.lon, slots: {} }
+    groups[img.label].slots[img.time_slot] = img
   }
-  return nearest
+
+  let nearestGroup = null
+  let minDist = Infinity
+  for (const g of Object.values(groups)) {
+    const d = (g.lat - coords.lat) ** 2 + (g.lon - coords.lon) ** 2
+    if (d < minDist) { minDist = d; nearestGroup = g }
+  }
+  if (!nearestGroup) return null
+
+  // Pick image for current time slot, fall back to any available slot
+  const slot = currentTimeSlot()
+  const FALLBACK_ORDER = ['day', 'morning', 'evening', 'night']
+  return nearestGroup.slots[slot]
+    ?? FALLBACK_ORDER.map(s => nearestGroup.slots[s]).find(Boolean)
+    ?? null
 }
 
 function getImageStyle(fc, validFor) {

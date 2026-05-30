@@ -21,6 +21,15 @@ CITY_IMAGES_DIR = Path("/data/city_images")
 async def lifespan(app: FastAPI):
     CITY_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     init_db()
+    # Add time_slot column to existing databases that predate the feature
+    from app.database import engine
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE city_images ADD COLUMN time_slot TEXT DEFAULT 'day'"))
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
     scheduler = create_scheduler()
     scheduler.start()
     yield

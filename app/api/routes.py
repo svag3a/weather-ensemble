@@ -323,6 +323,7 @@ class CityImageOut(BaseModel):
     label: str
     lat: float
     lon: float
+    time_slot: str
     created_at: datetime
 
 
@@ -330,6 +331,7 @@ class CityImageUpdate(BaseModel):
     label: str
     lat: float
     lon: float
+    time_slot: str = "day"
 
 
 def _img_out(row: CityImage) -> CityImageOut:
@@ -340,13 +342,14 @@ def _img_out(row: CityImage) -> CityImageOut:
         label=row.label,
         lat=row.lat,
         lon=row.lon,
+        time_slot=row.time_slot or "day",
         created_at=row.created_at,
     )
 
 
 @router.get("/city-images", response_model=list[CityImageOut])
 def list_city_images(db: Session = Depends(get_db)):
-    rows = db.query(CityImage).order_by(CityImage.created_at.desc()).all()
+    rows = db.query(CityImage).order_by(CityImage.label, CityImage.time_slot).all()
     return [_img_out(r) for r in rows]
 
 
@@ -356,6 +359,7 @@ async def upload_city_image(
     label: str = Form(...),
     lat: float = Form(...),
     lon: float = Form(...),
+    time_slot: str = Form(default="day"),
     db: Session = Depends(get_db),
 ):
     ext = _Path(file.filename).suffix if file.filename else ""
@@ -364,7 +368,7 @@ async def upload_city_image(
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     content = await file.read()
     dest.write_bytes(content)
-    row = CityImage(filename=filename, label=label, lat=lat, lon=lon)
+    row = CityImage(filename=filename, label=label, lat=lat, lon=lon, time_slot=time_slot)
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -383,6 +387,7 @@ def update_city_image(
     row.label = body.label
     row.lat = body.lat
     row.lon = body.lon
+    row.time_slot = body.time_slot
     db.commit()
     db.refresh(row)
     return _img_out(row)

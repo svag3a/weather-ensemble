@@ -116,4 +116,5 @@ class CityImage(Base):
     label: Mapped[str] = mapped_column(String)
     lat: Mapped[float] = mapped_column(Float)
     lon: Mapped[float] = mapped_column(Float)
+    time_slot: Mapped[Optional[str]] = mapped_column(String, default="day")  # night|morning|day|evening
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
