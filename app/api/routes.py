@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory
+from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary
 
 router = APIRouter()
 
@@ -304,3 +304,122 @@ async def trigger_collection():
     import asyncio
     asyncio.create_task(collect_and_update())
     return {"status": "collection started"}
+
+
+@router.get("/status")
+def get_system_status(db: Session = Depends(get_db)):
+    """System health dashboard: fetch freshness, observation status, weight updates, ensemble."""
+    from sqlalchemy import func
+
+    now_naive = datetime.utcnow()
+
+    def age_min(dt) -> Optional[int]:
+        if dt is None:
+            return None
+        d = dt.replace(tzinfo=None) if getattr(dt, "tzinfo", None) else dt
+        return max(0, round((now_naive - d).total_seconds() / 60))
+
+    def status(age: Optional[int], warn_min: int, error_min: int) -> str:
+        if age is None:
+            return "missing"
+        if age <= warn_min:
+            return "ok"
+        if age <= error_min:
+            return "stale"
+        return "missing"
+
+    # ── Forecast sources ──────────────────────────────────────────────────────
+    source_rows = (
+        db.query(
+            Forecast.source,
+            func.max(Forecast.issued_at).label("latest"),
+            func.count(Forecast.id).label("total"),
+        )
+        .group_by(Forecast.source)
+        .all()
+    )
+    # Count forecast hours in latest run per source
+    forecast_sources = []
+    for src, latest, _ in source_rows:
+        if src == "ensemble":
+            continue
+        hrs = (
+            db.query(func.count(Forecast.id))
+            .filter(Forecast.source == src, Forecast.issued_at == latest)
+            .scalar()
+        ) or 0
+        age = age_min(latest)
+        forecast_sources.append({
+            "source":         src,
+            "issued_at":      latest.isoformat() if latest else None,
+            "age_minutes":    age,
+            "forecast_hours": hrs,
+            "status":         status(age, 90, 240),
+        })
+    forecast_sources.sort(key=lambda x: x["source"])
+
+    # ── Observations ──────────────────────────────────────────────────────────
+    obs = db.query(Observation).order_by(Observation.valid_for.desc()).first()
+    obs_age = age_min(obs.valid_for) if obs else None
+    observation = {
+        "valid_for":   obs.valid_for.isoformat() if obs else None,
+        "age_minutes": obs_age,
+        "temperature": round(obs.temperature, 1) if obs and obs.temperature is not None else None,
+        "wind_speed":  round(obs.wind_speed, 1)  if obs and obs.wind_speed  is not None else None,
+        "precip_mm":   round(obs.precip_mm, 1)   if obs and obs.precip_mm   is not None else None,
+        "status":      status(obs_age, 90, 180),
+    }
+
+    # ── Weight updates ────────────────────────────────────────────────────────
+    weight_rows = db.query(SourceWeight).all()
+    latest_weight_update = max((r.updated_at for r in weight_rows), default=None)
+    min_samples = min((r.sample_count for r in weight_rows), default=0)
+    max_samples = max((r.sample_count for r in weight_rows), default=0)
+    w_age = age_min(latest_weight_update)
+    weights_status = {
+        "last_updated": latest_weight_update.isoformat() if latest_weight_update else None,
+        "age_minutes":  w_age,
+        "min_samples":  min_samples,
+        "max_samples":  max_samples,
+        "source_count": len(set(r.source for r in weight_rows)),
+        "status":       status(w_age, 90, 240),
+    }
+
+    # ── Ensemble ──────────────────────────────────────────────────────────────
+    ens_row = (
+        db.query(EnsembleForecast.computed_at, func.count(EnsembleForecast.id).label("cnt"))
+        .group_by(EnsembleForecast.computed_at)
+        .order_by(EnsembleForecast.computed_at.desc())
+        .first()
+    )
+    ens_age = age_min(ens_row[0]) if ens_row else None
+    ensemble = {
+        "computed_at":    ens_row[0].isoformat() if ens_row else None,
+        "age_minutes":    ens_age,
+        "forecast_hours": ens_row[1] if ens_row else 0,
+        "status":         status(ens_age, 90, 240),
+    }
+
+    # ── AI summaries ─────────────────────────────────────────────────────────
+    ai_rows = db.query(AiSummary).order_by(AiSummary.generated_at.desc()).all()
+    ai_by_period: dict = {}
+    for row in ai_rows:
+        p = row.period
+        if p not in ai_by_period:
+            a = age_min(row.generated_at)
+            ai_by_period[p] = {
+                "period":       p,
+                "valid_date":   row.valid_date.isoformat(),
+                "generated_at": row.generated_at.isoformat(),
+                "age_minutes":  a,
+                "status":       status(a, 130, 300),  # 2h cache + 10min buffer
+            }
+
+    return {
+        "forecast_sources": forecast_sources,
+        "observation":      observation,
+        "weights":          weights_status,
+        "ensemble":         ensemble,
+        "ai_summaries":     list(ai_by_period.values()),
+        "server_time":      now_naive.isoformat(),
+    }

@@ -53,3 +53,9 @@ export async function triggerCollect() {
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+export async function fetchStatus() {
+  const res = await fetch(`${BASE}/status`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}

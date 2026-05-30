@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchEnsemble, fetchLocalForecast, fetchSources, fetchWeights, fetchWeightsHistory, fetchRadarNow, triggerCollect } from './api'
+import { fetchEnsemble, fetchLocalForecast, fetchSources, fetchWeights, fetchWeightsHistory, fetchRadarNow, fetchStatus, triggerCollect } from './api'
 import HourlyTimeline from './components/HourlyTimeline'
 import EnsembleForecast from './components/EnsembleForecast'
 import SourceComparison from './components/SourceComparison'
 import SourceRanking from './components/SourceRanking'
 import RankingChart from './components/RankingChart'
+import SystemStatus from './components/SystemStatus'
 
 function useData(fetcher, deps = []) {
   const [data, setData] = useState(null)
@@ -67,9 +68,10 @@ export default function App() {
       : fetchEnsemble(hoursAhead),
     [hoursAhead, coords]
   )
-  const sources = useData(() => fetchSources(hoursAhead), [hoursAhead])
-  const weights = useData(fetchWeights)
+  const sources       = useData(() => fetchSources(hoursAhead), [hoursAhead])
+  const weights       = useData(fetchWeights)
   const weightsHistory = useData(fetchWeightsHistory)
+  const systemStatus  = useData(fetchStatus)
 
   useEffect(() => {
     const refresh = () => {
@@ -172,6 +174,7 @@ export default function App() {
               Tekniska detaljer
             </summary>
             <div className="space-y-6">
+              <SystemStatus data={systemStatus.data} />
               <EnsembleForecast data={ensemble.data} sources={sources.data} />
               <SourceComparison data={sources.data} />
               <SourceRanking data={weights.data} />
