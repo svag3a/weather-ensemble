@@ -121,8 +121,8 @@ const SLOT_BASE_BRIGHTNESS = { night: 0.32, morning: 0.85, day: 1.00, evening: 0
 
 // Build filter anchor points using today's actual sunrise/sunset so
 // the curve shifts with the seasons (June midnight sun vs December darkness).
-function buildFilterAnchors(now) {
-  const { sunrise, sunset } = sunTimesUTC(now)
+function buildFilterAnchors(now, lat = 57.706, lon = 11.967) {
+  const { sunrise, sunset } = sunTimesUTC(now, lat, lon)
   const tz = -now.getTimezoneOffset() / 60          // local UTC offset in hours
   const sr   = (sunrise + tz + 24) % 24             // sunrise local
   const ss   = (sunset  + tz + 24) % 24             // sunset local
@@ -152,10 +152,12 @@ function buildFilterAnchors(now) {
     .filter((a, i, arr) => i === 0 || Math.abs(a[0] - arr[i - 1][0]) > 0.1)
 }
 
-function getImageStyle(fc, imageSlot = 'day') {
+function getImageStyle(fc, imageSlot = 'day', coords = null) {
   const now  = new Date()
   const hour = now.getHours() + now.getMinutes() / 60
-  const A    = buildFilterAnchors(now)
+  const lat  = coords?.lat ?? 57.706
+  const lon  = coords?.lon ?? 11.967
+  const A    = buildFilterAnchors(now, lat, lon)
 
   // Interpolate between surrounding anchors
   let i = A.length - 2
@@ -190,7 +192,7 @@ function getImageStyle(fc, imageSlot = 'day') {
   const cloud  = fc?.cloud_cover        ?? 0
   const precip = fc?.precip_probability ?? 0
   const temp   = fc?.temperature        ?? 10
-  const { sunrise, sunset } = sunTimesUTC(now)
+  const { sunrise, sunset } = sunTimesUTC(now, lat, lon)
   const tz = -now.getTimezoneOffset() / 60
   const srLocal = (sunrise + tz + 24) % 24
   const ssLocal = (sunset  + tz + 24) % 24
@@ -1518,7 +1520,7 @@ export default function MobileApp() {
   const future = forecast?.filter(fc => parseTS(fc.valid_for) > now) ?? []
   const currentFc = future[0] ?? null
   const days = groupByDay(future)
-  const imageStyle = getImageStyle(currentFc, bgImage?.actualSlot ?? 'day')
+  const imageStyle = getImageStyle(currentFc, bgImage?.actualSlot ?? 'day', coords)
 
   return (
     <div className="fixed inset-0 bg-slate-900 text-slate-100 flex flex-col">

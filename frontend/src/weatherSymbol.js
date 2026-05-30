@@ -1,13 +1,21 @@
-// Göteborg coordinates for sunrise/sunset calculation
-const LAT = 57.706
-const LON = 11.967
+// Default coordinates — Göteborg. Overridden whenever GPS is available.
+const _DEFAULT_LAT = 57.706
+const _DEFAULT_LON = 11.967
 
 /**
  * Compute sunrise and sunset times (fractional UTC hours) for a given date
- * using the Spencer equation-of-time + declination approximation.
- * Accurate to within ~5 minutes for mid-latitudes.
+ * and geographic position using the Spencer equation-of-time + declination
+ * approximation. Accurate to within ~5 minutes for mid-latitudes.
+ *
+ * Handles edge cases:
+ *   cosHA > 1  → polar night (sun never rises)  → sunrise = sunset = 0
+ *   cosHA < -1 → midnight sun (sun never sets)  → sunrise = 0, sunset = 24
+ *
+ * @param {Date}   date
+ * @param {number} lat  Latitude  in decimal degrees (default: Göteborg)
+ * @param {number} lon  Longitude in decimal degrees (default: Göteborg)
  */
-export function sunTimesUTC(date) {
+export function sunTimesUTC(date, lat = _DEFAULT_LAT, lon = _DEFAULT_LON) {
   const rad = Math.PI / 180
 
   // Day of year (1–366)
@@ -19,11 +27,11 @@ export function sunTimesUTC(date) {
 
   // Hour angle at sunrise/sunset — 90.833° accounts for refraction + solar disc
   const cosHA =
-    (Math.cos(rad * 90.833) - Math.sin(rad * LAT) * Math.sin(rad * declination)) /
-    (Math.cos(rad * LAT) * Math.cos(rad * declination))
+    (Math.cos(rad * 90.833) - Math.sin(rad * lat) * Math.sin(rad * declination)) /
+    (Math.cos(rad * lat)    * Math.cos(rad * declination))
 
-  if (cosHA > 1)  return { sunrise: 0,  sunset: 0  }  // polar night  → always dark
-  if (cosHA < -1) return { sunrise: 0,  sunset: 24 }  // midnight sun → always light
+  if (cosHA > 1)  return { sunrise: 0,  sunset: 0  }  // polar night
+  if (cosHA < -1) return { sunrise: 0,  sunset: 24 }  // midnight sun
 
   const HA = Math.acos(cosHA) / rad  // degrees
 
@@ -32,7 +40,7 @@ export function sunTimesUTC(date) {
   const eot = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B)
 
   // Solar noon in UTC, adjusted for longitude and equation of time
-  const solarNoon = 12 - LON / 15 - eot / 60
+  const solarNoon = 12 - lon / 15 - eot / 60
 
   return {
     sunrise: solarNoon - HA / 15,
@@ -40,15 +48,13 @@ export function sunTimesUTC(date) {
   }
 }
 
-function isNight(validFor) {
+function isNight(validFor, lat = _DEFAULT_LAT, lon = _DEFAULT_LON) {
   if (!validFor) return false
-  // API returns naive UTC strings — append 'Z' so the browser parses them as
-  // UTC rather than local time, which would shift the day/night boundary by 2h.
   const iso = typeof validFor === 'string' && !validFor.endsWith('Z') && !validFor.includes('+')
     ? validFor + 'Z'
     : validFor
   const d = new Date(iso)
-  const { sunrise, sunset } = sunTimesUTC(d)
+  const { sunrise, sunset } = sunTimesUTC(d, lat, lon)
   const utcH = d.getUTCHours() + d.getUTCMinutes() / 60
   return utcH < sunrise || utcH >= sunset
 }
