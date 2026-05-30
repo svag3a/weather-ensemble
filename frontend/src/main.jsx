@@ -9,16 +9,13 @@ function isMobile() {
   return /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
 }
 
-function Root() {
-  return isMobile() ? <Navigate to="/mobile" replace /> : <App />
-}
-
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Root />} />
+        <Route path="/" element={<MobileApp />} />
         <Route path="/mobile" element={<MobileApp />} />
+        <Route path="/admin" element={<App />} />
       </Routes>
     </BrowserRouter>
   </StrictMode>,
