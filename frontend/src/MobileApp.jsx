@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages } from './api'
-import { getWeatherInfo, feelsLike } from './weatherSymbol'
+import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -104,73 +104,105 @@ function useCityBackground(coords) {
   }
   if (!nearestGroup) return null
 
-  // Pick image for current time slot, fall back to any available slot
+  // Pick image for current time slot, fall back to closest available slot
   const slot = currentTimeSlot()
   const FALLBACK_ORDER = ['day', 'morning', 'evening', 'night']
-  return nearestGroup.slots[slot]
+  const image = nearestGroup.slots[slot]
     ?? FALLBACK_ORDER.map(s => nearestGroup.slots[s]).find(Boolean)
     ?? null
+  if (!image) return null
+  // Return both image and the slot it actually came from (for filter compensation)
+  return { ...image, actualSlot: image.time_slot ?? slot }
 }
 
-// Anchor points for clear-sky filter at each key hour.
-// With 4 photos covering each slot, the filter only fine-tunes within
-// the slot — no need for dramatic shifts.
-const _FILTER_ANCHORS = [
-  // h   brightness  saturation  hueRot  overlay
-  [  0,  0.35,       0.55,        15,    'rgba(10,20,60,0.30)'   ],  // midnight
-  [  3,  0.30,       0.50,        20,    'rgba(10,20,60,0.35)'   ],  // deep night
-  [  5,  0.42,       0.55,        10,    'rgba(20,30,80,0.22)'   ],  // pre-dawn
-  [  6,  0.70,       1.00,       -20,    'rgba(180,100,30,0.15)' ],  // sunrise
-  [  8,  0.90,       1.05,        -8,    'rgba(200,130,40,0.07)' ],  // morning
-  [ 11,  1.00,       1.10,         0,    null                    ],  // late morning
-  [ 14,  1.05,       1.15,         0,    null                    ],  // afternoon
-  [ 17,  0.95,       1.10,        -5,    'rgba(200,120,30,0.06)' ],  // late afternoon
-  [ 19,  0.80,       1.00,       -15,    'rgba(180,100,20,0.14)' ],  // golden hour
-  [ 20,  0.65,       0.90,        -8,    'rgba(150,80,20,0.18)'  ],  // sunset
-  [ 21,  0.52,       0.75,         5,    'rgba(30,20,60,0.20)'   ],  // dusk
-  [ 22,  0.42,       0.65,        12,    'rgba(15,20,60,0.25)'   ],  // early night
-  [ 24,  0.35,       0.55,        15,    'rgba(10,20,60,0.30)'   ],  // midnight (wrap)
-]
+// How bright each slot's photo is relative to a neutral day photo.
+// Used to compensate when a fallback slot is shown instead of the ideal one.
+const SLOT_BASE_BRIGHTNESS = { night: 0.32, morning: 0.85, day: 1.00, evening: 0.72 }
 
-function getImageStyle(fc) {
-  // Use current local time for the photo filter — the image shows the city right now
-  const now = new Date()
+// Build filter anchor points using today's actual sunrise/sunset so
+// the curve shifts with the seasons (June midnight sun vs December darkness).
+function buildFilterAnchors(now) {
+  const { sunrise, sunset } = sunTimesUTC(now)
+  const tz = -now.getTimezoneOffset() / 60          // local UTC offset in hours
+  const sr   = (sunrise + tz + 24) % 24             // sunrise local
+  const ss   = (sunset  + tz + 24) % 24             // sunset local
+  const noon = (sr + ss) / 2                        // solar noon local
+  // Midpoint of the night (between today's sunset and tomorrow's sunrise)
+  const nightMid = ((ss + sr + 24) / 2 + 12) % 24  // guaranteed between ss and sr
+
+  // [localHour, brightness, saturation, hueRotate, overlay]
+  return [
+    [ 0,        0.30, 0.50,  20, 'rgba(10,20,60,0.35)'   ],
+    [ nightMid, 0.25, 0.45,  22, 'rgba(10,20,60,0.38)'   ],
+    [ sr - 1,   0.42, 0.58,  10, 'rgba(20,30,80,0.22)'   ],
+    [ sr,       0.70, 1.00, -20, 'rgba(180,100,30,0.15)' ],
+    [ sr + 2,   0.90, 1.05,  -8, 'rgba(200,130,40,0.07)' ],
+    [ noon - 1, 1.00, 1.10,   0, null                    ],
+    [ noon,     1.05, 1.15,   0, null                    ],
+    [ ss - 2,   0.95, 1.10,  -5, 'rgba(200,120,30,0.06)' ],
+    [ ss - 1,   0.80, 1.00, -15, 'rgba(180,100,20,0.14)' ],
+    [ ss,       0.65, 0.90,  -8, 'rgba(150,80,20,0.18)'  ],
+    [ ss + 1,   0.52, 0.75,   5, 'rgba(30,20,60,0.20)'   ],
+    [ ss + 2,   0.42, 0.65,  12, 'rgba(15,20,60,0.25)'   ],
+    [ 24,       0.30, 0.50,  20, 'rgba(10,20,60,0.35)'   ],
+  ]
+    .filter(([h]) => h >= 0 && h <= 24)
+    .sort((a, b) => a[0] - b[0])
+    // Remove duplicates (can happen when sr/ss anchors overlap at extreme latitudes)
+    .filter((a, i, arr) => i === 0 || Math.abs(a[0] - arr[i - 1][0]) > 0.1)
+}
+
+function getImageStyle(fc, imageSlot = 'day') {
+  const now  = new Date()
   const hour = now.getHours() + now.getMinutes() / 60
+  const A    = buildFilterAnchors(now)
 
-  // Find surrounding anchors and interpolate
-  const A = _FILTER_ANCHORS
+  // Interpolate between surrounding anchors
   let i = A.length - 2
   for (let j = 0; j < A.length - 1; j++) {
     if (hour >= A[j][0] && hour < A[j + 1][0]) { i = j; break }
   }
   const [h0, b0, s0, hr0, ov0] = A[i]
   const [h1, b1, s1, hr1, ov1] = A[i + 1]
-  const t = (hour - h0) / (h1 - h0)
+  const t    = (hour - h0) / (h1 - h0)
   const lerp = (a, b) => a + (b - a) * t
 
   let brightness = lerp(b0, b1)
   let saturation = lerp(s0, s1)
   let hueRotate  = lerp(hr0, hr1)
-  let overlay    = t < 0.5 ? ov0 : ov1   // use closer anchor's overlay
+  let overlay    = t < 0.5 ? ov0 : ov1
 
-  // Weather adjustments layered on top of time-of-day
+  // ── Fallback compensation ────────────────────────────────────────────────
+  // If the displayed photo is from a different slot (e.g. day photo shown at
+  // night), the filter must work harder to bridge the gap.
+  // We scale brightness by the ratio of what is needed vs what the photo
+  // naturally provides, capped to avoid blowing out or crushing the image.
+  const photoBase = SLOT_BASE_BRIGHTNESS[imageSlot] ?? 1.0
+  if (photoBase !== 1.0) {
+    // Only compensate when the mismatch is significant (> 20 %)
+    const ratio = brightness / photoBase
+    if (Math.abs(ratio - 1) > 0.20) {
+      brightness = Math.max(0.25, Math.min(1.5, brightness * (1 / photoBase)))
+    }
+  }
+
+  // ── Weather adjustments ─────────────────────────────────────────────────
   const cloud  = fc?.cloud_cover        ?? 0
   const precip = fc?.precip_probability ?? 0
   const temp   = fc?.temperature        ?? 10
-  const isDaytime = hour >= 6 && hour < 21
+  const { sunrise, sunset } = sunTimesUTC(now)
+  const tz = -now.getTimezoneOffset() / 60
+  const srLocal = (sunrise + tz + 24) % 24
+  const ssLocal = (sunset  + tz + 24) % 24
+  const isDaytime = hour >= srLocal && hour < ssLocal
 
   if (isDaytime) {
     brightness = Math.max(0.30, brightness - (cloud / 100) * 0.25)
     saturation = Math.max(0.40, saturation - (cloud / 100) * 0.35)
-    if (precip > 60) {
-      brightness -= 0.12; overlay = 'rgba(50,70,120,0.25)'
-    } else if (precip > 30) {
-      overlay = overlay ?? 'rgba(80,100,140,0.12)'
-    } else if (cloud > 70) {
-      overlay = overlay ?? 'rgba(80,90,100,0.12)'
-    }
+    if (precip > 60)      { brightness -= 0.12; overlay = 'rgba(50,70,120,0.25)' }
+    else if (precip > 30) { overlay = overlay ?? 'rgba(80,100,140,0.12)' }
+    else if (cloud > 70)  { overlay = overlay ?? 'rgba(80,90,100,0.12)'  }
   }
-
   if (temp < 0) hueRotate += 8
 
   const filter = [
@@ -1486,7 +1518,7 @@ export default function MobileApp() {
   const future = forecast?.filter(fc => parseTS(fc.valid_for) > now) ?? []
   const currentFc = future[0] ?? null
   const days = groupByDay(future)
-  const imageStyle = getImageStyle(currentFc)
+  const imageStyle = getImageStyle(currentFc, bgImage?.actualSlot ?? 'day')
 
   return (
     <div className="fixed inset-0 bg-slate-900 text-slate-100 flex flex-col">
