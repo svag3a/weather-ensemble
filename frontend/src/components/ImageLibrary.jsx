@@ -1,5 +1,28 @@
 import { useState } from 'react'
 
+// Resize + convert to WebP before upload — keeps files well under nginx's limit
+// and speeds up page loads on mobile.
+async function resizeToWebP(file, maxWidth = 1400, quality = 0.82) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, maxWidth / img.width)
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+      canvas.toBlob(
+        blob => resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' })),
+        'image/webp',
+        quality,
+      )
+    }
+    img.src = URL.createObjectURL(file)
+  })
+}
+
 const PRESETS = [
   { label: 'Centrum',      lat: 57.7060, lon: 11.9670 },
   { label: 'Haga',         lat: 57.7010, lon: 11.9580 },
@@ -40,8 +63,9 @@ function UploadForm({ onUpload }) {
     setUploading(true)
     setError(null)
     try {
+      const resized = await resizeToWebP(file)
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', resized)
       fd.append('label', label)
       fd.append('lat', lat)
       fd.append('lon', lon)
