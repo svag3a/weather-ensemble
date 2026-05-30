@@ -4,7 +4,7 @@ const SLOTS = [
   { key: 'night',   label: 'Natt',   hours: '00–06', icon: '🌙' },
   { key: 'morning', label: 'Morgon', hours: '06–12', icon: '🌅' },
   { key: 'day',     label: 'Dag',    hours: '12–18', icon: '☀️' },
-  { key: 'evening', label: 'Kväll',  hours: '18–24', icon: '🌆' },
+  { key: 'evening', label: 'Kväll',  hours: '18–24', icon: '🌇' },
 ]
 
 const PRESETS = [
