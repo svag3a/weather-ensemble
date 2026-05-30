@@ -454,6 +454,15 @@ def debug_weights_diag(db: Session = Depends(get_db)):
         Forecast.lead_hours != 1
     ).limit(10).all()
 
+    # Lead_hours distribution for exact truth_time
+    from collections import Counter
+    exact_fcs = db.query(Forecast.source, Forecast.lead_hours, Forecast.issued_at).filter(
+        Forecast.valid_for == truth_time,
+        Forecast.lead_hours != 1
+    ).all()
+    issued_dates = sorted(set(str(f[2])[:10] for f in exact_fcs))
+    lead_dist = Counter(f[1] for f in exact_fcs)
+
     return {
         "now_utc": now.isoformat(),
         "truth_time": truth_time.isoformat(),
@@ -461,6 +470,8 @@ def debug_weights_diag(db: Session = Depends(get_db)):
         "obs_temperature": obs.temperature if obs else None,
         "recent_observations": [{"valid_for": o.valid_for.isoformat(), "temp": o.temperature} for o in recent_obs],
         "forecasts_matching_truth_time": fc_count,
+        "forecast_issued_dates": issued_dates,
+        "forecast_lead_hours_distribution": dict(sorted(lead_dist.items())),
         "sample_forecasts_near_truth": [
             {"valid_for": str(f[0]), "source": f[1], "lead_hours": f[2]} for f in sample_fcs
         ],
