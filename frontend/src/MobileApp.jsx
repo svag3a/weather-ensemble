@@ -909,6 +909,18 @@ function EnsembleView({ ensembleFc }) {
 
   const displayOrder = SOURCE_ORDER.filter(s => currentBySource[s])
 
+  // Rank sources by summing their per-parameter rank positions (temp + precip + wind).
+  // Lower sum = better overall rank. Sources without weight data are placed last.
+  const rankSum = Object.fromEntries(displayOrder.map(s => [s, 0]));
+  ['mae_temperature', 'mae_precip', 'mae_wind'].forEach(param => {
+    const withData    = displayOrder.filter(s => bySource[s]?.[param] != null)
+    const withoutData = displayOrder.filter(s => bySource[s]?.[param] == null)
+    withData.sort((a, b) => bySource[a][param] - bySource[b][param])
+           .forEach((s, i) => { rankSum[s] += i })
+    withoutData.forEach(s => { rankSum[s] += displayOrder.length })
+  })
+  const rankedOrder = [...displayOrder].sort((a, b) => rankSum[a] - rankSum[b])
+
   // Best source per parameter (lowest MAE)
   const best = (param) => {
     let bestSrc = null, bestVal = Infinity
@@ -932,7 +944,7 @@ function EnsembleView({ ensembleFc }) {
       <div className="bg-slate-800 rounded-2xl overflow-hidden">
         <div className="px-5 pt-4 pb-3 border-b border-slate-700">
           <h2 className="text-white font-medium text-sm">Källjämförelse — kl {hourLabel}</h2>
-          <p className="text-slate-500 text-xs mt-0.5">Närmaste timme per källa</p>
+          <p className="text-slate-500 text-xs mt-0.5">Rankad efter historisk träffsäkerhet · närmaste timme</p>
         </div>
 
         {/* Header row */}
@@ -959,11 +971,12 @@ function EnsembleView({ ensembleFc }) {
           </div>
         )}
 
-        {/* Source rows */}
-        {displayOrder.map(src => {
+        {/* Source rows — ranked order */}
+        {rankedOrder.map((src, idx) => {
           const fc = currentBySource[src]
           return (
             <div key={src} className="flex items-center gap-2 px-5 py-2 border-b border-slate-700/40 last:border-0">
+              <span className="text-slate-600 text-xs font-mono w-5 shrink-0">{idx + 1}.</span>
               <span className="flex-1 text-slate-300 text-sm">{SOURCE_LABELS[src] ?? src}</span>
               <span className="w-12 text-right text-slate-300 text-sm font-mono">
                 {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
