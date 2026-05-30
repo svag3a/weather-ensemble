@@ -480,7 +480,7 @@ function CurrentCard({ fc, radar, allForecasts }) {
     </div>
   )
 
-  const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for)
+  const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, radar?.cape ?? 0)
   const feels = feelsLike(fc.temperature, fc.wind_speed)
   const conf = summariseConfidence(allForecasts)
   const summary = generateSummary(allForecasts)

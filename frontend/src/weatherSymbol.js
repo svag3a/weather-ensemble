@@ -59,7 +59,15 @@ function isNight(validFor, lat = _DEFAULT_LAT, lon = _DEFAULT_LON) {
   return utcH < sunrise || utcH >= sunset
 }
 
-export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover, validFor = null) {
+/**
+ * @param {number|null} temperature        °C
+ * @param {number|null} precipProbability  0–100 %
+ * @param {number|null} windSpeed          m/s
+ * @param {number|null} cloudCover         0–100 %
+ * @param {string|null} validFor           ISO timestamp (for day/night)
+ * @param {number}      cape               J/kg from radar — optional, enables thunder symbol
+ */
+export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover, validFor = null, cape = 0) {
   const precip = precipProbability ?? 0
   const cloud  = cloudCover ?? 0
   const wind   = windSpeed ?? 0
@@ -67,19 +75,28 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
 
   const windy  = wind > 10
   const frozen = temp <= 0
+  const sleet  = temp > 0 && temp <= 3   // snöblandat regn-zon
   const night  = isNight(validFor)
 
+  // Thunder takes priority when atmosphere is unstable + precipitation likely
+  const thunder = cape >= 500 && precip >= 40
+
   let symbol, label
-  if (precip >= 60) {
-    symbol = frozen ? '🌨' : '🌧'
-    label  = frozen ? 'Snö' : 'Regn'
+
+  if (thunder) {
+    symbol = '⛈'
+    label  = cape >= 1500 ? 'Kraftig åska' : 'Åskväder'
+  } else if (precip >= 60) {
+    if (frozen)     { symbol = '🌨'; label = 'Snö' }
+    else if (sleet) { symbol = '🌧'; label = 'Snöblandat regn' }
+    else            { symbol = '🌧'; label = 'Regn' }
   } else if (precip >= 20) {
-    symbol = frozen ? '🌨' : '🌦'
-    label  = frozen ? 'Lätt snö' : 'Lätt regn'
+    if (frozen)     { symbol = '🌨'; label = 'Lätt snö' }
+    else if (sleet) { symbol = '🌦'; label = 'Lätt snöblandat regn' }
+    else            { symbol = '🌦'; label = 'Lätt regn' }
   } else if (cloud > 75) {
     symbol = '☁️'; label = 'Mulet'
   } else if (cloud > 50) {
-    // At night the sun isn't peeking through — use plain cloud
     symbol = night ? '☁️' : '⛅'
     label  = 'Halvmulet'
   } else if (cloud > 25) {
@@ -90,7 +107,7 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
     label  = night ? 'Klar natt' : 'Klart'
   }
 
-  if (windy) { symbol += '💨'; label += ', blåsigt' }
+  if (windy && !thunder) { symbol += '💨'; label += ', blåsigt' }
 
   return { symbol, label }
 }
