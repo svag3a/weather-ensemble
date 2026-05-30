@@ -157,10 +157,13 @@ async def _pregen_ai_summaries(db: Session) -> None:
     if not os.getenv("ANTHROPIC_API_KEY"):
         return
     from datetime import date, timedelta
+    from zoneinfo import ZoneInfo
     from app.sources.ai_summary import generate_summary
+    _stockholm = ZoneInfo("Europe/Stockholm")
+    now_local = datetime.now(_stockholm)
     for period, target_date in [
-        ("today",    date.today()),
-        ("tomorrow", date.today() + timedelta(days=1)),
+        ("today",    now_local.date()),
+        ("tomorrow", (now_local + timedelta(days=1)).date()),
     ]:
         try:
             await generate_summary(db, target_date, period)

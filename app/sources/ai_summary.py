@@ -14,7 +14,11 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL_HOURS = 2
+_CACHE_TTL_HOURS = 0.75   # 45 min — keeps summaries fresh after forecast updates
+
+# Stockholm timezone for correct "today/tomorrow" day boundaries
+from zoneinfo import ZoneInfo
+_STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
 _SYSTEM_PROMPT = """Du är en meteorolog som skriver vädersammanfattningar för Göteborg på svenska.
 
@@ -165,7 +169,9 @@ def _hours_for_date(db: Session, target_date: date) -> list:
         {"valid_for": r.valid_for, "temperature": r.temperature,
          "precip_probability": r.precip_probability, "wind_speed": r.wind_speed,
          "cloud_cover": r.cloud_cover, "precip_mm": r.precip_mm, "confidence": r.confidence}
-        for r in rows if r.valid_for.date() == target_date
+        for r in rows
+        # valid_for is stored as naive UTC — convert to Stockholm local time before comparing dates
+        if r.valid_for.replace(tzinfo=timezone.utc).astimezone(_STOCKHOLM).date() == target_date
     ]
 
 

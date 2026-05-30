@@ -285,9 +285,13 @@ async def get_summary(
 ):
     """AI-generated weather summary for today or tomorrow. Cached 2h."""
     from datetime import date, timedelta
+    from zoneinfo import ZoneInfo
     from app.sources.ai_summary import generate_summary
 
-    target_date = date.today() if period == "today" else date.today() + timedelta(days=1)
+    # Use Stockholm local date so "today/tomorrow" matches what the user sees
+    _stockholm = ZoneInfo("Europe/Stockholm")
+    now_local = datetime.now(_stockholm)
+    target_date = now_local.date() if period == "today" else (now_local + timedelta(days=1)).date()
     result = await generate_summary(db, target_date, period)
     if result is None:
         raise HTTPException(
