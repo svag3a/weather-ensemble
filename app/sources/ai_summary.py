@@ -26,6 +26,7 @@ REGLER:
 5. practical_advice.tips: lägg bara till om det faktiskt är ovanligt eller kräver agerande
 6. Returnera EXAKT JSON-strukturen nedan — inget annat, ingen kommentar, inga kodblock
 7. Använd ENBART vanliga, korrekta svenska ord — inga påhittade sammansättningar, kontrollera stavning
+8. Veckodagsnamnet finns i fältet "weekday" — använd exakt det ordet, räkna aldrig ut veckodagen själv
 
 OUTPUT-SCHEMA:
 {
@@ -234,9 +235,13 @@ async def generate_summary(db: Session, target_date: date, period: str) -> Optio
     temps = [h["temperature"] for h in hours if h["temperature"] is not None]
     confs = [h["confidence"] or 0.5 for h in hours]
 
+    _WEEKDAYS_SV = ["måndag","tisdag","onsdag","torsdag","fredag","lördag","söndag"]
+    weekday_sv = _WEEKDAYS_SV[target_date.weekday()]
+
     input_data = {
         "location": "Göteborg",
         "date": target_date.isoformat(),
+        "weekday": weekday_sv,   # explicit — do not infer day name from the date
         "confidence_score": round(sum(confs) / len(confs), 2) if confs else 0.5,
         "confidence_per_parameter": {
             "temperature": spread["temperature_confidence"],
