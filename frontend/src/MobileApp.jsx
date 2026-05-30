@@ -3,7 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages } from './api'
-import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
+import { getWeatherInfo, feelsLike } from './weatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -112,66 +112,71 @@ function useCityBackground(coords) {
     ?? null
 }
 
-function getImageStyle(fc, validFor) {
-  if (!fc) return { filter: 'none', overlay: null }
+// Anchor points for clear-sky filter at each key hour.
+// With 4 photos covering each slot, the filter only fine-tunes within
+// the slot — no need for dramatic shifts.
+const _FILTER_ANCHORS = [
+  // h   brightness  saturation  hueRot  overlay
+  [  0,  0.35,       0.55,        15,    'rgba(10,20,60,0.30)'   ],  // midnight
+  [  3,  0.30,       0.50,        20,    'rgba(10,20,60,0.35)'   ],  // deep night
+  [  5,  0.42,       0.55,        10,    'rgba(20,30,80,0.22)'   ],  // pre-dawn
+  [  6,  0.70,       1.00,       -20,    'rgba(180,100,30,0.15)' ],  // sunrise
+  [  8,  0.90,       1.05,        -8,    'rgba(200,130,40,0.07)' ],  // morning
+  [ 11,  1.00,       1.10,         0,    null                    ],  // late morning
+  [ 14,  1.05,       1.15,         0,    null                    ],  // afternoon
+  [ 17,  0.95,       1.10,        -5,    'rgba(200,120,30,0.06)' ],  // late afternoon
+  [ 19,  0.80,       1.00,       -15,    'rgba(180,100,20,0.14)' ],  // golden hour
+  [ 20,  0.65,       0.90,        -8,    'rgba(150,80,20,0.18)'  ],  // sunset
+  [ 21,  0.52,       0.75,         5,    'rgba(30,20,60,0.20)'   ],  // dusk
+  [ 22,  0.42,       0.65,        12,    'rgba(15,20,60,0.25)'   ],  // early night
+  [ 24,  0.35,       0.55,        15,    'rgba(10,20,60,0.30)'   ],  // midnight (wrap)
+]
 
-  const cloud = fc.cloud_cover ?? 0
-  const precip = fc.precip_probability ?? 0
-  const temp = fc.temperature ?? 10
+function getImageStyle(fc) {
+  // Use current local time for the photo filter — the image shows the city right now
+  const now = new Date()
+  const hour = now.getHours() + now.getMinutes() / 60
 
-  // Determine night / golden hour
-  let night = false
-  let golden = false
-  if (validFor) {
-    const iso = typeof validFor === 'string' && !validFor.endsWith('Z') && !validFor.includes('+')
-      ? validFor + 'Z' : validFor
-    const d = new Date(iso)
-    const { sunrise, sunset } = sunTimesUTC(d)
-    const utcH = d.getUTCHours() + d.getUTCMinutes() / 60
-    night = utcH < sunrise || utcH >= sunset
-    if (!night) {
-      golden = Math.abs(utcH - sunrise) <= 1.5 || Math.abs(utcH - sunset) <= 1.5
-    }
+  // Find surrounding anchors and interpolate
+  const A = _FILTER_ANCHORS
+  let i = A.length - 2
+  for (let j = 0; j < A.length - 1; j++) {
+    if (hour >= A[j][0] && hour < A[j + 1][0]) { i = j; break }
   }
+  const [h0, b0, s0, hr0, ov0] = A[i]
+  const [h1, b1, s1, hr1, ov1] = A[i + 1]
+  const t = (hour - h0) / (h1 - h0)
+  const lerp = (a, b) => a + (b - a) * t
 
-  let brightness = 1.0
-  let saturation = 1.0
-  let hueRotate = 0
-  let overlay = null
+  let brightness = lerp(b0, b1)
+  let saturation = lerp(s0, s1)
+  let hueRotate  = lerp(hr0, hr1)
+  let overlay    = t < 0.5 ? ov0 : ov1   // use closer anchor's overlay
 
-  if (night) {
-    brightness = 0.42
-    saturation = 0.65
-    hueRotate = 15   // svag blå-kall ton, inte drastisk färgvridning
-    overlay = 'rgba(10,25,60,0.25)'
-  } else if (golden) {
-    brightness = Math.max(0.85, 1.0 - cloud / 100 * 0.2)
-    saturation = 1.1
-    hueRotate = -15
-    overlay = 'rgba(200,120,30,0.12)'
-  } else {
-    // Clouds dim brightness and saturation
-    brightness = Math.max(0.7, 1.0 - (cloud / 100) * 0.3)
-    saturation = Math.max(0.55, 1.0 - (cloud / 100) * 0.45)
-  }
+  // Weather adjustments layered on top of time-of-day
+  const cloud  = fc?.cloud_cover        ?? 0
+  const precip = fc?.precip_probability ?? 0
+  const temp   = fc?.temperature        ?? 10
+  const isDaytime = hour >= 6 && hour < 21
 
-  if (temp < 0) hueRotate += 10
-
-  // Precipitation overlays (only for non-night)
-  if (!night) {
+  if (isDaytime) {
+    brightness = Math.max(0.30, brightness - (cloud / 100) * 0.25)
+    saturation = Math.max(0.40, saturation - (cloud / 100) * 0.35)
     if (precip > 60) {
-      overlay = 'rgba(50,70,120,0.25)'
-    } else if (precip >= 30) {
-      overlay = 'rgba(80,100,140,0.15)'
-    } else if (cloud > 70 && !overlay) {
-      overlay = 'rgba(80,90,100,0.15)'
+      brightness -= 0.12; overlay = 'rgba(50,70,120,0.25)'
+    } else if (precip > 30) {
+      overlay = overlay ?? 'rgba(80,100,140,0.12)'
+    } else if (cloud > 70) {
+      overlay = overlay ?? 'rgba(80,90,100,0.12)'
     }
   }
+
+  if (temp < 0) hueRotate += 8
 
   const filter = [
-    `brightness(${brightness.toFixed(2)})`,
-    `saturate(${saturation.toFixed(2)})`,
-    hueRotate !== 0 ? `hue-rotate(${hueRotate}deg)` : null,
+    `brightness(${Math.max(0.25, brightness).toFixed(2)})`,
+    `saturate(${Math.max(0.30, saturation).toFixed(2)})`,
+    Math.round(hueRotate) !== 0 ? `hue-rotate(${Math.round(hueRotate)}deg)` : null,
   ].filter(Boolean).join(' ')
 
   return { filter, overlay }
@@ -1481,7 +1486,7 @@ export default function MobileApp() {
   const future = forecast?.filter(fc => parseTS(fc.valid_for) > now) ?? []
   const currentFc = future[0] ?? null
   const days = groupByDay(future)
-  const imageStyle = getImageStyle(currentFc, currentFc?.valid_for)
+  const imageStyle = getImageStyle(currentFc)
 
   return (
     <div className="fixed inset-0 bg-slate-900 text-slate-100 flex flex-col">
