@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchEnsemble, fetchLocalForecast, fetchSources, fetchWeights, fetchWeightsHistory, fetchRadarNow, fetchStatus, triggerCollect } from './api'
+import { fetchEnsemble, fetchLocalForecast, fetchSources, fetchWeights, fetchWeightsHistory, fetchRadarNow, fetchStatus, triggerCollect, fetchCityImages, uploadCityImage, updateCityImage, deleteCityImage } from './api'
 import HourlyTimeline from './components/HourlyTimeline'
 import EnsembleForecast from './components/EnsembleForecast'
 import SourceComparison from './components/SourceComparison'
 import SourceRanking from './components/SourceRanking'
 import RankingChart from './components/RankingChart'
 import SystemStatus from './components/SystemStatus'
+import ImageLibrary from './components/ImageLibrary'
 
 function useData(fetcher, deps = []) {
   const [data, setData] = useState(null)
@@ -72,12 +73,14 @@ export default function App() {
   const weights       = useData(fetchWeights)
   const weightsHistory = useData(fetchWeightsHistory)
   const systemStatus  = useData(fetchStatus)
+  const cityImages    = useData(fetchCityImages)
 
   useEffect(() => {
     const refresh = () => {
       ensemble.reload()
       sources.reload()
       weights.reload()
+      cityImages.reload()
     }
     const interval = setInterval(refresh, 10 * 60 * 1000)
     const onVisible = () => { if (document.visibilityState === 'visible') refresh() }
@@ -174,6 +177,12 @@ export default function App() {
               Tekniska detaljer
             </summary>
             <div className="space-y-6">
+              <ImageLibrary
+                data={cityImages.data}
+                onUpload={async (fd) => { await uploadCityImage(fd); cityImages.reload() }}
+                onUpdate={async (id, fields) => { await updateCityImage(id, fields); cityImages.reload() }}
+                onDelete={async (id) => { await deleteCityImage(id); cityImages.reload() }}
+              />
               <SystemStatus data={systemStatus.data} />
               <EnsembleForecast data={ensemble.data} sources={sources.data} />
               <SourceComparison data={sources.data} />

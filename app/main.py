@@ -14,8 +14,12 @@ from app.api.routes import router
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 
+CITY_IMAGES_DIR = Path("/data/city_images")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    CITY_IMAGES_DIR.mkdir(parents=True, exist_ok=True)
     init_db()
     scheduler = create_scheduler()
     scheduler.start()
@@ -37,6 +41,9 @@ app.include_router(router, prefix="/api/v1")
 def health():
     return {"status": "ok"}
 
+
+if CITY_IMAGES_DIR.exists():
+    app.mount("/city-images", StaticFiles(directory=str(CITY_IMAGES_DIR), html=False), name="city-images")
 
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")

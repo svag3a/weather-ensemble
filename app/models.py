@@ -107,3 +107,13 @@ class SourceWeightHistory(Base):
     __table_args__ = (
         UniqueConstraint("snapshot_date", "source", "lead_hours", name="uq_weight_history"),
     )
+
+
+class CityImage(Base):
+    __tablename__ = "city_images"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    filename: Mapped[str] = mapped_column(String, unique=True)
+    label: Mapped[str] = mapped_column(String)
+    lat: Mapped[float] = mapped_column(Float)
+    lon: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

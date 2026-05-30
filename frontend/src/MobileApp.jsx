@@ -2,8 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary } from './api'
-import { getWeatherInfo, feelsLike } from './weatherSymbol'
+import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages } from './api'
+import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -70,6 +70,89 @@ function useRadarLocation() {
   }, [poll])
 
   return { radar, coords }
+}
+
+function useCityBackground(coords) {
+  const [images, setImages] = useState([])
+
+  useEffect(() => {
+    fetchCityImages().then(setImages).catch(() => {})
+  }, [])
+
+  if (!coords || !images.length) return null
+
+  let nearest = null
+  let minDist = Infinity
+  for (const img of images) {
+    const d = (img.lat - coords.lat) ** 2 + (img.lon - coords.lon) ** 2
+    if (d < minDist) { minDist = d; nearest = img }
+  }
+  return nearest
+}
+
+function getImageStyle(fc, validFor) {
+  if (!fc) return { filter: 'none', overlay: null }
+
+  const cloud = fc.cloud_cover ?? 0
+  const precip = fc.precip_probability ?? 0
+  const temp = fc.temperature ?? 10
+
+  // Determine night / golden hour
+  let night = false
+  let golden = false
+  if (validFor) {
+    const iso = typeof validFor === 'string' && !validFor.endsWith('Z') && !validFor.includes('+')
+      ? validFor + 'Z' : validFor
+    const d = new Date(iso)
+    const { sunrise, sunset } = sunTimesUTC(d)
+    const utcH = d.getUTCHours() + d.getUTCMinutes() / 60
+    night = utcH < sunrise || utcH >= sunset
+    if (!night) {
+      golden = Math.abs(utcH - sunrise) <= 1.5 || Math.abs(utcH - sunset) <= 1.5
+    }
+  }
+
+  let brightness = 1.0
+  let saturation = 1.0
+  let hueRotate = 0
+  let overlay = null
+
+  if (night) {
+    brightness = 0.25
+    saturation = 0.45
+    hueRotate = 195
+    overlay = 'rgba(10,20,60,0.4)'
+  } else if (golden) {
+    brightness = Math.max(0.85, 1.0 - cloud / 100 * 0.2)
+    saturation = 1.1
+    hueRotate = -15
+    overlay = 'rgba(200,120,30,0.12)'
+  } else {
+    // Clouds dim brightness and saturation
+    brightness = Math.max(0.7, 1.0 - (cloud / 100) * 0.3)
+    saturation = Math.max(0.55, 1.0 - (cloud / 100) * 0.45)
+  }
+
+  if (temp < 0) hueRotate += 10
+
+  // Precipitation overlays (only for non-night)
+  if (!night) {
+    if (precip > 60) {
+      overlay = 'rgba(50,70,120,0.25)'
+    } else if (precip >= 30) {
+      overlay = 'rgba(80,100,140,0.15)'
+    } else if (cloud > 70 && !overlay) {
+      overlay = 'rgba(80,90,100,0.15)'
+    }
+  }
+
+  const filter = [
+    `brightness(${brightness.toFixed(2)})`,
+    `saturate(${saturation.toFixed(2)})`,
+    hueRotate !== 0 ? `hue-rotate(${hueRotate}deg)` : null,
+  ].filter(Boolean).join(' ')
+
+  return { filter, overlay }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1285,6 +1368,7 @@ export default function MobileApp() {
   const [slideDir, setSlideDir] = useState(1)
   const { radar, coords } = useRadarLocation()
   const geoLocation = useReverseGeocode(coords)
+  const bgImage = useCityBackground(coords)
 
   // Direction-aware tab change: drives the slide animation
   const changeTab = useCallback((newTab) => {
@@ -1324,6 +1408,7 @@ export default function MobileApp() {
   const future = forecast?.filter(fc => parseTS(fc.valid_for) > now) ?? []
   const currentFc = future[0] ?? null
   const days = groupByDay(future)
+  const imageStyle = getImageStyle(currentFc, currentFc?.valid_for)
 
   return (
     <div className="fixed inset-0 bg-slate-900 text-slate-100 flex flex-col">
@@ -1345,7 +1430,20 @@ export default function MobileApp() {
 
               {activeTab === 'now' && (
                 <>
-                  {geoLocation && (
+                  {bgImage && (
+                    <div className="relative -mx-4 -mt-10 h-52 mb-1 overflow-hidden">
+                      <img src={bgImage.url} alt={bgImage.label} className="w-full h-full object-cover transition-all duration-1000" style={{ filter: imageStyle.filter }} />
+                      {imageStyle.overlay && <div className="absolute inset-0 transition-all duration-1000" style={{ background: imageStyle.overlay }} />}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/20 to-transparent" />
+                      {geoLocation && (
+                        <div className="absolute bottom-3 left-4 flex items-center gap-1.5 text-white/70 text-xs drop-shadow">
+                          <span>📍</span>
+                          <span>{[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {!bgImage && geoLocation && (
                     <div className="flex items-center gap-1.5 px-1 text-slate-500 text-xs">
                       <span>📍</span>
                       <span>

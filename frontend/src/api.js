@@ -59,3 +59,30 @@ export async function fetchStatus() {
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
+
+export async function fetchCityImages() {
+  const res = await fetch(`${BASE}/city-images`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function uploadCityImage(formData) {
+  const res = await fetch(`${BASE}/city-images`, { method: 'POST', body: formData })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function updateCityImage(id, { label, lat, lon }) {
+  const res = await fetch(`${BASE}/city-images/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ label, lat, lon }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function deleteCityImage(id) {
+  const res = await fetch(`${BASE}/city-images/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await res.text())
+}

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Body
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from app.database import get_db
-from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary
+from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage
 
 router = APIRouter()
 
@@ -304,6 +304,96 @@ async def trigger_collection():
     import asyncio
     asyncio.create_task(collect_and_update())
     return {"status": "collection started"}
+
+
+import uuid as _uuid
+from pathlib import Path as _Path
+
+IMAGE_DIR = _Path("/data/city_images")
+
+
+class CityImageOut(BaseModel):
+    id: int
+    url: str
+    filename: str
+    label: str
+    lat: float
+    lon: float
+    created_at: datetime
+
+
+class CityImageUpdate(BaseModel):
+    label: str
+    lat: float
+    lon: float
+
+
+def _img_out(row: CityImage) -> CityImageOut:
+    return CityImageOut(
+        id=row.id,
+        url=f"/city-images/{row.filename}",
+        filename=row.filename,
+        label=row.label,
+        lat=row.lat,
+        lon=row.lon,
+        created_at=row.created_at,
+    )
+
+
+@router.get("/city-images", response_model=list[CityImageOut])
+def list_city_images(db: Session = Depends(get_db)):
+    rows = db.query(CityImage).order_by(CityImage.created_at.desc()).all()
+    return [_img_out(r) for r in rows]
+
+
+@router.post("/city-images", response_model=CityImageOut, status_code=201)
+async def upload_city_image(
+    file: UploadFile = File(...),
+    label: str = Form(...),
+    lat: float = Form(...),
+    lon: float = Form(...),
+    db: Session = Depends(get_db),
+):
+    ext = _Path(file.filename).suffix if file.filename else ""
+    filename = f"{_uuid.uuid4()}{ext}"
+    dest = IMAGE_DIR / filename
+    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    content = await file.read()
+    dest.write_bytes(content)
+    row = CityImage(filename=filename, label=label, lat=lat, lon=lon)
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return _img_out(row)
+
+
+@router.put("/city-images/{image_id}", response_model=CityImageOut)
+def update_city_image(
+    image_id: int,
+    body: CityImageUpdate,
+    db: Session = Depends(get_db),
+):
+    row = db.query(CityImage).filter(CityImage.id == image_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    row.label = body.label
+    row.lat = body.lat
+    row.lon = body.lon
+    db.commit()
+    db.refresh(row)
+    return _img_out(row)
+
+
+@router.delete("/city-images/{image_id}", status_code=204)
+def delete_city_image(image_id: int, db: Session = Depends(get_db)):
+    row = db.query(CityImage).filter(CityImage.id == image_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    file_path = IMAGE_DIR / row.filename
+    if file_path.exists():
+        file_path.unlink()
+    db.delete(row)
+    db.commit()
 
 
 @router.get("/status")

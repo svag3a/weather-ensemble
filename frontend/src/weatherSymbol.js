@@ -7,7 +7,7 @@ const LON = 11.967
  * using the Spencer equation-of-time + declination approximation.
  * Accurate to within ~5 minutes for mid-latitudes.
  */
-function sunTimesUTC(date) {
+export function sunTimesUTC(date) {
   const rad = Math.PI / 180
 
   // Day of year (1–366)

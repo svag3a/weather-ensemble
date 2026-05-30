@@ -11,3 +11,4 @@ rasterio
 pyproj
 numpy
 anthropic
+python-multipart
