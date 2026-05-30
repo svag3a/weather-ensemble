@@ -124,7 +124,7 @@ export default function SourceRanking({ data }) {
     <div className="bg-slate-800 rounded-xl p-6">
       <h2 className="text-lg font-semibold text-white mb-1">Källrangordning</h2>
       <p className="text-xs text-slate-500 mb-4">
-        Lägre MAE = bättre träffsäkerhet · Regn mäts med Brier score (0–1)
+        Rank-sum på 1h+3h+6h (kortsiktig träffsäkerhet) · Lägre MAE = bättre · Regn mäts med Brier score (0–1)
       </p>
 
       {/* Tabs */}
