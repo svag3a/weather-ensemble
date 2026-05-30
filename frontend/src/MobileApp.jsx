@@ -907,7 +907,8 @@ function EnsembleView({ ensembleFc }) {
   const weightsAt1 = weights?.filter(w => w.lead_hours === 1) ?? []
   const bySource = Object.fromEntries(weightsAt1.map(w => [w.source, w]))
 
-  const displayOrder = SOURCE_ORDER.filter(s => currentBySource[s])
+  // Include ensemble in the ranked list alongside individual sources
+  const displayOrder = [...SOURCE_ORDER, 'ensemble'].filter(s => currentBySource[s])
 
   // Rank sources by summing their per-parameter rank positions (temp + precip + wind).
   // Lower sum = better overall rank. Sources without weight data are placed last.
@@ -949,35 +950,22 @@ function EnsembleView({ ensembleFc }) {
 
         {/* Header row */}
         <div className="flex items-center gap-2 px-5 py-2 text-slate-500 text-xs">
+          <span className="w-5 shrink-0">#</span>
           <span className="flex-1">Källa</span>
           <span className="w-12 text-right">Temp</span>
           <span className="w-12 text-right">Regn%</span>
           <span className="w-14 text-right">Vind</span>
         </div>
 
-        {/* Ensemble row */}
-        {ensembleFc && (
-          <div className="flex items-center gap-2 px-5 py-2.5 bg-slate-700/50 border-y border-slate-600/50">
-            <span className="flex-1 text-white text-sm font-medium">Ensemble ★</span>
-            <span className="w-12 text-right text-white text-sm font-mono">
-              {ensembleFc.temperature != null ? `${Math.round(ensembleFc.temperature)}°` : '—'}
-            </span>
-            <span className={`w-12 text-right text-sm font-mono ${ensembleFc.precip_probability >= 40 ? 'text-blue-300' : 'text-slate-300'}`}>
-              {Math.round(ensembleFc.precip_probability)}%
-            </span>
-            <span className="w-14 text-right text-slate-300 text-sm font-mono">
-              {ensembleFc.wind_speed != null ? `${Math.round(ensembleFc.wind_speed)} m/s` : '—'}
-            </span>
-          </div>
-        )}
-
-        {/* Source rows — ranked order */}
+        {/* All sources in ranked order — ensemble included */}
         {rankedOrder.map((src, idx) => {
           const fc = currentBySource[src]
           return (
             <div key={src} className="flex items-center gap-2 px-5 py-2 border-b border-slate-700/40 last:border-0">
               <span className="text-slate-600 text-xs font-mono w-5 shrink-0">{idx + 1}.</span>
-              <span className="flex-1 text-slate-300 text-sm">{SOURCE_LABELS[src] ?? src}</span>
+              <span className="flex-1 text-slate-300 text-sm">
+                {SOURCE_LABELS[src] ?? src}{src === 'ensemble' ? ' ★' : ''}
+              </span>
               <span className="w-12 text-right text-slate-300 text-sm font-mono">
                 {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
               </span>
