@@ -17,6 +17,31 @@ from app.models import Forecast, SourceWeight, EnsembleForecast
 ALPHA = 0.1  # EMA smoothing factor for MAE updates
 LEAD_BUCKETS = [1, 3, 6, 12, 24, 48, 72]
 
+# Short-range precip tier: high-res regional models outperform coarse globals
+# at 1–6 h. Applied as a multiplier before independence scaling.
+# Values based on known NWP resolution/mesoscale skill.
+# Buckets 12+ h: no prior — let observed MAE speak.
+PRECIP_LEAD_BOOST: dict[int, dict[str, float]] = {
+    1: {
+        'smhi': 1.30, 'yr': 1.30, 'open_meteo_icon_eu': 1.20,
+        'open_meteo': 0.70, 'open_meteo_ecmwf': 0.85,
+        'open_meteo_ukmo': 0.85, 'open_meteo_knmi': 0.85,
+        'openweathermap': 0.70,
+    },
+    3: {
+        'smhi': 1.30, 'yr': 1.30, 'open_meteo_icon_eu': 1.20,
+        'open_meteo': 0.70, 'open_meteo_ecmwf': 0.85,
+        'open_meteo_ukmo': 0.85, 'open_meteo_knmi': 0.85,
+        'openweathermap': 0.70,
+    },
+    6: {
+        'smhi': 1.15, 'yr': 1.15, 'open_meteo_icon_eu': 1.10,
+        'open_meteo': 0.85, 'open_meteo_ecmwf': 0.90,
+        'open_meteo_ukmo': 0.90, 'open_meteo_knmi': 0.90,
+        'openweathermap': 0.85,
+    },
+}
+
 # Sources that share model infrastructure are grouped together.
 # Each group receives equal total weight regardless of how many members it has,
 # preventing correlated models from dominating the ensemble.
@@ -160,6 +185,9 @@ def update_weights(db: Session, valid_for: datetime) -> None:
         if fc.temperature is not None and not isnan(fc.temperature):
             err_t = abs(fc.temperature - consensus["temperature"])
             weight_row.mae_temperature = ALPHA * err_t + (1 - ALPHA) * weight_row.mae_temperature
+            # Signed bias: positive = source runs too warm
+            signed_t = fc.temperature - consensus["temperature"]
+            weight_row.bias_temperature = ALPHA * signed_t + (1 - ALPHA) * (weight_row.bias_temperature or 0.0)
         # Brier score for precipitation: (p/100 - outcome)² where outcome ∈ {0, 1}
         if consensus.get("precip_outcome") is not None:
             brier = (fc.precip_probability / 100.0 - consensus["precip_outcome"]) ** 2
@@ -167,6 +195,9 @@ def update_weights(db: Session, valid_for: datetime) -> None:
         if fc.wind_speed is not None and not isnan(fc.wind_speed) and consensus["wind_speed"] is not None:
             err_w = abs(fc.wind_speed - consensus["wind_speed"])
             weight_row.mae_wind = ALPHA * err_w + (1 - ALPHA) * weight_row.mae_wind
+            # Signed bias: positive = source runs too fast
+            signed_w = fc.wind_speed - consensus["wind_speed"]
+            weight_row.bias_wind = ALPHA * signed_w + (1 - ALPHA) * (weight_row.bias_wind or 0.0)
         if fc.cloud_cover is not None and not isnan(fc.cloud_cover) and consensus["cloud_cover"] is not None:
             err_c = abs(fc.cloud_cover - consensus["cloud_cover"])
             weight_row.mae_cloud = ALPHA * err_c + (1 - ALPHA) * weight_row.mae_cloud
@@ -220,10 +251,13 @@ def _get_weights(db: Session, lead_hours: int) -> dict[str, dict]:
     w_wind  = _independence_scale({s: v["wind"]  for s, v in raw.items()})
     w_cloud = _independence_scale({s: v["cloud"] for s, v in raw.items()})
 
-    # Precip: apply radar boost — radar gets a fixed fraction by lead time,
-    # NWP sources share the remainder proportionally.
+    # Precip: apply radar boost then short-range tier adjustment on NWP.
     radar_fraction = RADAR_PRECIP_WEIGHT.get(bucket, 0.0)
-    nwp_precip = {s: v["precip"] for s, v in raw.items() if s != "radar_nowcast"}
+    tier = PRECIP_LEAD_BOOST.get(bucket, {})  # empty dict = no prior at 12h+
+    nwp_precip = {
+        s: v["precip"] * tier.get(s, 1.0)
+        for s, v in raw.items() if s != "radar_nowcast"
+    }
     nwp_scaled = _independence_scale(nwp_precip) if nwp_precip else {}
     w_precip: dict[str, float] = {}
     if "radar_nowcast" in raw and radar_fraction > 0:
@@ -231,14 +265,20 @@ def _get_weights(db: Session, lead_hours: int) -> dict[str, dict]:
         for src, w in nwp_scaled.items():
             w_precip[src] = w * (1.0 - radar_fraction)
     else:
-        w_precip = _independence_scale({s: v["precip"] for s, v in raw.items()})
+        w_precip = _independence_scale({
+            s: v["precip"] * tier.get(s, 1.0) for s, v in raw.items()
+        })
 
+    # Also surface bias values so build_ensemble can apply bias correction
+    bias_map = {r.source: r for r in rows}
     return {
         src: {
             "w_temp":   w_temp.get(src, 0.0),
             "w_precip": w_precip.get(src, 0.0),
             "w_wind":   w_wind.get(src, 0.0),
             "w_cloud":  w_cloud.get(src, 0.0),
+            "bias_temp": getattr(bias_map.get(src), "bias_temperature", None) or 0.0,
+            "bias_wind": getattr(bias_map.get(src), "bias_wind", None) or 0.0,
         }
         for src in raw
     }
@@ -266,13 +306,17 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
             match = next((f for f in fcs if f.valid_for == valid_for), None)
             if match is None:
                 continue
-            w = weights.get(source, {"w_temp": 1.0, "w_precip": 1.0, "w_wind": 1.0, "w_cloud": 1.0})
+            w = weights.get(source, {"w_temp": 1.0, "w_precip": 1.0, "w_wind": 1.0, "w_cloud": 1.0,
+                                      "bias_temp": 0.0, "bias_wind": 0.0})
+            # Apply bias correction: subtract the source's systematic error
             if match.temperature is not None and not isnan(match.temperature):
-                temps.append((match.temperature, w["w_temp"]))
+                corrected_temp = match.temperature - w.get("bias_temp", 0.0)
+                temps.append((corrected_temp, w["w_temp"]))
             if not isnan(match.precip_probability):
                 precips.append((match.precip_probability, w["w_precip"]))
             if match.wind_speed is not None and not isnan(match.wind_speed):
-                winds.append((match.wind_speed, w["w_wind"]))
+                corrected_wind = max(0.0, match.wind_speed - w.get("bias_wind", 0.0))
+                winds.append((corrected_wind, w["w_wind"]))
             if match.cloud_cover is not None and not isnan(match.cloud_cover):
                 clouds.append((match.cloud_cover, w["w_cloud"]))
             if match.wind_direction is not None and not isnan(match.wind_direction):

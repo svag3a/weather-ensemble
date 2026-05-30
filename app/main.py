@@ -25,11 +25,16 @@ async def lifespan(app: FastAPI):
     from app.database import engine
     from sqlalchemy import text
     with engine.connect() as conn:
-        try:
-            conn.execute(text("ALTER TABLE city_images ADD COLUMN time_slot TEXT DEFAULT 'day'"))
-            conn.commit()
-        except Exception:
-            pass  # Column already exists
+        for stmt in [
+            "ALTER TABLE city_images ADD COLUMN time_slot TEXT DEFAULT 'day'",
+            "ALTER TABLE source_weights ADD COLUMN bias_temperature REAL DEFAULT 0.0",
+            "ALTER TABLE source_weights ADD COLUMN bias_wind REAL DEFAULT 0.0",
+        ]:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                pass  # Column already exists
     scheduler = create_scheduler()
     scheduler.start()
     yield

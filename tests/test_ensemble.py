@@ -60,10 +60,10 @@ class TestUpdateWeights:
         row = db.query(SourceWeight).filter_by(source="smhi", lead_hours=6).first()
         assert row is not None
         assert row.sample_count == 1
-        expected_mae_t = ALPHA * abs(13.0 - 15.0) + (1 - ALPHA) * 1.0
+        expected_mae_t = ALPHA * abs(13.0 - 15.0) + (1 - ALPHA) * 2.0  # initial default 2.0°C
         assert row.mae_temperature == pytest.approx(expected_mae_t)
-        # precip Brier: (10/100 - 0.0)^2 = 0.01
-        expected_brier = ALPHA * (10.0 / 100.0 - 0.0) ** 2 + (1 - ALPHA) * 1.0
+        # precip Brier: (10/100 - 0.0)^2 = 0.01; initial default 0.20
+        expected_brier = ALPHA * (10.0 / 100.0 - 0.0) ** 2 + (1 - ALPHA) * 0.20
         assert row.mae_precip == pytest.approx(expected_brier)
 
     def test_skips_update_without_observation(self, db):

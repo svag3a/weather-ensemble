@@ -27,7 +27,7 @@ class Forecast(Base):
 
 
 class SourceWeight(Base):
-    """Rolling MAE and derived weight per source and lead-time bucket."""
+    """Rolling MAE, bias and derived weight per source and lead-time bucket."""
     __tablename__ = "source_weights"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -37,6 +37,9 @@ class SourceWeight(Base):
     mae_precip: Mapped[float] = mapped_column(Float, default=1.0)
     mae_wind: Mapped[float] = mapped_column(Float, default=1.0)
     mae_cloud: Mapped[float] = mapped_column(Float, default=1.0)
+    # Signed bias: positive = source runs too warm/fast, negative = too cold/slow
+    bias_temperature: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0.0)
+    bias_wind: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0.0)
     sample_count: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
