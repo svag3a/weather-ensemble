@@ -86,3 +86,21 @@ export async function deleteCityImage(id) {
   const res = await fetch(`${BASE}/city-images/${id}`, { method: 'DELETE' })
   if (!res.ok) throw new Error(await res.text())
 }
+
+export async function fetchEnsembleHealth() {
+  const res = await fetch(`${BASE}/ensemble/health`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function excludeSource(source) {
+  const res = await fetch(`${BASE}/ensemble/sources/${encodeURIComponent(source)}/exclude`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function includeSource(source) {
+  const res = await fetch(`${BASE}/ensemble/sources/${encodeURIComponent(source)}/include`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}

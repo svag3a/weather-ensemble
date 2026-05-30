@@ -301,6 +301,128 @@ async def get_summary(
     return result
 
 
+SOURCE_LABELS: dict[str, str] = {
+    "smhi": "SMHI",
+    "yr": "Yr",
+    "openweathermap": "OpenWeatherMap",
+    "open_meteo": "Open-Meteo GFS",
+    "open_meteo_icon_eu": "Open-Meteo ICON-EU",
+    "open_meteo_ecmwf": "Open-Meteo ECMWF",
+    "open_meteo_ukmo": "Open-Meteo UKMO",
+    "open_meteo_knmi": "Open-Meteo KNMI",
+    "radar_nowcast": "Radar Nowcast",
+    "ensemble": "Ensemble",
+}
+
+
+@router.get("/ensemble/health")
+def get_ensemble_health(db: Session = Depends(get_db)):
+    """Source health dashboard based on lead_hours=1 bucket weights."""
+    rows = (
+        db.query(SourceWeight)
+        .filter(SourceWeight.lead_hours == 1, SourceWeight.source != "ensemble")
+        .all()
+    )
+
+    # Compute ensemble MAE for comparison baseline
+    ens_row = db.query(SourceWeight).filter(
+        SourceWeight.source == "ensemble", SourceWeight.lead_hours == 1
+    ).first()
+    ensemble_mae_temp = round(ens_row.mae_temperature, 3) if ens_row else None
+
+    sources_out = []
+    for r in rows:
+        bias_t = round(r.bias_temperature or 0.0, 2)
+        bias_w = round(r.bias_wind or 0.0, 2)
+        mae_t = round(r.mae_temperature, 3)
+        mae_p = round(r.mae_precip, 4)
+        mae_w = round(r.mae_wind, 3)
+
+        # Status determination
+        if r.excluded:
+            status = "excluded"
+        elif (
+            abs(bias_t) > 2.0
+            or (ensemble_mae_temp is not None and mae_t > ensemble_mae_temp * 2.0)
+        ):
+            status = "critical"
+        elif (
+            abs(bias_t) > 0.8
+            or (ensemble_mae_temp is not None and mae_t > ensemble_mae_temp * 1.4)
+        ):
+            status = "warning"
+        else:
+            status = "ok"
+
+        # Suggestion
+        suggestion = None
+        if r.excluded:
+            since_str = r.excluded_since.strftime("%Y-%m-%d") if r.excluded_since else "?"
+            suggestion = f"Exkluderad sedan {since_str}: {r.excluded_reason or ''}"
+        elif abs(bias_t) > 1.0:
+            suggestion = f"Systematisk temperaturbia {bias_t:+.1f}°C — kompenseras av bias-korrigering"
+        elif ensemble_mae_temp is not None and mae_t > ensemble_mae_temp * 1.5:
+            pct = round((mae_t / ensemble_mae_temp - 1) * 100)
+            suggestion = f"Temperaturträffsäkerheten är {pct}% sämre än ensemblen"
+
+        sources_out.append({
+            "source": r.source,
+            "label": SOURCE_LABELS.get(r.source, r.source),
+            "status": status,
+            "bias_temp": bias_t,
+            "bias_wind": bias_w,
+            "mae_temp": mae_t,
+            "mae_precip": mae_p,
+            "mae_wind": mae_w,
+            "sample_count": r.sample_count,
+            "excluded": r.excluded,
+            "excluded_reason": r.excluded_reason,
+            "excluded_since": r.excluded_since.isoformat() if r.excluded_since else None,
+            "manual_override": r.manual_override,
+            "suggestion": suggestion,
+        })
+
+    sources_out.sort(key=lambda x: x["source"])
+    excluded_count = sum(1 for s in sources_out if s["excluded"])
+
+    return {
+        "sources": sources_out,
+        "ensemble_mae_temp": ensemble_mae_temp,
+        "excluded_count": excluded_count,
+    }
+
+
+@router.post("/ensemble/sources/{source}/exclude", status_code=200)
+def exclude_source(source: str, db: Session = Depends(get_db)):
+    """Manually exclude a source from the ensemble."""
+    rows = db.query(SourceWeight).filter(SourceWeight.source == source).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"Source '{source}' not found")
+    now = datetime.now(timezone.utc)
+    for row in rows:
+        row.excluded = True
+        row.manual_override = True
+        row.excluded_reason = "Manuellt exkluderad"
+        row.excluded_since = now
+    db.commit()
+    return {"status": "excluded", "source": source}
+
+
+@router.post("/ensemble/sources/{source}/include", status_code=200)
+def include_source(source: str, db: Session = Depends(get_db)):
+    """Manually re-include a previously excluded source."""
+    rows = db.query(SourceWeight).filter(SourceWeight.source == source).all()
+    if not rows:
+        raise HTTPException(status_code=404, detail=f"Source '{source}' not found")
+    for row in rows:
+        row.excluded = False
+        row.manual_override = False
+        row.excluded_reason = None
+        row.excluded_since = None
+    db.commit()
+    return {"status": "included", "source": source}
+
+
 @router.post("/collect", status_code=202)
 async def trigger_collection():
     """Manually trigger a collection run (useful during development)."""

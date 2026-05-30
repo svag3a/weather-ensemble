@@ -14,7 +14,15 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from app.models import Forecast, SourceWeight, EnsembleForecast
 
-ALPHA = 0.1  # EMA smoothing factor for MAE updates
+ALPHA = 0.1  # EMA smoothing factor for MAE updates (default/stable)
+
+
+def _dynamic_alpha(weight_row) -> float:
+    """Boost learning rate when source shows significant bias drift."""
+    bias = abs(weight_row.bias_temperature or 0.0)
+    if bias > 2.0:  return 0.25   # strong drift — adapt quickly
+    if bias > 1.0:  return 0.15   # moderate drift
+    return ALPHA                   # stable — use default
 LEAD_BUCKETS = [1, 3, 6, 12, 24, 48, 72]
 
 # Short-range precip tier: high-res regional models outperform coarse globals
@@ -182,27 +190,42 @@ def update_weights(db: Session, valid_for: datetime) -> None:
             )
             db.add(weight_row)
 
+        alpha = _dynamic_alpha(weight_row)
         if fc.temperature is not None and not isnan(fc.temperature):
             err_t = abs(fc.temperature - consensus["temperature"])
-            weight_row.mae_temperature = ALPHA * err_t + (1 - ALPHA) * weight_row.mae_temperature
+            weight_row.mae_temperature = alpha * err_t + (1 - alpha) * weight_row.mae_temperature
             # Signed bias: positive = source runs too warm
             signed_t = fc.temperature - consensus["temperature"]
-            weight_row.bias_temperature = ALPHA * signed_t + (1 - ALPHA) * (weight_row.bias_temperature or 0.0)
+            weight_row.bias_temperature = alpha * signed_t + (1 - alpha) * (weight_row.bias_temperature or 0.0)
         # Brier score for precipitation: (p/100 - outcome)² where outcome ∈ {0, 1}
+        # Precip uses fixed ALPHA since Brier scale differs from physical units
         if consensus.get("precip_outcome") is not None:
             brier = (fc.precip_probability / 100.0 - consensus["precip_outcome"]) ** 2
             weight_row.mae_precip = ALPHA * brier + (1 - ALPHA) * weight_row.mae_precip
         if fc.wind_speed is not None and not isnan(fc.wind_speed) and consensus["wind_speed"] is not None:
             err_w = abs(fc.wind_speed - consensus["wind_speed"])
-            weight_row.mae_wind = ALPHA * err_w + (1 - ALPHA) * weight_row.mae_wind
+            weight_row.mae_wind = alpha * err_w + (1 - alpha) * weight_row.mae_wind
             # Signed bias: positive = source runs too fast
             signed_w = fc.wind_speed - consensus["wind_speed"]
-            weight_row.bias_wind = ALPHA * signed_w + (1 - ALPHA) * (weight_row.bias_wind or 0.0)
+            weight_row.bias_wind = alpha * signed_w + (1 - alpha) * (weight_row.bias_wind or 0.0)
         if fc.cloud_cover is not None and not isnan(fc.cloud_cover) and consensus["cloud_cover"] is not None:
             err_c = abs(fc.cloud_cover - consensus["cloud_cover"])
             weight_row.mae_cloud = ALPHA * err_c + (1 - ALPHA) * weight_row.mae_cloud
         weight_row.sample_count += 1
         weight_row.updated_at = datetime.now(timezone.utc)
+
+        # Auto-exclusion: only after enough samples and not manually overridden
+        if not weight_row.manual_override and weight_row.sample_count >= 20:
+            bias_t = abs(weight_row.bias_temperature or 0.0)
+            if bias_t > 3.0 and not weight_row.excluded:
+                weight_row.excluded = True
+                weight_row.excluded_reason = f"Auto: temperaturbia {weight_row.bias_temperature:+.1f}°C > 3°C"
+                weight_row.excluded_since = datetime.now(timezone.utc)
+            elif bias_t < 1.5 and weight_row.excluded and not weight_row.manual_override:
+                # Bias has normalized — auto-reinstate
+                weight_row.excluded = False
+                weight_row.excluded_reason = None
+                weight_row.excluded_since = None
 
     db.commit()
 
@@ -297,12 +320,19 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
         for fc in fcs:
             all_valid.add(fc.valid_for)
 
+    # Gather excluded sources once to avoid per-hour queries
+    excluded_sources = {
+        r.source for r in db.query(SourceWeight).filter(SourceWeight.excluded == True).all()
+    }
+
     for valid_for in sorted(all_valid):
         lead_hours = max(1, round((valid_for - computed_at).total_seconds() / 3600))
         weights = _get_weights(db, lead_hours)
 
         temps, precips, winds, clouds, wind_dirs, precip_mms = [], [], [], [], [], []
         for source, fcs in forecasts_by_source.items():
+            if source in excluded_sources:
+                continue
             match = next((f for f in fcs if f.valid_for == valid_for), None)
             if match is None:
                 continue

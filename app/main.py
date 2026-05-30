@@ -29,6 +29,10 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE city_images ADD COLUMN time_slot TEXT DEFAULT 'day'",
             "ALTER TABLE source_weights ADD COLUMN bias_temperature REAL DEFAULT 0.0",
             "ALTER TABLE source_weights ADD COLUMN bias_wind REAL DEFAULT 0.0",
+            "ALTER TABLE source_weights ADD COLUMN excluded INTEGER DEFAULT 0",
+            "ALTER TABLE source_weights ADD COLUMN excluded_reason TEXT",
+            "ALTER TABLE source_weights ADD COLUMN excluded_since DATETIME",
+            "ALTER TABLE source_weights ADD COLUMN manual_override INTEGER DEFAULT 0",
         ]:
             try:
                 conn.execute(text(stmt))
