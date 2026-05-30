@@ -42,32 +42,52 @@ const TABS = [
 
 const MEDALS = ['🥇', '🥈', '🥉']
 
+// Short-range lead buckets used for ranking — most practically relevant for a weather app
+const RANK_LEAD_HOURS = [1, 3, 6]
+
 function computeRankings(data) {
   const bySource = {}
   for (const row of data) {
+    // Only include short-range buckets for ranking
+    if (!RANK_LEAD_HOURS.includes(row.lead_hours)) continue
     if (!bySource[row.source]) bySource[row.source] = []
     bySource[row.source].push(row)
   }
 
-  const rankings = []
+  // Compute sample-count weighted MAE per parameter per source
+  const sourceParams = {}
   for (const [source, rows] of Object.entries(bySource)) {
     const realRows = rows.filter(r => r.sample_count > 0)
     if (realRows.length === 0) continue
-
     const totalSamples = realRows.reduce((s, r) => s + r.sample_count, 0)
     const wavg = field => realRows.reduce((s, r) => s + r[field] * r.sample_count, 0) / totalSamples
-
     const params = {}
     for (const p of PARAMS) {
       const mae = wavg(p.maeField)
-      const barPct = Math.min(100, (mae / PARAM_SCALE[p.key]) * 100)
-      params[p.key] = { mae, barPct }
+      params[p.key] = { mae, barPct: Math.min(100, (mae / PARAM_SCALE[p.key]) * 100) }
     }
-
-    rankings.push({ source, params, score: compositeScore(params) })
+    sourceParams[source] = params
   }
 
-  return rankings.sort((a, b) => a.score - b.score)
+  const sources = Object.keys(sourceParams)
+  if (!sources.length) return []
+
+  // Rank-sum: for each parameter, rank sources by MAE (lower = better rank 1)
+  // and sum ranks. Lower total = better overall.
+  const rankSum = Object.fromEntries(sources.map(s => [s, 0]))
+  for (const p of PARAMS) {
+    const sorted = [...sources]
+      .filter(s => sourceParams[s][p.key]?.mae != null)
+      .sort((a, b) => sourceParams[a][p.key].mae - sourceParams[b][p.key].mae)
+    sorted.forEach((s, i) => { rankSum[s] += i })
+    // Sources without data for this param get a penalty
+    sources.filter(s => sourceParams[s][p.key]?.mae == null)
+           .forEach(s => { rankSum[s] += sources.length })
+  }
+
+  return sources
+    .map(source => ({ source, params: sourceParams[source], rankSum: rankSum[source] }))
+    .sort((a, b) => a.rankSum - b.rankSum)
 }
 
 function sortByParam(rankings, paramKey) {
@@ -171,7 +191,7 @@ export default function SourceRanking({ data }) {
       </div>
 
       <p className="text-xs text-slate-600 mt-4">
-        Totalsortering: viktat komposit (Regn 40% · Temp 30% · Vind 20% · Moln 10%) · staplar normaliserade mot typiska maxvärden
+        Totalsortering: rank-sum på 1h+3h+6h (kortsiktig träffsäkerhet) · staplar normaliserade mot typiska maxvärden
       </p>
     </div>
   )
