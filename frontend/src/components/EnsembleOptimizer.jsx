@@ -90,9 +90,17 @@ export default function EnsembleOptimizer({ data, onReload }) {
                   <td className="py-2 text-right font-mono">{src.mae_wind.toFixed(2)} m/s</td>
                   <td className="py-2 text-right text-slate-400">{src.sample_count}</td>
                   <td className="py-2 text-center">
-                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${s.badge}`}>
-                      {s.label}
-                    </span>
+                    <div className="relative group inline-block">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${s.badge} ${src.suggestion ? 'cursor-help' : ''}`}>
+                        {s.label}{src.suggestion ? ' ℹ' : ''}
+                      </span>
+                      {src.suggestion && (
+                        <div className="absolute z-20 bottom-full left-1/2 -translate-x-1/2 mb-2 w-64 bg-slate-900 border border-slate-600 rounded-lg p-3 text-xs text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-xl text-left">
+                          {src.suggestion}
+                          <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-600" />
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2 text-right">
                     <button
