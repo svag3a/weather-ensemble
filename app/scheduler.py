@@ -114,8 +114,9 @@ async def collect_and_update() -> None:
         for source, forecasts in forecasts_by_source.items():
             _upsert_forecasts(db, source, issued_at, forecasts)
 
-        # Update weights using last hour's 1h forecasts as truth
-        truth_time = issued_at  # The current time is what was forecasted 1h ago
+        # Observations are for the *previous* hour (SMHI publishes completed hours).
+        # Pass a naive UTC datetime so it matches how valid_for is stored in the DB.
+        truth_time = (issued_at - timedelta(hours=1)).replace(tzinfo=None)
         update_weights(db, truth_time)
 
         build_ensemble(db, issued_at, forecasts_by_source)

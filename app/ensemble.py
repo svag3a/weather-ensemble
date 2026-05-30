@@ -84,7 +84,9 @@ def _get_truth(db: Session, valid_for: datetime) -> Optional[dict]:
     precip_outcome is 0.0 or 1.0 (binary) for use with Brier score.
     """
     from app.models import Observation
-    obs = db.query(Observation).filter(Observation.valid_for == valid_for).first()
+    # Observations are stored as naive UTC datetimes — strip timezone if present
+    valid_for_naive = valid_for.replace(tzinfo=None) if valid_for.tzinfo else valid_for
+    obs = db.query(Observation).filter(Observation.valid_for == valid_for_naive).first()
     if obs and obs.temperature is not None:
         precip_outcome = (
             1.0 if (obs.precip_mm is not None and obs.precip_mm > 0.1)
