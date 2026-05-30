@@ -118,10 +118,10 @@ function getImageStyle(fc, validFor) {
   let overlay = null
 
   if (night) {
-    brightness = 0.25
-    saturation = 0.45
+    brightness = 0.45
+    saturation = 0.4
     hueRotate = 195
-    overlay = 'rgba(10,20,60,0.4)'
+    overlay = 'rgba(10,20,60,0.35)'
   } else if (golden) {
     brightness = Math.max(0.85, 1.0 - cloud / 100 * 0.2)
     saturation = 1.1
