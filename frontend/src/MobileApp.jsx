@@ -559,10 +559,10 @@ function WeekView({ warnings }) {
   }, [])
 
   if (loading) return (
-    <div className="bg-slate-800 rounded-2xl p-6 text-slate-500 text-center">Hämtar prognos…</div>
+    <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>Hämtar prognos…</div>
   )
   if (!weekForecast) return (
-    <div className="bg-slate-800 rounded-2xl p-6 text-slate-400 text-center text-sm">Kunde inte hämta prognos.</div>
+    <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm`}>Kunde inte hämta prognos.</div>
   )
 
   const now     = new Date()
@@ -578,7 +578,7 @@ function WeekView({ warnings }) {
   const cutoff48 = new Date(Date.now() + 48 * 3600 * 1000)
 
   return (
-    <div className="bg-slate-800 rounded-2xl overflow-hidden">
+    <div className={`${GLASS} rounded-2xl overflow-hidden`}>
       {summaries.map(({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind }, i) => (
         <WeekDayRow
           key={i}
@@ -712,7 +712,7 @@ function WarningCard({ warning }) {
 function WarningsView({ warnings }) {
   if (!warnings.length) {
     return (
-      <div className="bg-slate-800 rounded-2xl p-8 flex flex-col items-center gap-3 text-center">
+      <div className={`${GLASS} rounded-2xl p-8 flex flex-col items-center gap-3 text-center`}>
         <span className="text-3xl">✓</span>
         <p className="text-white font-medium">Inga aktiva varningar</p>
         <p className="text-slate-500 text-sm">Inga SMHI-varningar gäller just nu för Göteborg.</p>
@@ -875,7 +875,7 @@ function ForecastDivergenceChart({ sources, ensembleFcs }) {
   if (!chartData.length) return null
 
   return (
-    <div className="bg-slate-800 rounded-2xl p-5 space-y-4">
+    <div className={`${GLASS} rounded-2xl p-5 space-y-4`}>
       <div className="flex items-center justify-between">
         <h2 className="text-white font-medium text-sm">Källspridning</h2>
         <div className="flex gap-1">
@@ -969,13 +969,13 @@ function EnsembleView({ ensembleFc }) {
   }, [])
 
   if (loading) return (
-    <div className="bg-slate-800 rounded-2xl p-6 text-slate-500 text-center">
+    <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>
       Hämtar källor…
     </div>
   )
 
   if (!sources) return (
-    <div className="bg-slate-800 rounded-2xl p-6 text-slate-400 text-center text-sm">
+    <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm`}>
       Kunde inte hämta källdata.
     </div>
   )
@@ -1027,7 +1027,7 @@ function EnsembleView({ ensembleFc }) {
   return (
     <div className="space-y-3">
       {/* Comparison table */}
-      <div className="bg-slate-800 rounded-2xl overflow-hidden">
+      <div className={`${GLASS} rounded-2xl overflow-hidden`}>
         <div className="px-5 pt-4 pb-3 border-b border-slate-700">
           <h2 className="text-white font-medium text-sm">Källjämförelse — kl {hourLabel}</h2>
           <p className="text-slate-500 text-xs mt-0.5">Rankad efter historisk träffsäkerhet · närmaste timme</p>
@@ -1077,7 +1077,7 @@ function EnsembleView({ ensembleFc }) {
 
       {/* Weight explanation */}
       {weightsAt1.length > 0 && (
-        <div className="bg-slate-800 rounded-2xl p-5 space-y-3">
+        <div className={`${GLASS} rounded-2xl p-5 space-y-3`}>
           <h2 className="text-white font-medium text-sm">Nuvarande vikter (0–6 h)</h2>
           <div className="space-y-2 text-sm">
             {bestTemp.src && (
@@ -1120,8 +1120,8 @@ function EnsembleView({ ensembleFc }) {
 // ── AnalysView ────────────────────────────────────────────────────────────────
 
 const ALERT_STYLE = {
-  none:    { bg: 'bg-slate-800',      border: '',                    dot: 'bg-slate-500' },
-  watch:   { bg: 'bg-slate-800',      border: 'border-yellow-500/40', dot: 'bg-yellow-400' },
+  none:    { bg: 'bg-black/20',       border: '',                    dot: 'bg-slate-500' },
+  watch:   { bg: 'bg-black/20',       border: 'border-yellow-500/40', dot: 'bg-yellow-400' },
   warning: { bg: 'bg-orange-900/30',  border: 'border-orange-500/40', dot: 'bg-orange-400' },
   alert:   { bg: 'bg-red-900/30',     border: 'border-red-500/40',    dot: 'bg-red-500' },
 }
@@ -1176,7 +1176,7 @@ function AnalysView() {
             key={p}
             onClick={() => setPeriod(p)}
             className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
-              period === p ? 'bg-slate-700 text-white' : 'bg-slate-800 text-slate-500'
+              period === p ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
             }`}
           >
             {label}
@@ -1185,13 +1185,13 @@ function AnalysView() {
       </div>
 
       {loading && (
-        <div className="bg-slate-800 rounded-2xl p-8 text-slate-500 text-center text-sm">
+        <div className={`${GLASS} rounded-2xl p-8 text-slate-500 text-center text-sm`}>
           Hämtar analys…
         </div>
       )}
 
       {error && (
-        <div className="bg-slate-800 rounded-2xl p-6 text-slate-400 text-center text-sm">
+        <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm`}>
           Kunde inte generera sammanfattning.
         </div>
       )}
@@ -1234,7 +1234,7 @@ function AnalysView() {
             </div>
 
             {/* Confidence */}
-            <div className="bg-slate-800 rounded-2xl p-4 flex items-start gap-3">
+            <div className={`${GLASS} rounded-2xl p-4 flex items-start gap-3`}>
               <ShieldCheck size={15} className={`shrink-0 mt-0.5 ${confStyle.color}`} />
               <div className="flex-1 min-w-0">
                 <span className={`text-xs font-medium ${confStyle.color}`}>{confStyle.label}</span>
@@ -1244,7 +1244,7 @@ function AnalysView() {
 
             {/* Key events */}
             {summary.key_events?.length > 0 && (
-              <div className="bg-slate-800 rounded-2xl overflow-hidden">
+              <div className={`${GLASS} rounded-2xl overflow-hidden`}>
                 <div className="px-5 pt-4 pb-2 border-b border-slate-700 flex items-center gap-2">
                   <Zap size={14} className="text-slate-400 shrink-0" />
                   <h3 className="text-white text-sm font-medium">Händelser</h3>
@@ -1268,7 +1268,7 @@ function AnalysView() {
 
             {/* Periods */}
             {summary.periods?.length > 0 && (
-              <div className="bg-slate-800 rounded-2xl overflow-hidden">
+              <div className={`${GLASS} rounded-2xl overflow-hidden`}>
                 <div className="px-5 pt-4 pb-2 border-b border-slate-700 flex items-center gap-2">
                   <Clock size={14} className="text-slate-400 shrink-0" />
                   <h3 className="text-white text-sm font-medium">Under dagen</h3>
@@ -1291,7 +1291,7 @@ function AnalysView() {
 
             {/* Insights */}
             {summary.insights?.length > 0 && (
-              <div className="bg-slate-800 rounded-2xl p-5 space-y-3">
+              <div className={`${GLASS} rounded-2xl p-5 space-y-3`}>
                 <div className="flex items-center gap-2">
                   <TrendingUp size={14} className="text-slate-400 shrink-0" />
                   <h3 className="text-white text-sm font-medium">Modellinsikter</h3>
@@ -1419,7 +1419,7 @@ export default function MobileApp() {
       <div className="flex-1 relative overflow-x-hidden min-h-0" {...swipeHandlers}>
 
         {/* Background city image — sits at z-0 behind the scrollable content */}
-        {activeTab === 'now' && bgImage && (
+        {bgImage && (
           <div className="absolute inset-0 z-0">
             <img
               src={bgImage.url}
