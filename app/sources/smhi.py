@@ -32,10 +32,20 @@ async def fetch(client: httpx.AsyncClient) -> list[HourlyForecast]:
         wind_dir = _val(d, "wind_from_direction")
         cloud = _val(d, "cloud_area_fraction")
         precip_mm = _val(d, "precipitation_amount_mean")
+        # Fog detection: explicit symbol_code=7 OR visibility < 1 km (met. definition)
+        wsymb = int(_val(d, "symbol_code", 0))
+        vis   = _val(d, "visibility_in_air", float("nan"))
+        import math
+        fog_symbol = 1.0 if wsymb == 7 else 0.0
+        fog_vis    = (1.0 if (not math.isnan(vis) and vis < 1.0) else
+                      0.6 if (not math.isnan(vis) and vis < 5.0) else 0.0)
+        fog = max(fog_symbol, fog_vis)
+
         results.append(HourlyForecast(
             valid_for=valid_for, temperature=temp, precip_probability=precip,
             wind_speed=wind, cloud_cover=cloud,
             wind_direction=wind_dir, precip_mm=precip_mm,
+            fog_probability=fog,
         ))
 
     return results
