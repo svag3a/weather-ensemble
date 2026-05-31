@@ -5,10 +5,10 @@ services:
       - "8000:8000"
     volumes:
       - weather_data:/data
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=sqlite:////data/weather.db
-      - OPENWEATHERMAP_API_KEY=${OPENWEATHERMAP_API_KEY}
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
     restart: unless-stopped
 
 volumes:
