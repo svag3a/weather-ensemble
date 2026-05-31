@@ -94,12 +94,12 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
   const fog = fogProbability ?? 0
   if (!thunder && !hail) {
     if (fog > 0.65) {
-      symbol = '☁️'; label = 'Dimma'
+      symbol = 'FOG'; label = 'Dimma'
       if (windy) { symbol += '💨'; label += ', blåsigt' }
       return { symbol, label }
     }
     if (fog > 0.45 && cloud > 85) {
-      symbol = '☁️'; label = 'Möjlig dimma'
+      symbol = 'FOG_POSSIBLE'; label = 'Möjlig dimma'
       return { symbol, label }
     }
   }

@@ -4,6 +4,7 @@ import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock,
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages } from './api'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
+import WeatherSymbol from './components/WeatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
@@ -440,7 +441,7 @@ function SixHourTable({ forecasts }) {
         return (
           <div key={i} className="flex items-center gap-3 py-0.5">
             <span className="text-slate-400 font-mono text-xs w-12 shrink-0">{formatHour(fc.valid_for)}</span>
-            <span className="text-lg w-6 text-center leading-none">{symbol}</span>
+            <span className="text-lg w-6 text-center leading-none"><WeatherSymbol symbol={symbol} /></span>
             <span className="flex items-baseline gap-1 w-20 shrink-0">
               <span className="text-white text-sm font-medium">
                 {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
@@ -490,7 +491,7 @@ function CurrentCard({ fc, radar, allForecasts }) {
       {/* Temp + symbol */}
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
-          <span className="text-6xl leading-none">{symbol}</span>
+          <span className="text-6xl leading-none"><WeatherSymbol symbol={symbol} /></span>
           <span className="text-slate-400 text-sm mt-2">{label}</span>
         </div>
         <div className="text-right">
@@ -548,7 +549,7 @@ function HourRow({ fc }) {
   return (
     <div className="flex items-center gap-3 py-2 border-b border-slate-700/50 last:border-0">
       <span className="text-slate-400 font-mono text-xs w-12 shrink-0">{formatHour(fc.valid_for)}</span>
-      <span className="text-xl w-7 text-center">{symbol}</span>
+      <span className="text-xl w-7 text-center"><WeatherSymbol symbol={symbol} /></span>
       <span className="flex items-baseline gap-1 w-20 shrink-0">
         <span className="text-white font-medium">
           {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
@@ -586,7 +587,7 @@ function DayRow({ hours, warnings, weekMin, weekMax }) {
         </div>
 
         {/* Symbol */}
-        <span className="text-2xl w-8 shrink-0 text-center">{symbol}</span>
+        <span className="text-2xl w-8 shrink-0 text-center"><WeatherSymbol symbol={symbol} /></span>
 
         {/* Temp bar + range */}
         <div className="flex-1 min-w-0 space-y-1">
@@ -740,7 +741,7 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
         </div>
 
         {/* Symbol */}
-        <span className="text-2xl w-8 text-center shrink-0">{symbol}</span>
+        <span className="text-2xl w-8 text-center shrink-0"><WeatherSymbol symbol={symbol} /></span>
 
         {/* Temp bar + secondary info */}
         <div className="flex-1 min-w-0 space-y-1">
