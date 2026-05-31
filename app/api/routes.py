@@ -469,14 +469,15 @@ def debug_weights_diag(db: Session = Depends(get_db)):
     obs_latest  = db.query(Observation).order_by(Observation.valid_for.desc()).first()
     truth_repr  = repr(truth_time)
 
-    # Raw SQL diagnostics — bypass ORM mapping issues
-    from sqlalchemy import text as sqlt
-    raw_weights = db.execute(sqlt(
+    # Raw SQL diagnostics — bypass ORM via sqlite3
+    import sqlite3 as _sq
+    _c = _sq.connect("/data/weather.db")
+    raw_weights = _c.execute(
         "SELECT source, lead_hours, sample_count, mae_temperature, updated_at "
         "FROM source_weights WHERE source='smhi' ORDER BY lead_hours"
-    )).fetchall()
-    raw_cols = db.execute(sqlt("PRAGMA table_info(source_weights)")).fetchall()
-    col_names = [r[1] for r in raw_cols]
+    ).fetchall()
+    col_names = [r[1] for r in _c.execute("PRAGMA table_info(source_weights)").fetchall()]
+    _c.close()
 
     return {
         "now_utc": now.isoformat(),
