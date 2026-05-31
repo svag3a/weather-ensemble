@@ -199,8 +199,8 @@ function getImageStyle(fc, imageSlot = 'day', coords = null) {
   const isDaytime = hour >= srLocal && hour < ssLocal
 
   if (isDaytime) {
-    brightness = Math.max(0.30, brightness - (cloud / 100) * 0.25)
-    saturation = Math.max(0.40, saturation - (cloud / 100) * 0.35)
+    brightness = Math.max(0.55, brightness - (cloud / 100) * 0.12)
+    saturation = Math.max(0.70, saturation - (cloud / 100) * 0.18)
     if (precip > 60)      { brightness -= 0.12; overlay = 'rgba(50,70,120,0.25)' }
     else if (precip > 30) { overlay = overlay ?? 'rgba(80,100,140,0.12)' }
     else if (cloud > 70)  { overlay = overlay ?? 'rgba(80,90,100,0.12)'  }
@@ -1545,8 +1545,8 @@ export default function MobileApp() {
               precip={currentFc?.precip_probability ?? 0}
               temperature={currentFc?.temperature ?? 10}
             />
-            {/* Subtle darkening so cards stay readable */}
-            <div className="absolute inset-0 bg-slate-900/30" />
+            {/* Very subtle darkening — glass cards handle text contrast */}
+            <div className="absolute inset-0 bg-slate-900/10" />
           </div>
         )}
 
