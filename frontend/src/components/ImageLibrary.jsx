@@ -82,8 +82,9 @@ function UploadForm({ onUpload, defaultLabel = '', defaultLat = '', defaultLon =
     setPreset(name)
     const p = PRESETS.find(p => p.label === name)
     if (p) {
-      setLat(String(p.lat))
-      setLon(String(p.lon))
+      // Only fill coordinates if not already set from a map click
+      if (!lat) setLat(String(p.lat))
+      if (!lon) setLon(String(p.lon))
       if (!label) setLabel(name)
     }
   }
@@ -138,15 +139,18 @@ function UploadForm({ onUpload, defaultLabel = '', defaultLat = '', defaultLon =
         </div>
       </div>
 
-      {/* Preset location */}
+      {/* Preset location — only fills label if coords already set from map */}
       <div>
-        <label className="text-slate-400 text-xs mb-1 block">Snabbval plats</label>
+        <label className="text-slate-400 text-xs mb-1 block">
+          Snabbval etikett
+          {lat && lon && <span className="text-blue-400 ml-2">· koordinater från kartan</span>}
+        </label>
         <select
           value={preset}
           onChange={handlePreset}
           className="w-full bg-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-600"
         >
-          <option value="">Välj förinställd plats…</option>
+          <option value="">Välj förinställd etikett…</option>
           {PRESETS.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
         </select>
       </div>
