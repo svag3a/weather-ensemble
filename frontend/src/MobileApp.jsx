@@ -364,7 +364,7 @@ function getDaySummary(hours) {
   const repWind   = median(pool.map(h => h.wind_speed ?? 0))
   const repFog    = median(pool.map(h => h.fog_probability ?? 0))
   // Pass null for validFor — day summaries always use daytime symbols
-  const { symbol } = getWeatherInfo(repTemp, repPrecip, repWind, repCloud, null, 0, repFog)
+  const { symbol } = getWeatherInfo(repTemp, repPrecip, repWind, repCloud, null, 0, repFog, 0)
 
   const maxPrecipMm = Math.max(...hours.map(h => h.precip_mm ?? 0))
   const drops = rainDrops(maxPrecipMm)
@@ -435,7 +435,7 @@ function SixHourTable({ forecasts }) {
   return (
     <div className="mt-4 border-t border-slate-700 pt-4 space-y-1">
       {rows.map((fc, i) => {
-        const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0)
+        const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
         const drops = rainDrops(fc.precip_mm)
         const fl = feelsLike(fc.temperature, fc.wind_speed)
         return (
@@ -481,7 +481,7 @@ function CurrentCard({ fc, radar, allForecasts }) {
     </div>
   )
 
-  const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, radar?.cape ?? 0, fc.fog_probability ?? 0)
+  const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, radar?.cape ?? 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
   const feels = feelsLike(fc.temperature, fc.wind_speed)
   const conf = summariseConfidence(allForecasts)
   const summary = generateSummary(allForecasts)
@@ -542,7 +542,7 @@ function CurrentCard({ fc, radar, allForecasts }) {
 }
 
 function HourRow({ fc }) {
-  const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0)
+  const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
   const drops = rainDrops(fc.precip_mm)
   const fl = feelsLike(fc.temperature, fc.wind_speed)
   return (

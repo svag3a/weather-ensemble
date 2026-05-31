@@ -65,28 +65,34 @@ function isNight(validFor, lat = _DEFAULT_LAT, lon = _DEFAULT_LON) {
  * @param {number|null} windSpeed          m/s
  * @param {number|null} cloudCover         0–100 %
  * @param {string|null} validFor           ISO timestamp (for day/night)
- * @param {number}      cape               J/kg from radar — optional, enables thunder symbol
+ * @param {number}      cape               J/kg from radar — optional, enables thunder/hail
  * @param {number}      fogProbability     0–1 ensemble fog signal
+ * @param {number}      precipMm           mm/h precipitation amount for intensity
  */
-export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover, validFor = null, cape = 0, fogProbability = 0) {
+export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover, validFor = null, cape = 0, fogProbability = 0, precipMm = 0) {
   const precip = precipProbability ?? 0
   const cloud  = cloudCover ?? 0
   const wind   = windSpeed ?? 0
   const temp   = temperature ?? 5
+  const mm     = precipMm ?? 0
 
   const windy  = wind > 10
   const frozen = temp <= 0
   const sleet  = temp > 0 && temp <= 3   // snöblandat regn-zon
   const night  = isNight(validFor)
 
+  // Hail: very high CAPE + heavy precipitation
+  const hail         = cape >= 2000 && precip >= 60
+  const possibleHail = cape >= 1000 && precip >= 60 && mm > 5
+
   // Thunder takes priority when atmosphere is unstable + precipitation likely
-  const thunder = cape >= 500 && precip >= 40
+  const thunder = !hail && cape >= 500 && precip >= 40
 
   let symbol, label
 
   // Fog takes priority when likely (>0.5), shows as possible when borderline (0.3-0.5)
   const fog = fogProbability ?? 0
-  if (!thunder) {
+  if (!thunder && !hail) {
     if (fog > 0.5) {
       symbol = '🌫️'; label = 'Dimma'
       if (windy) { symbol += '💨'; label += ', blåsigt' }
@@ -98,13 +104,19 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
     }
   }
 
-  if (thunder) {
+  if (hail) {
+    symbol = '🌨'; label = 'Hagel'
+  } else if (possibleHail) {
+    symbol = '🌨'; label = 'Möjlig hagel'
+  } else if (thunder) {
     symbol = '⛈'
     label  = cape >= 1500 ? 'Kraftig åska' : 'Åskväder'
   } else if (precip >= 60) {
+    // Heavy rain intensity from precip_mm
+    const rainLabel = mm > 10 ? 'Skyfall' : mm > 3 ? 'Kraftigt regn' : 'Regn'
     if (frozen)     { symbol = '🌨'; label = 'Snö' }
     else if (sleet) { symbol = '🌧'; label = 'Snöblandat regn' }
-    else            { symbol = '🌧'; label = 'Regn' }
+    else            { symbol = '🌧'; label = rainLabel }
   } else if (precip >= 20) {
     if (frozen)     { symbol = '🌨'; label = 'Lätt snö' }
     else if (sleet) { symbol = '🌦'; label = 'Lätt snöblandat regn' }
