@@ -426,10 +426,16 @@ def include_source(source: str, db: Session = Depends(get_db)):
 
 
 @router.post("/collect", status_code=202)
-async def trigger_collection():
-    """Manually trigger a collection run (useful during development)."""
+async def trigger_collection(sync: bool = False):
+    """Manually trigger a collection run. sync=true waits and returns errors."""
     from app.scheduler import collect_and_update
-    import asyncio
+    import asyncio, traceback
+    if sync:
+        try:
+            await collect_and_update()
+            return {"status": "completed"}
+        except Exception as e:
+            return {"status": "error", "error": traceback.format_exc(limit=10)}
     asyncio.create_task(collect_and_update())
     return {"status": "collection started"}
 
