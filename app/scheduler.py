@@ -119,7 +119,11 @@ async def collect_and_update() -> None:
         truth_time = (issued_at - timedelta(hours=1)).replace(tzinfo=None)
         update_weights(db, truth_time)
 
-        build_ensemble(db, issued_at, forecasts_by_source)
+        try:
+            build_ensemble(db, issued_at, forecasts_by_source)
+        except Exception as exc:
+            logger.error("build_ensemble failed: %s", exc, exc_info=True)
+            db.rollback()
         _maybe_snapshot_weights(db, issued_at.date())
         await _pregen_ai_summaries(db)
         logger.info("Collection run complete.")

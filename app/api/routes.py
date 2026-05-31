@@ -469,6 +469,16 @@ def debug_weights_diag(db: Session = Depends(get_db)):
     obs_latest  = db.query(Observation).order_by(Observation.valid_for.desc()).first()
     truth_repr  = repr(truth_time)
 
+    # Quick build_ensemble smoke test
+    import traceback as _tb
+    def _test_build_ensemble(db):
+        try:
+            from app.models import SourceWeight as _SW
+            excl = {r.source for r in db.query(_SW).filter(_SW.excluded == True).all()}
+            return f"ok — excluded_sources query works, excluded={excl}"
+        except Exception as _e:
+            return _tb.format_exc(limit=3)
+
     # Check latest ensemble forecast to verify scheduler is running
     latest_ens = (
         db.query(EnsembleForecast.computed_at)
@@ -493,6 +503,7 @@ def debug_weights_diag(db: Session = Depends(get_db)):
         "obs_latest_in_db": obs_latest.valid_for.isoformat() if obs_latest else None,
         "obs_latest_temp": obs_latest.temperature if obs_latest else None,
         "latest_ensemble_computed_at": latest_ens[0].isoformat() if latest_ens else None,
+        "build_ensemble_test": _test_build_ensemble(db),
         "weight_summary": [
             {"source": r[0], "buckets": r[1], "total_samples": r[2], "last_update": str(r[3])}
             for r in weight_summary
