@@ -469,6 +469,22 @@ def debug_weights_diag(db: Session = Depends(get_db)):
     obs_latest  = db.query(Observation).order_by(Observation.valid_for.desc()).first()
     truth_repr  = repr(truth_time)
 
+    # Directly call update_weights and report what changed
+    import traceback
+    before_count = db.query(SourceWeight).filter(SourceWeight.source == "smhi").count()
+    before_smhi1 = db.query(SourceWeight).filter(SourceWeight.source == "smhi", SourceWeight.lead_hours == 1).first()
+    before_samples = before_smhi1.sample_count if before_smhi1 else -1
+    uw_error = None
+    try:
+        from app.ensemble import update_weights as _uw
+        _uw(db, truth_time)
+        db.expire_all()  # force re-read from DB
+    except Exception as e:
+        uw_error = traceback.format_exc()
+    after_smhi1 = db.query(SourceWeight).filter(SourceWeight.source == "smhi", SourceWeight.lead_hours == 1).first()
+    after_samples = after_smhi1.sample_count if after_smhi1 else -1
+    all_buckets = [(r.lead_hours, r.sample_count) for r in db.query(SourceWeight).filter(SourceWeight.source == "smhi").all()]
+
     return {
         "now_utc": now.isoformat(),
         "truth_time": truth_time.isoformat(),
@@ -477,6 +493,10 @@ def debug_weights_diag(db: Session = Depends(get_db)):
         "obs_minus1h_match": obs_minus1.valid_for.isoformat() if obs_minus1 else None,
         "obs_latest_in_db": obs_latest.valid_for.isoformat() if obs_latest else None,
         "obs_latest_temp": obs_latest.temperature if obs_latest else None,
+        "uw_error": uw_error,
+        "uw_samples_before": before_samples,
+        "uw_samples_after": after_samples,
+        "smhi_all_buckets_after": sorted(all_buckets),
         "obs_for_truth_time": obs.valid_for.isoformat() if obs else None,
         "obs_temperature": obs.temperature if obs else None,
         "recent_observations": [{"valid_for": o.valid_for.isoformat(), "temp": o.temperature} for o in recent_obs],
