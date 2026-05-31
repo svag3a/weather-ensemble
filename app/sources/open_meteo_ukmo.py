@@ -35,7 +35,7 @@ async def fetch(client: httpx.AsyncClient) -> list[HourlyForecast]:
         dew_f = float(dew) if dew is not None else float("nan")
         cloud_f = float(cloud) if cloud is not None else float("nan")
         wind_f = float(wind) if wind is not None else float("nan")
-        fog = 1.0 if (temp_f - dew_f < 2.0 and cloud_f > 90.0 and wind_f < 3.0) else 0.0
+        fog = 1.0 if (temp_f - dew_f < 1.0 and cloud_f > 95.0 and wind_f < 2.0) else 0.0
         results.append(HourlyForecast(
             valid_for=valid_for,
             temperature=temp_f,

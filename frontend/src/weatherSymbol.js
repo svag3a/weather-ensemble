@@ -93,12 +93,12 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
   // Fog takes priority when likely (>0.5), shows as possible when borderline (0.3-0.5)
   const fog = fogProbability ?? 0
   if (!thunder && !hail) {
-    if (fog > 0.5) {
+    if (fog > 0.65) {
       symbol = '🌁'; label = 'Dimma'
       if (windy) { symbol += '💨'; label += ', blåsigt' }
       return { symbol, label }
     }
-    if (fog > 0.3 && cloud > 75) {
+    if (fog > 0.45 && cloud > 85) {
       symbol = '🌁'; label = 'Möjlig dimma'
       return { symbol, label }
     }
