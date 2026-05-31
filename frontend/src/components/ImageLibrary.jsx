@@ -198,81 +198,95 @@ function UploadForm({ onUpload, defaultLabel = '', defaultLat = '', defaultLon =
   )
 }
 
-// ── Location card (4 slots) ───────────────────────────────────────────────────
+// ── Location row (compact table row + expandable detail) ─────────────────────
 
-function LocationCard({ location, onUpload, onDelete }) {
+function SlotDots({ slots }) {
+  return (
+    <div className="flex gap-1">
+      {SLOTS.map(s => (
+        <span key={s.key} title={s.label} className="text-base leading-none">
+          {slots[s.key] ? s.icon : <span className="text-slate-700">·</span>}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+function LocationRow({ location, onUpload, onDelete }) {
+  const [open, setOpen]               = useState(false)
   const [uploadingSlot, setUploadingSlot] = useState(null)
-  const [editLabel, setEditLabel] = useState(null)
+  const filled = Object.keys(location.slots).length
 
   return (
-    <div className="bg-slate-800 rounded-xl overflow-hidden">
-      {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-700 flex items-center justify-between">
-        <div>
-          <span className="text-white font-medium">{location.label}</span>
-          <span className="text-slate-500 text-xs ml-2 font-mono">
-            {location.lat.toFixed(4)}, {location.lon.toFixed(4)}
-          </span>
-        </div>
-      </div>
+    <div className="border-b border-slate-700/50 last:border-0">
+      {/* Compact row */}
+      <button
+        onClick={() => { setOpen(o => !o); setUploadingSlot(null) }}
+        className="w-full flex items-center gap-4 px-4 py-3 hover:bg-slate-700/30 transition-colors text-left"
+      >
+        <span className={`text-xs font-mono w-8 shrink-0 ${filled === 4 ? 'text-blue-400' : filled > 0 ? 'text-yellow-400' : 'text-slate-600'}`}>
+          {filled}/4
+        </span>
+        <span className="flex-1 text-white text-sm font-medium">{location.label}</span>
+        <SlotDots slots={location.slots} />
+        <span className="text-slate-600 text-xs font-mono ml-2 hidden sm:block">
+          {location.lat.toFixed(3)}, {location.lon.toFixed(3)}
+        </span>
+        <span className={`text-slate-500 text-xs ml-2 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
 
-      {/* 4 time slots */}
-      <div className="grid grid-cols-4 gap-0 divide-x divide-slate-700">
-        {SLOTS.map(slot => {
-          const img = location.slots[slot.key]
-          return (
-            <div key={slot.key} className="flex flex-col">
-              {/* Slot header */}
-              <div className="px-2 py-1.5 bg-slate-700/50 text-center">
-                <div className="text-base">{slot.icon}</div>
-                <div className="text-slate-400 text-[10px]">{slot.label}</div>
-              </div>
-
-              {img ? (
-                /* Uploaded image */
-                <div className="relative group">
-                  <img
-                    src={img.url}
-                    alt={`${location.label} ${slot.label}`}
-                    className="w-full aspect-video object-cover"
-                  />
-                  <button
-                    onClick={() => onDelete(img.id)}
-                    className="absolute top-1 right-1 w-5 h-5 bg-red-600/80 hover:bg-red-500 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
-                    title="Ta bort"
-                  >
-                    ✕
-                  </button>
+      {/* Expanded detail */}
+      {open && (
+        <div className="bg-slate-700/20 border-t border-slate-700/50">
+          {/* 4 slot thumbnails */}
+          <div className="grid grid-cols-4 divide-x divide-slate-700/50">
+            {SLOTS.map(slot => {
+              const img = location.slots[slot.key]
+              return (
+                <div key={slot.key} className="flex flex-col">
+                  <div className="px-2 py-1.5 bg-slate-700/30 text-center">
+                    <span className="text-base">{slot.icon}</span>
+                    <div className="text-slate-400 text-[10px]">{slot.label}</div>
+                  </div>
+                  {img ? (
+                    <div className="relative group">
+                      <img src={img.url} alt={`${location.label} ${slot.label}`}
+                        className="w-full aspect-video object-cover" />
+                      <button
+                        onClick={() => onDelete(img.id)}
+                        className="absolute top-1 right-1 w-5 h-5 bg-red-600/80 hover:bg-red-500 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setUploadingSlot(slot.key)}
+                      className="flex-1 min-h-12 flex flex-col items-center justify-center gap-1 text-slate-600 hover:text-slate-400 hover:bg-slate-700/30 transition-colors"
+                    >
+                      <span>+</span>
+                      <span className="text-[10px]">Ladda upp</span>
+                    </button>
+                  )}
                 </div>
-              ) : (
-                /* Empty slot — upload button */
-                <button
-                  onClick={() => setUploadingSlot(slot.key)}
-                  className="flex-1 min-h-16 flex flex-col items-center justify-center gap-1 text-slate-600 hover:text-slate-400 hover:bg-slate-700/30 transition-colors"
-                >
-                  <span className="text-lg">+</span>
-                  <span className="text-[10px]">Ladda upp</span>
-                </button>
-              )}
-            </div>
-          )
-        })}
-      </div>
+              )
+            })}
+          </div>
 
-      {/* Inline upload form for a specific slot */}
-      {uploadingSlot && (
-        <div className="p-4 border-t border-slate-700 bg-slate-700/20">
-          <p className="text-slate-300 text-sm mb-3">
-            Ladda upp bild för <strong>{SLOTS.find(s => s.key === uploadingSlot)?.label}</strong>
-          </p>
-          <UploadForm
-            defaultLabel={location.label}
-            defaultLat={String(location.lat)}
-            defaultLon={String(location.lon)}
-            defaultSlot={uploadingSlot}
-            onUpload={onUpload}
-            onClose={() => setUploadingSlot(null)}
-          />
+          {/* Upload form for a specific slot */}
+          {uploadingSlot && (
+            <div className="p-4 border-t border-slate-700/50">
+              <p className="text-slate-300 text-sm mb-3">
+                Ladda upp bild för <strong>{SLOTS.find(s => s.key === uploadingSlot)?.label}</strong>
+              </p>
+              <UploadForm
+                defaultLabel={location.label}
+                defaultLat={String(location.lat)}
+                defaultLon={String(location.lon)}
+                defaultSlot={uploadingSlot}
+                onUpload={onUpload}
+                onClose={() => setUploadingSlot(null)}
+              />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -349,21 +363,31 @@ export default function ImageLibrary({ data, onUpload, onDelete }) {
         </div>
       )}
 
-      {/* Location cards */}
-      {locations.length === 0 && !showNewLocation && (
+      {/* Compact location table */}
+      {locations.length === 0 && !showNewLocation ? (
         <div className="bg-slate-800 rounded-xl p-8 text-center text-slate-500 text-sm">
-          Inga bilder uppladdade ännu. Klicka "+ Ny plats" för att börja.
+          Inga bilder uppladdade ännu. Klicka på kartan eller "+ Ny plats" för att börja.
+        </div>
+      ) : locations.length > 0 && (
+        <div className="bg-slate-800 rounded-xl overflow-hidden">
+          {/* Table header */}
+          <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-700 text-xs text-slate-500">
+            <span className="w-8 shrink-0">Slots</span>
+            <span className="flex-1">Plats</span>
+            <span>Bilder</span>
+            <span className="hidden sm:block ml-2 w-28">Koordinater</span>
+            <span className="w-4" />
+          </div>
+          {locations.map(loc => (
+            <LocationRow
+              key={loc.label}
+              location={loc}
+              onUpload={onUpload}
+              onDelete={onDelete}
+            />
+          ))}
         </div>
       )}
-
-      {locations.map(loc => (
-        <LocationCard
-          key={loc.label}
-          location={loc}
-          onUpload={onUpload}
-          onDelete={onDelete}
-        />
-      ))}
     </div>
   )
 }
