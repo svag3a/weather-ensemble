@@ -47,4 +47,4 @@ jobs:
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=20 \
             ubuntu@${{ secrets.EC2_HOST }} \
-            "cd ~/weather-ensemble && docker compose up -d --build"
+            "cd ~/weather-ensemble && docker compose build --no-cache && docker compose up -d"

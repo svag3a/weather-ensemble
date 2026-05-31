@@ -320,10 +320,13 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
         for fc in fcs:
             all_valid.add(fc.valid_for)
 
-    # Gather excluded sources once to avoid per-hour queries
-    excluded_sources = {
-        r.source for r in db.query(SourceWeight).filter(SourceWeight.excluded == True).all()
-    }
+    # Gather excluded sources — use integer comparison for SQLite Boolean compatibility
+    try:
+        excluded_sources = {
+            r.source for r in db.query(SourceWeight).filter(SourceWeight.excluded == 1).all()
+        }
+    except Exception:
+        excluded_sources = set()  # safe fallback if column is missing/broken
 
     for valid_for in sorted(all_valid):
         lead_hours = max(1, round((valid_for - computed_at).total_seconds() / 3600))
