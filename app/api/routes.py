@@ -463,25 +463,20 @@ def debug_weights_diag(db: Session = Depends(get_db)):
     issued_dates = sorted(set(str(f[2])[:10] for f in exact_fcs))
     lead_dist = Counter(f[1] for f in exact_fcs)
 
-    # Directly reproduce _get_truth logic to diagnose
-    obs_direct = db.query(Observation).filter(Observation.valid_for == truth_time).first()
-    obs_str = db.query(Observation).filter(
-        Observation.valid_for == str(truth_time)
-    ).first()
-    # Check raw DB value
-    from sqlalchemy import text as _text
-    raw = db.execute(_text("SELECT valid_for FROM observations ORDER BY valid_for DESC LIMIT 3")).fetchall()
-    truth_type = str(type(truth_time))
-    truth_repr = repr(truth_time)
+    # Direct obs queries around truth_time
+    obs_exact   = db.query(Observation).filter(Observation.valid_for == truth_time).first()
+    obs_minus1  = db.query(Observation).filter(Observation.valid_for == truth_time - timedelta(hours=1)).first()
+    obs_latest  = db.query(Observation).order_by(Observation.valid_for.desc()).first()
+    truth_repr  = repr(truth_time)
 
     return {
         "now_utc": now.isoformat(),
         "truth_time": truth_time.isoformat(),
-        "truth_time_type": truth_type,
         "truth_time_repr": truth_repr,
-        "obs_via_datetime": obs_direct.valid_for.isoformat() if obs_direct else None,
-        "obs_via_str": obs_str.valid_for.isoformat() if obs_str else None,
-        "raw_obs_valid_fors": [str(r[0]) for r in raw],
+        "obs_exact_match": obs_exact.valid_for.isoformat() if obs_exact else None,
+        "obs_minus1h_match": obs_minus1.valid_for.isoformat() if obs_minus1 else None,
+        "obs_latest_in_db": obs_latest.valid_for.isoformat() if obs_latest else None,
+        "obs_latest_temp": obs_latest.temperature if obs_latest else None,
         "obs_for_truth_time": obs.valid_for.isoformat() if obs else None,
         "obs_temperature": obs.temperature if obs else None,
         "recent_observations": [{"valid_for": o.valid_for.isoformat(), "temp": o.temperature} for o in recent_obs],
