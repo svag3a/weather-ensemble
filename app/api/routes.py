@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage
+from app.api.auth import get_current_user
 
 router = APIRouter()
 
@@ -392,7 +393,7 @@ def get_ensemble_health(db: Session = Depends(get_db)):
 
 
 @router.post("/ensemble/sources/{source}/exclude", status_code=200)
-def exclude_source(source: str, db: Session = Depends(get_db)):
+def exclude_source(source: str, db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
     """Manually exclude a source from the ensemble."""
     rows = db.query(SourceWeight).filter(SourceWeight.source == source).all()
     if not rows:
@@ -408,7 +409,7 @@ def exclude_source(source: str, db: Session = Depends(get_db)):
 
 
 @router.post("/ensemble/sources/{source}/include", status_code=200)
-def include_source(source: str, db: Session = Depends(get_db)):
+def include_source(source: str, db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
     """Manually re-include a previously excluded source."""
     rows = db.query(SourceWeight).filter(SourceWeight.source == source).all()
     if not rows:
@@ -425,7 +426,7 @@ def include_source(source: str, db: Session = Depends(get_db)):
 
 
 @router.post("/collect", status_code=202)
-async def trigger_collection():
+async def trigger_collection(_user: str = Depends(get_current_user)):
     """Manually trigger a collection run (useful during development)."""
     from app.scheduler import collect_and_update
     import asyncio
@@ -434,7 +435,7 @@ async def trigger_collection():
 
 
 @router.post("/collect/sync")
-async def trigger_collection_sync():
+async def trigger_collection_sync(_user: str = Depends(get_current_user)):
     """Run collection synchronously and return any errors — for debugging."""
     from app.scheduler import collect_and_update
     import traceback
@@ -446,7 +447,7 @@ async def trigger_collection_sync():
 
 
 @router.post("/debug/ensemble-test-cleanup", status_code=200)
-def cleanup_test_ensemble_rows(db: Session = Depends(get_db)):
+def cleanup_test_ensemble_rows(db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
     """Delete partial ensemble rows created by test endpoint."""
     from sqlalchemy import func
     # Find computed_at values that have very few rows (test artifacts)
@@ -516,6 +517,7 @@ async def upload_city_image(
     lon: float = Form(...),
     time_slot: str = Form(default="day"),
     db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
 ):
     ext = _Path(file.filename).suffix if file.filename else ""
     filename = f"{_uuid.uuid4()}{ext}"
@@ -535,6 +537,7 @@ def update_city_image(
     image_id: int,
     body: CityImageUpdate,
     db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
 ):
     row = db.query(CityImage).filter(CityImage.id == image_id).first()
     if row is None:
@@ -549,7 +552,7 @@ def update_city_image(
 
 
 @router.delete("/city-images/{image_id}", status_code=204)
-def delete_city_image(image_id: int, db: Session = Depends(get_db)):
+def delete_city_image(image_id: int, db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
     row = db.query(CityImage).filter(CityImage.id == image_id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Image not found")

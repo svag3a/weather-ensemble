@@ -73,6 +73,12 @@ export default function App() {
             <img src="/logo.png" alt="gbgvader.se" className="h-32 w-auto" />
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => fetch('/auth/logout', { method: 'POST' }).then(() => { window.location.href = '/' })}
+              className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-medium px-3 py-2 rounded-lg border border-slate-600 transition-colors"
+            >
+              Logga ut
+            </button>
             <select
               value={hoursAhead}
               onChange={e => setHoursAhead(Number(e.target.value))}

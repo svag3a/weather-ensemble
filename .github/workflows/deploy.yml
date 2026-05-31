@@ -31,7 +31,7 @@ jobs:
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=20 \
             ubuntu@${{ secrets.EC2_HOST }} \
-            "cd ~/weather-ensemble && git fetch origin && git reset --hard origin/main && echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' > .env"
+            "cd ~/weather-ensemble && git fetch origin && git reset --hard origin/main && echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' > .env && echo 'GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}' >> .env && echo 'GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}' >> .env"
 
       # Copy pre-built frontend (dist is gitignored, git pull won't overwrite it)
       - name: Copy frontend dist to server

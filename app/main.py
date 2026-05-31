@@ -1,15 +1,18 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Cookie
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from starlette.responses import RedirectResponse
 
 load_dotenv()
 
 from app.database import init_db
 from app.scheduler import create_scheduler
 from app.api.routes import router
+from app.api.auth import auth_router, verify_session_token
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
@@ -53,6 +56,7 @@ app = FastAPI(
 )
 
 app.include_router(router, prefix="/api/v1")
+app.include_router(auth_router)
 
 
 @app.get("/health")
@@ -65,6 +69,13 @@ if CITY_IMAGES_DIR.exists():
 
 if FRONTEND_DIST.exists():
     app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="assets")
+
+    @app.get("/admin")
+    async def admin_page(session: Optional[str] = Cookie(None)):
+        email = verify_session_token(session or "")
+        if not email:
+            return RedirectResponse(url="/auth/google", status_code=302)
+        return FileResponse(str(FRONTEND_DIST / "index.html"))
 
     @app.get("/{full_path:path}")
     async def spa_fallback(full_path: str):
