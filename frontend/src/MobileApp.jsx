@@ -599,9 +599,6 @@ function DayRow({ hours, warnings, weekMin, weekMax }) {
               {maxTemp != null ? `${maxTemp}°` : '—'}
             </span>
           </div>
-          {drops && (
-            <div className="pl-9 text-xs text-blue-300">{drops}</div>
-          )}
         </div>
 
         {/* Warning triangle */}
