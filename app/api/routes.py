@@ -362,8 +362,7 @@ def get_ensemble_health(db: Session = Depends(get_db)):
         elif abs(bias_t) > 1.0:
             suggestion = f"Systematisk temperaturbia {bias_t:+.1f}°C — kompenseras av bias-korrigering"
         elif ensemble_mae_temp is not None and mae_t > ensemble_mae_temp * 1.5:
-            pct = round((mae_t / ensemble_mae_temp - 1) * 100)
-            suggestion = f"Temperaturträffsäkerheten är {pct}% sämre än ensemblen"
+            suggestion = f"Temperatur-MAE {mae_t:.2f}°C vs ensemble {ensemble_mae_temp:.2f}°C — {(mae_t - ensemble_mae_temp):.2f}°C sämre"
 
         sources_out.append({
             "source": r.source,
