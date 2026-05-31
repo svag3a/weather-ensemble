@@ -71,7 +71,7 @@ export default function App() {
 
         <div className="flex items-center justify-between mb-8">
           <div>
-            <img src="/logo.png" alt="gbgvader.se" className="h-32 w-auto" />
+            <img src="/logo.png" alt="Weather Ensemble" className="h-20 w-auto" />
           </div>
           <div className="flex items-center gap-3">
             <button
