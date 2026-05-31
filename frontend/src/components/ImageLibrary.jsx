@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 const ImageMap = lazy(() => import('./ImageMap'))
 
 // Find the nearest preset label for a given coordinate
@@ -76,6 +76,10 @@ function UploadForm({ onUpload, defaultLabel = '', defaultLat = '', defaultLon =
   const [uploading, setUploading] = useState(false)
   const [error, setError]       = useState(null)
   const [progress, setProgress] = useState(null)
+
+  // Sync lat/lon when parent updates them via map click (after form is already open)
+  useEffect(() => { if (defaultLat) setLat(defaultLat) }, [defaultLat])
+  useEffect(() => { if (defaultLon) setLon(defaultLon) }, [defaultLon])
 
   const handlePreset = e => {
     const name = e.target.value
