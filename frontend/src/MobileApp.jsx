@@ -566,7 +566,7 @@ function HourRow({ fc }) {
   )
 }
 
-function DayRow({ hours, warnings }) {
+function DayRow({ hours, warnings, weekMin, weekMax }) {
   const [open, setOpen] = useState(false)
   const { minTemp, maxTemp, symbol, drops } = getDaySummary(hours)
   const label   = dayLabel(hours[0].valid_for)
@@ -580,24 +580,30 @@ function DayRow({ hours, warnings }) {
         className="w-full flex items-center gap-3 px-5 py-4 active:bg-white/5 transition-colors"
       >
         {/* Day name + date */}
-        <div className="flex-1 text-left">
-          <span className="text-white font-medium">{label}</span>
-          <span className="text-slate-500 text-sm ml-2">{date}</span>
+        <div className="w-24 shrink-0 text-left">
+          <div className="text-white font-medium">{label}</div>
+          <div className="text-slate-500 text-xs">{date}</div>
         </div>
 
         {/* Symbol */}
-        <span className="text-2xl">{symbol}</span>
+        <span className="text-2xl w-8 shrink-0 text-center">{symbol}</span>
 
-        {/* Temp range */}
-        <span className="text-sm font-mono text-slate-300 w-16 text-right">
-          {minTemp != null ? `${minTemp}–${maxTemp}°` : '—'}
-        </span>
+        {/* Temp bar + range */}
+        <div className="flex-1 min-w-0 flex items-center gap-2">
+          <span className="text-slate-400 text-xs font-mono w-7 text-right shrink-0">
+            {minTemp != null ? `${minTemp}°` : ''}
+          </span>
+          <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
+          <span className="text-white text-sm font-mono w-7 shrink-0">
+            {maxTemp != null ? `${maxTemp}°` : '—'}
+          </span>
+        </div>
 
         {/* Rain */}
-        <span className="text-xs w-10 text-center">{drops ?? <span className="text-slate-700">—</span>}</span>
+        <span className="text-xs w-8 text-center shrink-0">{drops ?? <span className="text-slate-700">—</span>}</span>
 
         {/* Warning triangle */}
-        <span className="w-4 text-center"><WarningTriangle warning={warning} /></span>
+        <span className="w-4 text-center shrink-0"><WarningTriangle warning={warning} /></span>
 
         {/* Chevron */}
         <span className={`text-slate-600 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
@@ -1572,9 +1578,15 @@ export default function MobileApp() {
                     </div>
                   )}
                   <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
-                  {days.slice(1).filter(hours => hours.length >= 23).map((hours, i) => (
-                    <DayRow key={i} hours={hours} warnings={warnings} />
-                  ))}
+                  {(() => {
+                    const visibleDays = days.slice(1).filter(h => h.length >= 23)
+                    const allSummaries = visibleDays.map(getDaySummary)
+                    const wMin = Math.min(...allSummaries.map(s => s.minTemp ?? 99))
+                    const wMax = Math.max(...allSummaries.map(s => s.maxTemp ?? -99))
+                    return visibleDays.map((hours, i) => (
+                      <DayRow key={i} hours={hours} warnings={warnings} weekMin={wMin} weekMax={wMax} />
+                    ))
+                  })()}
                 </>
               )}
 
