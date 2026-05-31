@@ -434,6 +434,45 @@ async def trigger_collection():
     return {"status": "collection started"}
 
 
+@router.get("/debug/ensemble-test")
+async def debug_ensemble_test(db: Session = Depends(get_db)):
+    """Run build_ensemble directly and report any error."""
+    import traceback
+    from datetime import timezone
+    from app.ensemble import build_ensemble as _be
+    from app.models import EnsembleForecast as _EF
+
+    before = db.query(_EF.computed_at).order_by(_EF.computed_at.desc()).first()
+    before_ts = before[0].isoformat() if before else None
+
+    # Build a tiny test: just pass empty dict so it returns immediately
+    error = None
+    try:
+        issued_at = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+        _be(db, issued_at, {})   # empty dict → no forecasts → should return immediately
+        error = None
+    except Exception as e:
+        error = traceback.format_exc(limit=5)
+
+    # Also test excluded query directly
+    excl_error = None
+    excl_result = None
+    try:
+        from app.models import SourceWeight as _SW
+        excl_result = [r.source for r in db.query(_SW).filter(_SW.excluded == 1).all()]
+    except Exception as e:
+        excl_error = traceback.format_exc(limit=3)
+
+    after = db.query(_EF.computed_at).order_by(_EF.computed_at.desc()).first()
+    return {
+        "build_ensemble_empty_call_error": error,
+        "excluded_query_result": excl_result,
+        "excluded_query_error": excl_error,
+        "ensemble_computed_at_before": before_ts,
+        "ensemble_computed_at_after": after[0].isoformat() if after else None,
+    }
+
+
 import uuid as _uuid
 from pathlib import Path as _Path
 
