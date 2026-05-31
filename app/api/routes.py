@@ -426,18 +426,24 @@ def include_source(source: str, db: Session = Depends(get_db)):
 
 
 @router.post("/collect", status_code=202)
-async def trigger_collection(sync: bool = False):
-    """Manually trigger a collection run. sync=true waits and returns errors."""
+async def trigger_collection():
+    """Manually trigger a collection run (useful during development)."""
     from app.scheduler import collect_and_update
-    import asyncio, traceback
-    if sync:
-        try:
-            await collect_and_update()
-            return {"status": "completed"}
-        except Exception as e:
-            return {"status": "error", "error": traceback.format_exc(limit=10)}
+    import asyncio
     asyncio.create_task(collect_and_update())
     return {"status": "collection started"}
+
+
+@router.post("/collect/sync")
+async def trigger_collection_sync():
+    """Run collection synchronously and return any errors — for debugging."""
+    from app.scheduler import collect_and_update
+    import traceback
+    try:
+        await collect_and_update()
+        return {"status": "completed"}
+    except Exception as e:
+        return {"status": "error", "error": traceback.format_exc(limit=15)}
 
 
 @router.post("/debug/ensemble-test-cleanup", status_code=200)
