@@ -445,12 +445,24 @@ async def debug_ensemble_test(db: Session = Depends(get_db)):
     before = db.query(_EF.computed_at).order_by(_EF.computed_at.desc()).first()
     before_ts = before[0].isoformat() if before else None
 
-    # Build a tiny test: just pass empty dict so it returns immediately
+    # Test build_ensemble with real current forecasts
     error = None
     try:
+        import httpx
+        from app.sources import smhi, yr
+        from app.scheduler import SOURCES
         issued_at = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
-        _be(db, issued_at, {})   # empty dict → no forecasts → should return immediately
-        error = None
+        # Fetch just 2 sources to test
+        test_data = {}
+        async with httpx.AsyncClient() as client:
+            for name in ['smhi', 'yr']:
+                try:
+                    fcs = await SOURCES[name](client)
+                    test_data[name] = fcs[:5]  # only first 5 forecast hours
+                except Exception as ex:
+                    error = f"fetch {name} failed: {ex}"
+        if not error:
+            _be(db, issued_at, test_data)
     except Exception as e:
         error = traceback.format_exc(limit=5)
 
