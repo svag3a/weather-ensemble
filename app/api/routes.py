@@ -411,6 +411,91 @@ def exclude_source(source: str, db: Session = Depends(get_db), _user: str = Depe
     return {"status": "excluded", "source": source}
 
 
+@router.get("/ensemble/trend")
+def get_ensemble_trend(
+    days: int = Query(default=14, ge=4, le=60),
+    db: Session = Depends(get_db),
+):
+    """
+    Direct forecast accuracy: ensemble 1h-ahead forecasts vs SMHI observations.
+    Returns daily MAE for temperature and Brier score for precipitation,
+    plus trend comparison between the two halves of the window.
+    """
+    from datetime import date, timedelta
+    from sqlalchemy import func
+
+    now_naive = datetime.utcnow()
+    cutoff    = now_naive - timedelta(days=days)
+
+    # Join ensemble 1h forecasts with observations on valid_for
+    rows = (
+        db.query(
+            Forecast.valid_for,
+            Forecast.temperature.label("fc_temp"),
+            Forecast.precip_probability.label("fc_precip"),
+            Observation.temperature.label("obs_temp"),
+            Observation.precip_mm.label("obs_precip_mm"),
+        )
+        .join(Observation, Forecast.valid_for == Observation.valid_for)
+        .filter(
+            Forecast.source == "ensemble",
+            Forecast.lead_hours == 1,
+            Forecast.valid_for >= cutoff,
+            Forecast.temperature.isnot(None),
+            Observation.temperature.isnot(None),
+        )
+        .order_by(Forecast.valid_for)
+        .all()
+    )
+
+    if len(rows) < 4:
+        return {"daily": [], "trend": None, "message": "Otillräcklig data — behöver fler observationer"}
+
+    # Group by calendar date and compute daily MAE + Brier
+    from collections import defaultdict
+    by_day: dict = defaultdict(lambda: {"temp_errs": [], "brier": []})
+    for r in rows:
+        d = r.valid_for.date().isoformat()
+        by_day[d]["temp_errs"].append(abs(r.fc_temp - r.obs_temp))
+        precip_outcome = 1.0 if (r.obs_precip_mm is not None and r.obs_precip_mm > 0.1) else 0.0
+        by_day[d]["brier"].append((r.fc_precip / 100.0 - precip_outcome) ** 2)
+
+    daily = sorted([
+        {
+            "date":      d,
+            "mae_temp":  round(sum(v["temp_errs"]) / len(v["temp_errs"]), 3),
+            "brier":     round(sum(v["brier"])     / len(v["brier"]),     4),
+            "n":         len(v["temp_errs"]),
+        }
+        for d, v in by_day.items()
+        if v["temp_errs"]
+    ], key=lambda x: x["date"])
+
+    # Trend: compare first half vs second half
+    mid  = len(daily) // 2
+    old  = daily[:mid]
+    new  = daily[mid:]
+    trend = None
+    if old and new:
+        old_mae  = sum(d["mae_temp"] for d in old) / len(old)
+        new_mae  = sum(d["mae_temp"] for d in new) / len(new)
+        old_bs   = sum(d["brier"]    for d in old) / len(old)
+        new_bs   = sum(d["brier"]    for d in new) / len(new)
+        pct_temp = round((new_mae  - old_mae)  / old_mae  * 100, 1) if old_mae  else None
+        pct_bs   = round((new_bs   - old_bs)   / old_bs   * 100, 1) if old_bs   else None
+        trend = {
+            "temp_mae_old":    round(old_mae, 3),
+            "temp_mae_new":    round(new_mae, 3),
+            "temp_pct_change": pct_temp,   # negative = improving
+            "brier_old":       round(old_bs, 4),
+            "brier_new":       round(new_bs, 4),
+            "brier_pct_change": pct_bs,
+            "direction":       "improving" if (pct_temp or 0) < -2 else "worsening" if (pct_temp or 0) > 2 else "stable",
+        }
+
+    return {"daily": daily, "trend": trend, "message": None}
+
+
 @router.post("/ensemble/sources/{source}/include", status_code=200)
 def include_source(source: str, db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
     """Manually re-include a previously excluded source."""

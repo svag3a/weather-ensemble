@@ -87,6 +87,12 @@ export async function deleteCityImage(id) {
   if (!res.ok) throw new Error(await res.text())
 }
 
+export async function fetchEnsembleTrend(days = 14) {
+  const res = await fetch(`${BASE}/ensemble/trend?days=${days}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchEnsembleHealth() {
   const res = await fetch(`${BASE}/ensemble/health`)
   if (!res.ok) throw new Error(await res.text())

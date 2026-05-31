@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchEnsemble, fetchSources, fetchWeights, fetchWeightsHistory, fetchStatus, triggerCollect, fetchCityImages, uploadCityImage, updateCityImage, deleteCityImage, fetchEnsembleHealth } from './api'
+import { fetchEnsemble, fetchSources, fetchWeights, fetchWeightsHistory, fetchStatus, triggerCollect, fetchCityImages, uploadCityImage, updateCityImage, deleteCityImage, fetchEnsembleHealth, fetchEnsembleTrend } from './api'
 import EnsembleForecast from './components/EnsembleForecast'
 import SourceComparison from './components/SourceComparison'
 import SourceRanking from './components/SourceRanking'
@@ -7,6 +7,7 @@ import RankingChart from './components/RankingChart'
 import SystemStatus from './components/SystemStatus'
 import ImageLibrary from './components/ImageLibrary'
 import EnsembleOptimizer from './components/EnsembleOptimizer'
+import EnsembleTrend from './components/EnsembleTrend'
 
 function useData(fetcher, deps = []) {
   const [data, setData] = useState(null)
@@ -35,6 +36,7 @@ export default function App() {
   const systemStatus   = useData(fetchStatus)
   const cityImages     = useData(fetchCityImages)
   const ensembleHealth = useData(fetchEnsembleHealth)
+  const ensembleTrend  = useData(fetchEnsembleTrend)
 
   useEffect(() => {
     const refresh = () => {
@@ -124,6 +126,7 @@ export default function App() {
 
         {activeTab === 'status' && (
           <div className="space-y-6">
+            <EnsembleTrend data={ensembleTrend.data} />
             <EnsembleOptimizer data={ensembleHealth.data} onReload={ensembleHealth.reload} />
             <SystemStatus data={systemStatus.data} />
             <EnsembleForecast data={ensemble.data} sources={sources.data} />
