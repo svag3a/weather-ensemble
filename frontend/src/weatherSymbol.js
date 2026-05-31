@@ -66,8 +66,9 @@ function isNight(validFor, lat = _DEFAULT_LAT, lon = _DEFAULT_LON) {
  * @param {number|null} cloudCover         0–100 %
  * @param {string|null} validFor           ISO timestamp (for day/night)
  * @param {number}      cape               J/kg from radar — optional, enables thunder symbol
+ * @param {number}      fogProbability     0–1 ensemble fog signal
  */
-export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover, validFor = null, cape = 0) {
+export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover, validFor = null, cape = 0, fogProbability = 0) {
   const precip = precipProbability ?? 0
   const cloud  = cloudCover ?? 0
   const wind   = windSpeed ?? 0
@@ -82,6 +83,20 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
   const thunder = cape >= 500 && precip >= 40
 
   let symbol, label
+
+  // Fog takes priority when likely (>0.5), shows as possible when borderline (0.3-0.5)
+  const fog = fogProbability ?? 0
+  if (!thunder) {
+    if (fog > 0.5) {
+      symbol = '🌫️'; label = 'Dimma'
+      if (windy) { symbol += '💨'; label += ', blåsigt' }
+      return { symbol, label }
+    }
+    if (fog > 0.3 && cloud > 75) {
+      symbol = '🌫️'; label = 'Möjlig dimma'
+      return { symbol, label }
+    }
+  }
 
   if (thunder) {
     symbol = '⛈'

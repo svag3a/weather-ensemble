@@ -60,6 +60,7 @@ def _upsert_forecasts(db: Session, source: str, issued_at: datetime, forecasts) 
                 wind_direction=None if isnan(fc.wind_direction) else fc.wind_direction,
                 cloud_cover=None if isnan(fc.cloud_cover) else fc.cloud_cover,
                 precip_mm=None if isnan(fc.precip_mm) else fc.precip_mm,
+                fog_probability=None if isnan(fc.fog_probability) else fc.fog_probability,
             ))
     db.commit()
 

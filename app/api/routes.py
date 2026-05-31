@@ -23,6 +23,7 @@ class ForecastOut(BaseModel):
     cloud_cover: Optional[float] = None
     precip_mm: Optional[float] = None
     confidence: Optional[float] = None
+    fog_probability: Optional[float] = None
 
 
 class SourceWeightOut(BaseModel):
@@ -74,6 +75,7 @@ def get_ensemble_forecast(
             cloud_cover=r.cloud_cover,
             precip_mm=r.precip_mm,
             confidence=r.confidence,
+            fog_probability=r.fog_probability,
         )
         for r in rows
     ]
@@ -248,6 +250,7 @@ async def get_local_forecast(
             cloud_cover=r.cloud_cover,
             precip_mm=r.precip_mm,
             confidence=r.confidence,
+            fog_probability=r.fog_probability,
         ))
 
     return result

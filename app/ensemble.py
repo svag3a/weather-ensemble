@@ -335,7 +335,7 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
         lead_hours = max(1, round((valid_for - computed_at).total_seconds() / 3600))
         weights = _get_weights(db, lead_hours)
 
-        temps, precips, winds, clouds, wind_dirs, precip_mms = [], [], [], [], [], []
+        temps, precips, winds, clouds, wind_dirs, precip_mms, fog_signals = [], [], [], [], [], [], []
         for source, fcs in forecasts_by_source.items():
             if source in excluded_sources:
                 continue
@@ -359,6 +359,8 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
                 wind_dirs.append((match.wind_direction, w["w_wind"]))
             if match.precip_mm is not None and not isnan(match.precip_mm):
                 precip_mms.append(match.precip_mm)
+            if match.fog_probability is not None and not isnan(match.fog_probability):
+                fog_signals.append(match.fog_probability)
 
         if not precips:
             continue
@@ -392,6 +394,7 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
         ens_wind_dir = circular_wavg(wind_dirs)
         ens_precip_mm = sum(precip_mms) / len(precip_mms) if precip_mms else None
         ens_confidence = _compute_confidence(temps, precips)
+        ens_fog = sum(fog_signals) / len(fog_signals) if fog_signals else 0.0
 
         # Physical consistency: precipitation requires cloud cover
         if ens_precip is not None and ens_cloud is not None:
@@ -421,6 +424,7 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
                 wind_direction=wd,
                 precip_mm=pm,
                 confidence=ens_confidence,
+                fog_probability=round(ens_fog, 3),
             ))
             # Also track ensemble as a source so its MAE is measured in the ranking
             ens_fc_exists = (

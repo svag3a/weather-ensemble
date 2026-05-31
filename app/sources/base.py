@@ -14,3 +14,4 @@ class HourlyForecast:
     cloud_cover: float = float("nan")
     wind_direction: float = float("nan")
     precip_mm: float = float("nan")
+    fog_probability: float = float("nan")

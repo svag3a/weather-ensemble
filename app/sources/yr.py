@@ -38,10 +38,15 @@ async def fetch(client: httpx.AsyncClient) -> list[HourlyForecast]:
             import math
             precip = round(100 * (1 - math.exp(-precip_mm_val)), 1)
 
+        symbol_code = next_block.get("summary", {}).get("symbol_code", "")
+        fog_codes = {"fog", "lightfog"}
+        fog_prob = 1.0 if (symbol_code in fog_codes or "fog" in symbol_code) else 0.0
+
         results.append(HourlyForecast(
             valid_for=valid_for, temperature=temp, precip_probability=precip,
             wind_speed=wind, cloud_cover=cloud,
             wind_direction=wind_dir, precip_mm=precip_mm_val,
+            fog_probability=fog_prob,
         ))
 
     return results
