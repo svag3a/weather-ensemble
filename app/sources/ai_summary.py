@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL_HOURS = 0.75   # 45 min — keeps summaries fresh after forecast updates
+_CACHE_TTL_HOURS = 0.5    # 30 min — keeps summaries fresh after forecast updates
 
 # Stockholm timezone for correct "today/tomorrow" day boundaries
 from zoneinfo import ZoneInfo
@@ -93,7 +93,7 @@ def _confidence_label(score: float) -> str:
     return "low"
 
 
-def _detect_rain_windows(hours: list, threshold: int = 40) -> list:
+def _detect_rain_windows(hours: list, threshold: int = 50) -> list:
     windows, start, max_prob = [], None, 0
     for h in hours:
         prob = h["precip_probability"] or 0
