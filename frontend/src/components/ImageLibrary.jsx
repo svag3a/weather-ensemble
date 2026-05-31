@@ -1,5 +1,34 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState, useEffect, lazy, Suspense } from 'react'
 const ImageMap = lazy(() => import('./ImageMap'))
+
+// Reverse-geocode all locations to get neighborhood names (Nominatim, sequential)
+function useNeighborhoods(locations) {
+  const [nbhd, setNbhd] = useState({})
+  const key = locations.map(l => l.label).join(',')
+  useEffect(() => {
+    if (!locations.length) return
+    let cancelled = false
+    ;(async () => {
+      const results = {}
+      for (const loc of locations) {
+        if (cancelled) break
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${loc.lat}&lon=${loc.lon}&format=json&accept-language=sv`,
+            { headers: { 'Accept-Language': 'sv' } }
+          )
+          const d = await r.json()
+          const a = d.address ?? {}
+          results[loc.label] = a.city_district || a.suburb || a.neighbourhood || null
+        } catch { results[loc.label] = null }
+        await new Promise(r => setTimeout(r, 1100)) // Nominatim: max 1 req/s
+      }
+      if (!cancelled) setNbhd(results)
+    })()
+    return () => { cancelled = true }
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
+  return nbhd
+}
 
 const SLOTS = [
   { key: 'night',   label: 'Natt',   hours: '00–06', icon: '🌙' },
@@ -212,28 +241,74 @@ function SlotDots({ slots }) {
   )
 }
 
-function LocationRow({ location, onUpload, onDelete }) {
-  const [open, setOpen]               = useState(false)
+function LocationRow({ location, neighborhood, onUpload, onDelete, onUpdate }) {
+  const [open, setOpen]                   = useState(false)
   const [uploadingSlot, setUploadingSlot] = useState(null)
+  const [editing, setEditing]             = useState(false)
+  const [editVal, setEditVal]             = useState(location.label)
+  const [saving, setSaving]               = useState(false)
   const filled = Object.keys(location.slots).length
+
+  const saveLabel = async () => {
+    if (!editVal.trim() || editVal === location.label) { setEditing(false); return }
+    setSaving(true)
+    // Update every image in this location group
+    const images = Object.values(location.slots)
+    await Promise.all(images.map(img =>
+      onUpdate(img.id, { label: editVal.trim(), lat: location.lat, lon: location.lon, time_slot: img.time_slot })
+    ))
+    setSaving(false)
+    setEditing(false)
+  }
 
   return (
     <div className="border-b border-slate-700/50 last:border-0">
       {/* Compact row */}
-      <button
-        onClick={() => { setOpen(o => !o); setUploadingSlot(null) }}
-        className="w-full flex items-center gap-4 px-4 py-3 hover:bg-slate-700/30 transition-colors text-left"
-      >
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-slate-700/20 transition-colors">
+        {/* Slot count */}
         <span className={`text-xs font-mono w-8 shrink-0 ${filled === 4 ? 'text-blue-400' : filled > 0 ? 'text-yellow-400' : 'text-slate-600'}`}>
           {filled}/4
         </span>
-        <span className="flex-1 text-white text-sm font-medium">{location.label}</span>
-        <SlotDots slots={location.slots} />
-        <span className="text-slate-600 text-xs font-mono ml-2 hidden sm:block">
-          {location.lat.toFixed(3)}, {location.lon.toFixed(3)}
+
+        {/* Neighborhood */}
+        <span className="w-28 shrink-0 text-slate-400 text-xs truncate">
+          {neighborhood ?? <span className="text-slate-700">…</span>}
         </span>
-        <span className={`text-slate-500 text-xs ml-2 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
-      </button>
+
+        {/* Label — editable */}
+        {editing ? (
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <input
+              autoFocus
+              value={editVal}
+              onChange={e => setEditVal(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') saveLabel(); if (e.key === 'Escape') setEditing(false) }}
+              className="flex-1 bg-slate-600 text-white text-sm rounded px-2 py-1 border border-slate-500 outline-none focus:border-blue-500 min-w-0"
+            />
+            <button onClick={saveLabel} disabled={saving}
+              className="text-xs text-green-400 hover:text-green-300 shrink-0">
+              {saving ? '…' : '✓'}
+            </button>
+            <button onClick={() => setEditing(false)}
+              className="text-xs text-slate-500 hover:text-slate-300 shrink-0">✕</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="text-white text-sm font-medium truncate">{location.label}</span>
+            <button onClick={e => { e.stopPropagation(); setEditing(true); setEditVal(location.label) }}
+              className="text-slate-600 hover:text-slate-400 text-xs shrink-0" title="Redigera etikett">✎</button>
+          </div>
+        )}
+
+        {/* Slot icons */}
+        <SlotDots slots={location.slots} />
+
+        {/* Expand toggle */}
+        <button
+          onClick={() => { setOpen(o => !o); setUploadingSlot(null) }}
+          className={`text-slate-500 text-xs ml-1 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+        >▼</button>
+      </div>
 
       {/* Expanded detail */}
       {open && (
@@ -295,11 +370,12 @@ function LocationRow({ location, onUpload, onDelete }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function ImageLibrary({ data, onUpload, onDelete }) {
+export default function ImageLibrary({ data, onUpload, onUpdate, onDelete }) {
   const [showNewLocation, setShowNewLocation]   = useState(false)
-  const [pendingPos, setPendingPos]             = useState(null)   // {lat, lon} from map click
-  const [selectedLocation, setSelectedLocation] = useState(null)   // location clicked on map
-  const locations = groupByLocation(data)
+  const [pendingPos, setPendingPos]             = useState(null)
+  const [selectedLocation, setSelectedLocation] = useState(null)
+  const locations   = groupByLocation(data)
+  const neighborhoods = useNeighborhoods(locations)
 
   const handleMapClick = (lat, lon) => {
     setPendingPos({ lat, lon })
@@ -371,18 +447,19 @@ export default function ImageLibrary({ data, onUpload, onDelete }) {
       ) : locations.length > 0 && (
         <div className="bg-slate-800 rounded-xl overflow-hidden">
           {/* Table header */}
-          <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-700 text-xs text-slate-500">
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 text-xs text-slate-500">
             <span className="w-8 shrink-0">Slots</span>
-            <span className="flex-1">Plats</span>
-            <span>Bilder</span>
-            <span className="hidden sm:block ml-2 w-28">Koordinater</span>
-            <span className="w-4" />
+            <span className="w-28 shrink-0">Stadsdel</span>
+            <span className="flex-1">Etikett</span>
+            <span className="mr-5">Bilder</span>
           </div>
           {locations.map(loc => (
             <LocationRow
               key={loc.label}
               location={loc}
+              neighborhood={neighborhoods[loc.label]}
               onUpload={onUpload}
+              onUpdate={onUpdate}
               onDelete={onDelete}
             />
           ))}
