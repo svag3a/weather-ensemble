@@ -434,7 +434,7 @@ async def trigger_collection():
     return {"status": "collection started"}
 
 
-@router.delete("/debug/ensemble-test-cleanup", status_code=200)
+@router.post("/debug/ensemble-test-cleanup", status_code=200)
 def cleanup_test_ensemble_rows(db: Session = Depends(get_db)):
     """Delete partial ensemble rows created by test endpoint."""
     from sqlalchemy import func
