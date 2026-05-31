@@ -313,12 +313,11 @@ function windDirArrow(deg) {
 }
 
 function rainDrops(mm) {
-  if (mm == null || mm < 0.1) return null
-  if (mm < 0.5)  return '💧'
-  if (mm < 2.0)  return '💧💧'
-  if (mm < 5.0)  return '💧💧💧'
-  if (mm < 10.0) return '💧💧💧💧'
-  return '💧💧💧💧💧'
+  if (mm == null || mm < 0.5) return null   // 0.5mm min matches rain symbol threshold
+  if (mm < 2.0)  return '💧'
+  if (mm < 5.0)  return '💧💧'
+  if (mm < 10.0) return '💧💧💧'
+  return '💧💧💧💧'
 }
 
 function groupByDay(forecasts) {
