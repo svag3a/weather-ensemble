@@ -173,6 +173,9 @@ def update_weights(db: Session, valid_for: datetime) -> None:
 
     for fc in all_forecasts:
         bucket = _lead_bucket(fc.lead_hours)
+        # Flush pending rows first so the query below finds newly-created rows
+        # (SessionLocal uses autoflush=False, so we must flush manually here)
+        db.flush()
         weight_row = (
             db.query(SourceWeight)
             .filter(SourceWeight.source == fc.source, SourceWeight.lead_hours == bucket)
