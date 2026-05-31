@@ -469,30 +469,20 @@ def debug_weights_diag(db: Session = Depends(get_db)):
     obs_latest  = db.query(Observation).order_by(Observation.valid_for.desc()).first()
     truth_repr  = repr(truth_time)
 
-    # Raw SQL diagnostics
-    import sqlite3 as _sq, traceback as _tb
-    _c = _sq.connect("/data/weather.db")
-    raw_weights = _c.execute(
-        "SELECT source, lead_hours, sample_count, mae_temperature, updated_at "
-        "FROM source_weights WHERE source='smhi' ORDER BY lead_hours"
-    ).fetchall()
-    col_names = [r[1] for r in _c.execute("PRAGMA table_info(source_weights)").fetchall()]
-    _c.close()
-
-    # Try update_weights directly
-    uw_error = None
-    uw_before = len(raw_weights)
-    try:
-        from app.ensemble import update_weights as _uw
-        _uw(db, truth_time)
-    except Exception as _e:
-        uw_error = _tb.format_exc()
-    # Check DB after via sqlite3
-    _c2 = _sq.connect("/data/weather.db")
-    raw_after = _c2.execute(
-        "SELECT source, lead_hours, sample_count FROM source_weights WHERE source='smhi' ORDER BY lead_hours"
-    ).fetchall()
-    _c2.close()
+    # Check latest ensemble forecast to verify scheduler is running
+    latest_ens = (
+        db.query(EnsembleForecast.computed_at)
+        .order_by(EnsembleForecast.computed_at.desc())
+        .first()
+    )
+    # Count all weight rows per source
+    from sqlalchemy import func
+    weight_summary = db.query(
+        SourceWeight.source,
+        func.count(SourceWeight.id).label("bucket_count"),
+        func.sum(SourceWeight.sample_count).label("total_samples"),
+        func.max(SourceWeight.updated_at).label("last_update"),
+    ).group_by(SourceWeight.source).all()
 
     return {
         "now_utc": now.isoformat(),
@@ -502,10 +492,11 @@ def debug_weights_diag(db: Session = Depends(get_db)):
         "obs_minus1h_match": obs_minus1.valid_for.isoformat() if obs_minus1 else None,
         "obs_latest_in_db": obs_latest.valid_for.isoformat() if obs_latest else None,
         "obs_latest_temp": obs_latest.temperature if obs_latest else None,
-        "raw_smhi_before": [list(r) for r in raw_weights],
-        "raw_smhi_after": [list(r) for r in raw_after],
-        "uw_error": uw_error,
-        "source_weights_columns": col_names,
+        "latest_ensemble_computed_at": latest_ens[0].isoformat() if latest_ens else None,
+        "weight_summary": [
+            {"source": r[0], "buckets": r[1], "total_samples": r[2], "last_update": str(r[3])}
+            for r in weight_summary
+        ],
         "obs_for_truth_time": obs.valid_for.isoformat() if obs else None,
         "obs_temperature": obs.temperature if obs else None,
         "recent_observations": [{"valid_for": o.valid_for.isoformat(), "temp": o.temperature} for o in recent_obs],
