@@ -589,18 +589,20 @@ function DayRow({ hours, warnings, weekMin, weekMax }) {
         <span className="text-2xl w-8 shrink-0 text-center">{symbol}</span>
 
         {/* Temp bar + range */}
-        <div className="flex-1 min-w-0 flex items-center gap-2">
-          <span className="text-slate-400 text-xs font-mono w-7 text-right shrink-0">
-            {minTemp != null ? `${minTemp}°` : ''}
-          </span>
-          <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
-          <span className="text-white text-sm font-mono w-7 shrink-0">
-            {maxTemp != null ? `${maxTemp}°` : '—'}
-          </span>
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-center gap-2">
+            <span className="text-slate-400 text-xs font-mono w-7 text-right shrink-0">
+              {minTemp != null ? `${minTemp}°` : ''}
+            </span>
+            <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
+            <span className="text-white text-sm font-mono w-7 shrink-0">
+              {maxTemp != null ? `${maxTemp}°` : '—'}
+            </span>
+          </div>
+          {drops && (
+            <div className="pl-9 text-xs text-blue-300">{drops}</div>
+          )}
         </div>
-
-        {/* Rain */}
-        <span className="text-xs w-8 text-center shrink-0">{drops ?? <span className="text-slate-700">—</span>}</span>
 
         {/* Warning triangle */}
         <span className="w-4 text-center shrink-0"><WarningTriangle warning={warning} /></span>
