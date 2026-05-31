@@ -26,6 +26,7 @@ function useData(fetcher, deps = []) {
 export default function App() {
   const [collecting, setCollecting] = useState(false)
   const [hoursAhead, setHoursAhead] = useState(48)
+  const [activeTab, setActiveTab]   = useState('status')
 
   const ensemble = useData(() => fetchEnsemble(hoursAhead), [hoursAhead])
   const sources       = useData(() => fetchSources(hoursAhead), [hoursAhead])
@@ -104,20 +105,44 @@ export default function App() {
           </div>
         ))}
 
-        <div className="space-y-6">
-              <ImageLibrary
-                data={cityImages.data}
-                onUpload={async (fd) => { await uploadCityImage(fd); cityImages.reload() }}
-                onUpdate={async (id, fields) => { await updateCityImage(id, fields); cityImages.reload() }}
-                onDelete={async (id) => { await deleteCityImage(id); cityImages.reload() }}
-              />
-              <EnsembleOptimizer data={ensembleHealth.data} onReload={ensembleHealth.reload} />
-              <SystemStatus data={systemStatus.data} />
-              <EnsembleForecast data={ensemble.data} sources={sources.data} />
-              <SourceComparison data={sources.data} />
-              <SourceRanking data={weights.data} />
-              <RankingChart history={weightsHistory.data} />
+        {/* Tab bar */}
+        <div className="flex gap-1 mb-6 border-b border-slate-700">
+          {[['status', 'Status'], ['karta', 'Karta']].map(([id, label]) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                activeTab === id
+                  ? 'border-blue-500 text-white'
+                  : 'border-transparent text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
+
+        {activeTab === 'status' && (
+          <div className="space-y-6">
+            <EnsembleOptimizer data={ensembleHealth.data} onReload={ensembleHealth.reload} />
+            <SystemStatus data={systemStatus.data} />
+            <EnsembleForecast data={ensemble.data} sources={sources.data} />
+            <SourceComparison data={sources.data} />
+            <SourceRanking data={weights.data} />
+            <RankingChart history={weightsHistory.data} />
+          </div>
+        )}
+
+        {activeTab === 'karta' && (
+          <div className="space-y-6">
+            <ImageLibrary
+              data={cityImages.data}
+              onUpload={async (fd) => { await uploadCityImage(fd); cityImages.reload() }}
+              onUpdate={async (id, fields) => { await updateCityImage(id, fields); cityImages.reload() }}
+              onDelete={async (id) => { await deleteCityImage(id); cityImages.reload() }}
+            />
+          </div>
+        )}
 
         <p className="text-center text-xs text-slate-600 mt-8">
           Uppdateras automatiskt varje timme · Vikter baserade på EMA av 1h-konsensus
