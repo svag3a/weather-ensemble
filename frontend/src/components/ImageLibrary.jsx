@@ -1,33 +1,14 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense } from 'react'
 const ImageMap = lazy(() => import('./ImageMap'))
 
-// Reverse-geocode all locations to get neighborhood names (Nominatim, sequential)
-function useNeighborhoods(locations) {
-  const [nbhd, setNbhd] = useState({})
-  const key = locations.map(l => l.label).join(',')
-  useEffect(() => {
-    if (!locations.length) return
-    let cancelled = false
-    ;(async () => {
-      const results = {}
-      for (const loc of locations) {
-        if (cancelled) break
-        try {
-          const r = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${loc.lat}&lon=${loc.lon}&format=json&accept-language=sv`,
-            { headers: { 'Accept-Language': 'sv' } }
-          )
-          const d = await r.json()
-          const a = d.address ?? {}
-          results[loc.label] = a.city_district || a.suburb || a.neighbourhood || null
-        } catch { results[loc.label] = null }
-        await new Promise(r => setTimeout(r, 1100)) // Nominatim: max 1 req/s
-      }
-      if (!cancelled) setNbhd(results)
-    })()
-    return () => { cancelled = true }
-  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
-  return nbhd
+// Find the nearest preset label for a given coordinate
+function nearestPreset(lat, lon) {
+  let best = null, minDist = Infinity
+  for (const p of PRESETS) {
+    const d = (p.lat - lat) ** 2 + (p.lon - lon) ** 2
+    if (d < minDist) { minDist = d; best = p }
+  }
+  return best?.label ?? null
 }
 
 const SLOTS = [
@@ -374,8 +355,7 @@ export default function ImageLibrary({ data, onUpload, onUpdate, onDelete }) {
   const [showNewLocation, setShowNewLocation]   = useState(false)
   const [pendingPos, setPendingPos]             = useState(null)
   const [selectedLocation, setSelectedLocation] = useState(null)
-  const locations   = groupByLocation(data)
-  const neighborhoods = useNeighborhoods(locations)
+  const locations = groupByLocation(data)
 
   const handleMapClick = (lat, lon) => {
     setPendingPos({ lat, lon })
@@ -457,7 +437,7 @@ export default function ImageLibrary({ data, onUpload, onUpdate, onDelete }) {
             <LocationRow
               key={loc.label}
               location={loc}
-              neighborhood={neighborhoods[loc.label]}
+              neighborhood={nearestPreset(loc.lat, loc.lon)}
               onUpload={onUpload}
               onUpdate={onUpdate}
               onDelete={onDelete}
