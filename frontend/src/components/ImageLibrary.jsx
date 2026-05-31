@@ -232,7 +232,14 @@ function LocationRow({ location, neighborhood, onUpload, onDelete, onUpdate }) {
   const [editing, setEditing]             = useState(false)
   const [editVal, setEditVal]             = useState(location.label)
   const [saving, setSaving]               = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const filled = Object.keys(location.slots).length
+
+  const deleteLocation = async () => {
+    const images = Object.values(location.slots)
+    await Promise.all(images.map(img => onDelete(img.id)))
+    setConfirmDelete(false)
+  }
 
   const saveLabel = async () => {
     if (!editVal.trim() || editVal === location.label) { setEditing(false); return }
@@ -287,6 +294,21 @@ function LocationRow({ location, neighborhood, onUpload, onDelete, onUpdate }) {
 
         {/* Slot icons */}
         <SlotDots slots={location.slots} />
+
+        {/* Delete — inline confirm */}
+        {confirmDelete ? (
+          <div className="flex items-center gap-1.5 shrink-0 ml-1">
+            <span className="text-xs text-red-400">Radera {filled} bild{filled !== 1 ? 'er' : ''}?</span>
+            <button onClick={deleteLocation} className="text-xs text-red-400 hover:text-red-300 font-medium">Ja</button>
+            <button onClick={() => setConfirmDelete(false)} className="text-xs text-slate-500 hover:text-slate-300">Nej</button>
+          </div>
+        ) : (
+          <button
+            onClick={e => { e.stopPropagation(); setConfirmDelete(true) }}
+            className="text-slate-700 hover:text-red-400 text-sm ml-1 shrink-0 transition-colors"
+            title="Ta bort plats"
+          >🗑</button>
+        )}
 
         {/* Expand toggle */}
         <button
