@@ -435,7 +435,7 @@ function SixHourTable({ forecasts }) {
     <div className="mt-4 border-t border-slate-700 pt-4 space-y-1">
       {rows.map((fc, i) => {
         const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
-        const drops = rainDrops(fc.precip_mm)
+        const drops = fc.precip_probability >= 20 ? rainDrops(fc.precip_mm) : null
         const fl = feelsLike(fc.temperature, fc.wind_speed)
         return (
           <div key={i} className="flex items-center gap-3 py-0.5">
@@ -542,7 +542,8 @@ function CurrentCard({ fc, radar, allForecasts }) {
 
 function HourRow({ fc }) {
   const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
-  const drops = rainDrops(fc.precip_mm)
+  // Only show drops when precip_probability ≥ 20 — same threshold as rain symbol
+  const drops = fc.precip_probability >= 20 ? rainDrops(fc.precip_mm) : null
   const fl = feelsLike(fc.temperature, fc.wind_speed)
   return (
     <div className="flex items-center gap-3 py-2 border-b border-slate-700/50 last:border-0">
