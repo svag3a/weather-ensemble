@@ -434,55 +434,24 @@ async def trigger_collection():
     return {"status": "collection started"}
 
 
-@router.get("/debug/ensemble-test")
-async def debug_ensemble_test(db: Session = Depends(get_db)):
-    """Run build_ensemble directly and report any error."""
-    import traceback
-    from datetime import timezone
-    from app.ensemble import build_ensemble as _be
-    from app.models import EnsembleForecast as _EF
-
-    before = db.query(_EF.computed_at).order_by(_EF.computed_at.desc()).first()
-    before_ts = before[0].isoformat() if before else None
-
-    # Test build_ensemble with real current forecasts
-    error = None
-    try:
-        import httpx
-        from app.sources import smhi, yr
-        from app.scheduler import SOURCES
-        issued_at = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
-        # Fetch just 2 sources to test
-        test_data = {}
-        async with httpx.AsyncClient() as client:
-            for name in ['smhi', 'yr']:
-                try:
-                    fcs = await SOURCES[name](client)
-                    test_data[name] = fcs[:5]  # only first 5 forecast hours
-                except Exception as ex:
-                    error = f"fetch {name} failed: {ex}"
-        if not error:
-            _be(db, issued_at, test_data)
-    except Exception as e:
-        error = traceback.format_exc(limit=5)
-
-    # Also test excluded query directly
-    excl_error = None
-    excl_result = None
-    try:
-        from app.models import SourceWeight as _SW
-        excl_result = [r.source for r in db.query(_SW).filter(_SW.excluded == 1).all()]
-    except Exception as e:
-        excl_error = traceback.format_exc(limit=3)
-
-    after = db.query(_EF.computed_at).order_by(_EF.computed_at.desc()).first()
-    return {
-        "build_ensemble_empty_call_error": error,
-        "excluded_query_result": excl_result,
-        "excluded_query_error": excl_error,
-        "ensemble_computed_at_before": before_ts,
-        "ensemble_computed_at_after": after[0].isoformat() if after else None,
-    }
+@router.delete("/debug/ensemble-test-cleanup", status_code=200)
+def cleanup_test_ensemble_rows(db: Session = Depends(get_db)):
+    """Delete partial ensemble rows created by test endpoint."""
+    from sqlalchemy import func
+    # Find computed_at values that have very few rows (test artifacts)
+    counts = db.query(
+        EnsembleForecast.computed_at,
+        func.count(EnsembleForecast.id).label("cnt")
+    ).group_by(EnsembleForecast.computed_at).all()
+    deleted_times = []
+    for computed_at, cnt in counts:
+        if cnt < 20:  # full collect creates 100+ rows
+            db.query(EnsembleForecast).filter(
+                EnsembleForecast.computed_at == computed_at
+            ).delete()
+            deleted_times.append({"computed_at": str(computed_at), "rows": cnt})
+    db.commit()
+    return {"deleted": deleted_times}
 
 
 import uuid as _uuid
