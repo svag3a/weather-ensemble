@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Tooltip, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 
 // Fix Leaflet default icon paths broken by bundlers
@@ -10,23 +9,16 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-// Custom DivIcon: shows slot-fill indicator + label
-function makeIcon(label, slotCount) {
+// Custom DivIcon: colored teardrop pin, no embedded label (shown via Tooltip on hover)
+function makeIcon(slotCount) {
   const fullness = Math.min(slotCount, 4)
   const colors = ['#475569', '#f97316', '#eab308', '#22c55e', '#3b82f6']
   const bg = colors[fullness]
-  const html = `
-    <div style="
-      background:${bg};border:2px solid white;border-radius:50% 50% 50% 0;
-      width:28px;height:28px;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,.4);
-    "></div>
-    <div style="
-      position:absolute;top:32px;left:50%;transform:translateX(-50%);
-      background:rgba(15,23,42,.85);color:white;font-size:11px;font-weight:600;
-      padding:2px 6px;border-radius:4px;white-space:nowrap;
-    ">${label}</div>
-  `
-  return L.divIcon({ className: '', html, iconSize: [28, 40], iconAnchor: [14, 28], popupAnchor: [0, -30] })
+  const html = `<div style="
+    background:${bg};border:2px solid white;border-radius:50% 50% 50% 0;
+    width:28px;height:28px;transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,.4);
+  "></div>`
+  return L.divIcon({ className: '', html, iconSize: [28, 28], iconAnchor: [14, 28], tooltipAnchor: [14, -14] })
 }
 
 // Pending position icon (where user just clicked)
@@ -70,7 +62,11 @@ export default function ImageMap({ locations, pendingPos, onMapClick, onPinClick
         {/* Existing location pins */}
         {locations.map(loc => {
           const slotCount = Object.keys(loc.slots).length
-          const icon = makeIcon(loc.label, slotCount)
+          const icon = makeIcon(slotCount)
+          const slotIcons = ['🌙','🌅','☀️','🌇'].map((ico, i) => {
+            const key = ['night','morning','day','evening'][i]
+            return loc.slots[key] ? ico : '·'
+          }).join(' ')
           return (
             <Marker
               key={loc.label}
@@ -85,12 +81,11 @@ export default function ImageMap({ locations, pendingPos, onMapClick, onPinClick
               }}
               draggable={true}
             >
-              <Popup>
-                <div className="text-sm font-medium">{loc.label}</div>
-                <div className="text-xs text-gray-500">
-                  {slotCount}/4 slots · {loc.lat.toFixed(4)}, {loc.lon.toFixed(4)}
-                </div>
-              </Popup>
+              <Tooltip direction="top" offset={[0, -30]} opacity={0.95}>
+                <div style={{ fontWeight: 600, marginBottom: 2 }}>{loc.label}</div>
+                <div style={{ fontSize: 12, color: '#94a3b8' }}>{slotIcons}</div>
+                <div style={{ fontSize: 11, color: '#64748b' }}>{slotCount}/4 slots</div>
+              </Tooltip>
             </Marker>
           )
         })}
@@ -98,7 +93,9 @@ export default function ImageMap({ locations, pendingPos, onMapClick, onPinClick
         {/* Pending click position */}
         {pendingPos && (
           <Marker position={[pendingPos.lat, pendingPos.lon]} icon={pendingIcon}>
-            <Popup>Ny plats här</Popup>
+            <Tooltip direction="top" offset={[0, -14]} opacity={0.95} permanent>
+              <span style={{ fontSize: 12 }}>Ny plats här</span>
+            </Tooltip>
           </Marker>
         )}
       </MapContainer>
