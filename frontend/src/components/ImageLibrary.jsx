@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
+const ImageMap = lazy(() => import('./ImageMap'))
 
 const SLOTS = [
   { key: 'night',   label: 'Natt',   hours: '00–06', icon: '🌙' },
@@ -281,8 +282,27 @@ function LocationCard({ location, onUpload, onDelete }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ImageLibrary({ data, onUpload, onDelete }) {
-  const [showNewLocation, setShowNewLocation] = useState(false)
+  const [showNewLocation, setShowNewLocation]   = useState(false)
+  const [pendingPos, setPendingPos]             = useState(null)   // {lat, lon} from map click
+  const [selectedLocation, setSelectedLocation] = useState(null)   // location clicked on map
   const locations = groupByLocation(data)
+
+  const handleMapClick = (lat, lon) => {
+    setPendingPos({ lat, lon })
+    setSelectedLocation(null)
+    setShowNewLocation(true)
+  }
+
+  const handlePinClick = (loc) => {
+    if (loc.fromDrag) {
+      // Drag → update coords of selected location
+      setPendingPos({ lat: loc.lat, lon: loc.lon })
+      setSelectedLocation(loc)
+    } else {
+      setSelectedLocation(loc)
+      setPendingPos({ lat: loc.lat, lon: loc.lon })
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -290,24 +310,41 @@ export default function ImageLibrary({ data, onUpload, onDelete }) {
         <div>
           <h2 className="text-lg font-semibold text-white">Bildbibliotek</h2>
           <p className="text-slate-500 text-xs mt-0.5">
-            Upp till 4 bilder per plats — en per tidslot
+            Upp till 4 bilder per plats — en per tidslot · Klicka på kartan för att placera en ny nål
           </p>
         </div>
         <button
-          onClick={() => setShowNewLocation(o => !o)}
+          onClick={() => { setShowNewLocation(o => !o); setPendingPos(null); setSelectedLocation(null) }}
           className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           {showNewLocation ? 'Avbryt' : '+ Ny plats'}
         </button>
       </div>
 
-      {/* New location upload form */}
+      {/* Map */}
+      <div className="relative">
+        <Suspense fallback={<div className="h-[360px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta…</div>}>
+          <ImageMap
+            locations={locations}
+            pendingPos={pendingPos}
+            onMapClick={handleMapClick}
+            onPinClick={handlePinClick}
+          />
+        </Suspense>
+      </div>
+
+      {/* New location upload form — pre-filled from map click */}
       {showNewLocation && (
         <div className="bg-slate-800 rounded-xl p-5">
-          <p className="text-white font-medium mb-4">Lägg till ny plats</p>
+          <p className="text-white font-medium mb-4">
+            {selectedLocation ? `Lägg till slot för ${selectedLocation.label}` : 'Lägg till ny plats'}
+          </p>
           <UploadForm
+            defaultLabel={selectedLocation?.label ?? ''}
+            defaultLat={pendingPos ? String(pendingPos.lat.toFixed(6)) : ''}
+            defaultLon={pendingPos ? String(pendingPos.lon.toFixed(6)) : ''}
             onUpload={onUpload}
-            onClose={() => setShowNewLocation(false)}
+            onClose={() => { setShowNewLocation(false); setPendingPos(null); setSelectedLocation(null) }}
           />
         </div>
       )}
