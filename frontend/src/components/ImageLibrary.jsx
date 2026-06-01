@@ -407,10 +407,12 @@ function MotifUploadForm({ onUpload, onClose }) {
     if (!file || !label || !lat || !lon) return
     setUploading(true)
     setError(null)
-    setProgress('Laddar upp…')
+    setProgress('Komprimerar…')
     try {
+      const resized = await resizeToWebP(file)
+      setProgress('Laddar upp…')
       const fd = new FormData()
-      fd.append('file', file)
+      fd.append('file', resized)
       fd.append('label', label)
       fd.append('lat', lat)
       fd.append('lon', lon)
