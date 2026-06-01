@@ -597,7 +597,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
 
       {/* Motif — width drives scale (no stretch), container clips transparent sky */}
       {motifImage && (
-        <div className="-mx-6 mt-0 relative overflow-hidden" style={{ height: 200 }}>
+        <div className="-mx-6 mt-0 relative overflow-hidden" style={{ height: 260 }}>
           <img
             src={motifImage.url}
             alt={motifImage.label}
@@ -605,7 +605,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
               position: 'absolute',
               bottom: 0,
               right: 0,
-              width: '75%',
+              width: '95%',
               height: 'auto',
             }}
           />
