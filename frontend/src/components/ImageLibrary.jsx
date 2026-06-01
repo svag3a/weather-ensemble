@@ -381,11 +381,14 @@ function LocationRow({ location, neighborhood, onUpload, onDelete, onUpdate }) {
 
 // ── Motif section ─────────────────────────────────────────────────────────────
 
-function MotifUploadForm({ onUpload, onClose }) {
+function MotifUploadForm({ onUpload, onClose, defaultLabel = '', defaultLat = '', defaultLon = '' }) {
   const [file, setFile]         = useState(null)
-  const [label, setLabel]       = useState('')
-  const [lat, setLat]           = useState('')
-  const [lon, setLon]           = useState('')
+  const [label, setLabel]       = useState(defaultLabel)
+  const [lat, setLat]           = useState(defaultLat)
+  const [lon, setLon]           = useState(defaultLon)
+
+  useEffect(() => { if (defaultLat) setLat(defaultLat) }, [defaultLat])
+  useEffect(() => { if (defaultLon) setLon(defaultLon) }, [defaultLon])
   const [preset, setPreset]     = useState('')
   const [uploading, setUploading] = useState(false)
   const [error, setError]       = useState(null)
@@ -576,109 +579,95 @@ function MotifRow({ img, onDelete }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ImageLibrary({ data, onUpload, onUpdate, onDelete }) {
-  const [showNewLocation, setShowNewLocation]   = useState(false)
   const [pendingPos, setPendingPos]             = useState(null)
-  const [selectedLocation, setSelectedLocation] = useState(null)
-  const bgData = (data ?? []).filter(img => img.image_type !== 'motif')
-  const locations = groupByLocation(bgData)
+  const [showMotifForm, setShowMotifForm]       = useState(false)
+  const [selectedMotif, setSelectedMotif]       = useState(null)
+
+  // Motif images only — these drive the map
+  const motifData   = (data ?? []).filter(img => img.image_type === 'motif')
+  // Group motifs by label for the map pins
+  const motifGroups = motifData.reduce((acc, img) => {
+    if (!acc[img.label]) acc[img.label] = { label: img.label, lat: img.lat, lon: img.lon, slots: {} }
+    acc[img.label].slots['day'] = img   // motifs have one image, use 'day' slot key for map compat
+    return acc
+  }, {})
+  const mapLocations = Object.values(motifGroups)
 
   const handleMapClick = (lat, lon) => {
     setPendingPos({ lat, lon })
-    setSelectedLocation(null)
-    setShowNewLocation(true)
+    setSelectedMotif(null)
+    setShowMotifForm(true)
   }
 
   const handlePinClick = (loc) => {
-    if (loc.fromDrag) {
-      // Drag → update coords of selected location
-      setPendingPos({ lat: loc.lat, lon: loc.lon })
-      setSelectedLocation(loc)
-    } else {
-      setSelectedLocation(loc)
-      setPendingPos({ lat: loc.lat, lon: loc.lon })
-    }
+    setSelectedMotif(loc)
+    setPendingPos({ lat: loc.lat, lon: loc.lon })
+    setShowMotifForm(true)
   }
 
   return (
-    <div className="space-y-8">
-      {/* ── Background images section ── */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-white">Bakgrundsbilder</h2>
-            <p className="text-slate-500 text-xs mt-0.5">
-              Upp till 4 bilder per plats — en per tidslot · Klicka på kartan för att placera en ny nål
-            </p>
-          </div>
-          <button
-            onClick={() => { setShowNewLocation(o => !o); setPendingPos(null); setSelectedLocation(null) }}
-            className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-          >
-            {showNewLocation ? 'Avbryt' : '+ Ny plats'}
-          </button>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Motivbilder</h2>
+          <p className="text-slate-500 text-xs mt-0.5">
+            En motivbild per plats · Klicka på kartan för att lägga till
+          </p>
         </div>
-
-        {/* Map */}
-        <div className="relative">
-          <Suspense fallback={<div className="h-[360px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta…</div>}>
-            <ImageMap
-              locations={locations}
-              pendingPos={pendingPos}
-              onMapClick={handleMapClick}
-              onPinClick={handlePinClick}
-            />
-          </Suspense>
-        </div>
-
-        {/* New location upload form — pre-filled from map click */}
-        {showNewLocation && (
-          <div className="bg-slate-800 rounded-xl p-5">
-            <p className="text-white font-medium mb-4">
-              {selectedLocation ? `Lägg till slot för ${selectedLocation.label}` : 'Lägg till ny plats'}
-            </p>
-            <UploadForm
-              defaultLabel={selectedLocation?.label ?? ''}
-              defaultLat={pendingPos ? String(pendingPos.lat.toFixed(6)) : ''}
-              defaultLon={pendingPos ? String(pendingPos.lon.toFixed(6)) : ''}
-              onUpload={onUpload}
-              onClose={() => { setShowNewLocation(false); setPendingPos(null); setSelectedLocation(null) }}
-            />
-          </div>
-        )}
-
-        {/* Compact location table */}
-        {locations.length === 0 && !showNewLocation ? (
-          <div className="bg-slate-800 rounded-xl p-8 text-center text-slate-500 text-sm">
-            Inga bakgrundsbilder uppladdade ännu. Klicka på kartan eller "+ Ny plats" för att börja.
-          </div>
-        ) : locations.length > 0 && (
-          <div className="bg-slate-800 rounded-xl overflow-hidden">
-            {/* Table header */}
-            <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 text-xs text-slate-500">
-              <span className="w-8 shrink-0">Slots</span>
-              <span className="w-28 shrink-0">Stadsdel</span>
-              <span className="flex-1">Etikett</span>
-              <span className="mr-5">Bilder</span>
-            </div>
-            {locations.map(loc => (
-              <LocationRow
-                key={loc.label}
-                location={loc}
-                neighborhood={nearestPreset(loc.lat, loc.lon)}
-                onUpload={onUpload}
-                onUpdate={onUpdate}
-                onDelete={onDelete}
-              />
-            ))}
-          </div>
-        )}
+        <button
+          onClick={() => { setShowMotifForm(o => !o); setPendingPos(null); setSelectedMotif(null) }}
+          className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        >
+          {showMotifForm ? 'Avbryt' : '+ Nytt motiv'}
+        </button>
       </div>
 
-      {/* Divider */}
-      <div className="border-t border-slate-700" />
+      {/* Map — shows motif pins */}
+      <div className="relative">
+        <Suspense fallback={<div className="h-[360px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta…</div>}>
+          <ImageMap
+            locations={mapLocations}
+            pendingPos={pendingPos}
+            onMapClick={handleMapClick}
+            onPinClick={handlePinClick}
+          />
+        </Suspense>
+      </div>
 
-      {/* ── Motif section ── */}
-      <MotifSection data={data} onUpload={onUpload} onDelete={onDelete} />
+      {/* Motif upload form — opened by map click or button */}
+      {showMotifForm && (
+        <div className="bg-slate-800 rounded-xl p-5">
+          <p className="text-white font-medium mb-4">
+            {selectedMotif ? `Ersätt motiv för ${selectedMotif.label}` : 'Lägg till nytt motiv'}
+          </p>
+          <MotifUploadForm
+            defaultLabel={selectedMotif?.label ?? ''}
+            defaultLat={pendingPos ? String(pendingPos.lat.toFixed(6)) : ''}
+            defaultLon={pendingPos ? String(pendingPos.lon.toFixed(6)) : ''}
+            onUpload={onUpload}
+            onClose={() => { setShowMotifForm(false); setPendingPos(null); setSelectedMotif(null) }}
+          />
+        </div>
+      )}
+
+      {/* Motif list */}
+      {motifData.length === 0 && !showMotifForm ? (
+        <div className="bg-slate-800 rounded-xl p-8 text-center text-slate-500 text-sm">
+          Inga motivbilder uppladdade ännu. Klicka på kartan eller "+ Nytt motiv".
+        </div>
+      ) : motifData.length > 0 && (
+        <div className="bg-slate-800 rounded-xl overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 text-xs text-slate-500">
+            <span className="w-28 shrink-0">Stadsdel</span>
+            <span className="flex-1">Etikett</span>
+            <span className="w-20 text-right">Koordinater</span>
+            <span className="w-8" />
+          </div>
+          {motifData.map(img => (
+            <MotifRow key={img.id} img={img} onDelete={onDelete} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
