@@ -116,6 +116,20 @@ function useCityBackground(coords) {
   return { ...image, actualSlot: image.time_slot ?? slot }
 }
 
+function useCityMotif(coords) {
+  const [images, setImages] = useState([])
+  useEffect(() => {
+    fetchCityImages().then(imgs => setImages(imgs.filter(i => i.image_type === 'motif'))).catch(() => {})
+  }, [])
+  if (!coords || !images.length) return null
+  let nearest = null, minDist = Infinity
+  for (const img of images) {
+    const d = (img.lat - coords.lat) ** 2 + (img.lon - coords.lon) ** 2
+    if (d < minDist) { minDist = d; nearest = img }
+  }
+  return nearest
+}
+
 // How bright each slot's photo is relative to a neutral day photo.
 // Used to compensate when a fallback slot is shown instead of the ideal one.
 const SLOT_BASE_BRIGHTNESS = { night: 0.32, morning: 0.85, day: 1.00, evening: 0.72 }
@@ -215,6 +229,60 @@ function getImageStyle(fc, imageSlot = 'day', coords = null) {
   ].filter(Boolean).join(' ')
 
   return { filter, overlay }
+}
+
+function getSkyCss(fc, coords) {
+  const now = new Date()
+  const hour = now.getHours() + now.getMinutes() / 60
+  const lat = coords?.lat ?? 57.706
+  const lon = coords?.lon ?? 11.967
+  const { sunrise, sunset } = sunTimesUTC(now, lat, lon)
+  const tz = -now.getTimezoneOffset() / 60
+  const sr = (sunrise + tz + 24) % 24
+  const ss = (sunset + tz + 24) % 24
+
+  // [hour, topColor, bottomColor]
+  const anchors = [
+    [0,              '#0a0f1e', '#1a2744'],
+    [sr - 1,         '#1a1040', '#2d1b69'],
+    [sr,             '#7c2d12', '#f97316'],
+    [sr + 1,         '#1d4ed8', '#fed7aa'],
+    [sr + 3,         '#1e40af', '#bfdbfe'],
+    [(sr + ss) / 2,  '#1d4ed8', '#93c5fd'],
+    [ss - 2,         '#1e40af', '#bfdbfe'],
+    [ss - 1,         '#b45309', '#fbbf24'],
+    [ss,             '#7f1d1d', '#c2410c'],
+    [ss + 1,         '#312e81', '#4c1d95'],
+    [ss + 2,         '#1e1b4b', '#0f172a'],
+    [24,             '#0a0f1e', '#1a2744'],
+  ].filter(([h]) => h >= 0 && h <= 24).sort((a, b) => a[0] - b[0])
+
+  // Find surrounding anchors and lerp colors
+  let i = anchors.length - 2
+  for (let j = 0; j < anchors.length - 1; j++) {
+    if (hour >= anchors[j][0] && hour < anchors[j + 1][0]) { i = j; break }
+  }
+  const t = (hour - anchors[i][0]) / (anchors[i + 1][0] - anchors[i][0])
+
+  // Simple lerp for hex colors
+  const lerpHex = (c1, c2, t) => {
+    const r1 = parseInt(c1.slice(1, 3), 16), g1 = parseInt(c1.slice(3, 5), 16), b1 = parseInt(c1.slice(5, 7), 16)
+    const r2 = parseInt(c2.slice(1, 3), 16), g2 = parseInt(c2.slice(3, 5), 16), b2 = parseInt(c2.slice(5, 7), 16)
+    const r = Math.round(r1 + (r2 - r1) * t), g = Math.round(g1 + (g2 - g1) * t), b = Math.round(b1 + (b2 - b1) * t)
+    return `rgb(${r},${g},${b})`
+  }
+
+  const top = lerpHex(anchors[i][1], anchors[i + 1][1], t)
+  const bot = lerpHex(anchors[i][2], anchors[i + 1][2], t)
+
+  // Weather modifier — cloud/rain desaturates and darkens
+  const cloud = fc?.cloud_cover ?? 0
+  const precip = fc?.precip_probability ?? 0
+  const filter = cloud > 70 || precip > 40
+    ? `grayscale(${Math.min(60, cloud * 0.5)}%) brightness(${1 - cloud * 0.003})`
+    : ''
+
+  return { gradient: `linear-gradient(to bottom, ${top}, ${bot})`, filter }
 }
 
 // ── Weather particles ─────────────────────────────────────────────────────────
@@ -1488,6 +1556,7 @@ export default function MobileApp() {
   const { radar, coords } = useRadarLocation()
   const geoLocation = useReverseGeocode(coords)
   const bgImage = useCityBackground(coords)
+  const motifImage = useCityMotif(coords)
 
   // Direction-aware tab change: drives the slide animation
   const changeTab = useCallback((newTab) => {
@@ -1527,7 +1596,6 @@ export default function MobileApp() {
   const future = forecast?.filter(fc => parseTS(fc.valid_for) > now) ?? []
   const currentFc = future[0] ?? null
   const days = groupByDay(future)
-  const imageStyle = getImageStyle(currentFc, bgImage?.actualSlot ?? 'day', coords)
 
   return (
     <div className="fixed inset-0 bg-slate-900 text-slate-100 flex flex-col">
@@ -1535,24 +1603,30 @@ export default function MobileApp() {
       {/* Animated content area */}
       <div className="flex-1 relative overflow-x-hidden min-h-0" {...swipeHandlers}>
 
-        {/* Background city image — sits at z-0 behind the scrollable content */}
-        {bgImage && (
-          <div className="absolute inset-0 z-0">
+        {/* Sky background for Nu-vyn */}
+        {activeTab === 'now' && (() => {
+          const sky = getSkyCss(currentFc, coords)
+          return (
+            <div className="absolute inset-0 z-0 overflow-hidden"
+                 style={{ background: sky.gradient, filter: sky.filter || undefined }}>
+              <WeatherParticles
+                precip={currentFc?.precip_probability ?? 0}
+                temperature={currentFc?.temperature ?? 10}
+              />
+            </div>
+          )
+        })()}
+
+        {/* Motif image — in front of sky (z-index 5), behind glass cards (z-10) */}
+        {activeTab === 'now' && motifImage && (
+          <div className="absolute bottom-0 left-0 right-0 flex justify-center pointer-events-none"
+               style={{ height: '45%', zIndex: 5 }}>
             <img
-              src={bgImage.url}
-              alt={bgImage.label}
-              className="w-full h-full object-cover transition-all duration-1000"
-              style={{ filter: imageStyle.filter }}
+              src={motifImage.url}
+              alt={motifImage.label}
+              className="h-full w-auto object-contain object-bottom"
+              style={{ maxWidth: '80%' }}
             />
-            {imageStyle.overlay && (
-              <div className="absolute inset-0 transition-all duration-1000" style={{ background: imageStyle.overlay }} />
-            )}
-            <WeatherParticles
-              precip={currentFc?.precip_probability ?? 0}
-              temperature={currentFc?.temperature ?? 10}
-            />
-            {/* Very subtle darkening — glass cards handle text contrast */}
-            <div className="absolute inset-0 bg-slate-900/10" />
           </div>
         )}
 

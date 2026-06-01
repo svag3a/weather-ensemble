@@ -568,6 +568,7 @@ class CityImageOut(BaseModel):
     lat: float
     lon: float
     time_slot: str
+    image_type: str
     created_at: datetime
 
 
@@ -587,6 +588,7 @@ def _img_out(row: CityImage) -> CityImageOut:
         lat=row.lat,
         lon=row.lon,
         time_slot=row.time_slot or "day",
+        image_type=row.image_type or "background",
         created_at=row.created_at,
     )
 
@@ -604,6 +606,7 @@ async def upload_city_image(
     lat: float = Form(...),
     lon: float = Form(...),
     time_slot: str = Form(default="day"),
+    image_type: str = Form(default="background"),
     db: Session = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
@@ -613,7 +616,7 @@ async def upload_city_image(
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     content = await file.read()
     dest.write_bytes(content)
-    row = CityImage(filename=filename, label=label, lat=lat, lon=lon, time_slot=time_slot)
+    row = CityImage(filename=filename, label=label, lat=lat, lon=lon, time_slot=time_slot, image_type=image_type)
     db.add(row)
     db.commit()
     db.refresh(row)

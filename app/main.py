@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
     with engine.connect() as conn:
         for stmt in [
             "ALTER TABLE city_images ADD COLUMN time_slot TEXT DEFAULT 'day'",
+            "ALTER TABLE city_images ADD COLUMN image_type TEXT DEFAULT 'background'",
             "ALTER TABLE source_weights ADD COLUMN bias_temperature REAL DEFAULT 0.0",
             "ALTER TABLE source_weights ADD COLUMN bias_wind REAL DEFAULT 0.0",
             "ALTER TABLE source_weights ADD COLUMN excluded INTEGER DEFAULT 0",

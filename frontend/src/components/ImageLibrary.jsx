@@ -379,13 +379,206 @@ function LocationRow({ location, neighborhood, onUpload, onDelete, onUpdate }) {
   )
 }
 
+// ── Motif section ─────────────────────────────────────────────────────────────
+
+function MotifUploadForm({ onUpload, onClose }) {
+  const [file, setFile]         = useState(null)
+  const [label, setLabel]       = useState('')
+  const [lat, setLat]           = useState('')
+  const [lon, setLon]           = useState('')
+  const [preset, setPreset]     = useState('')
+  const [uploading, setUploading] = useState(false)
+  const [error, setError]       = useState(null)
+  const [progress, setProgress] = useState(null)
+
+  const handlePreset = e => {
+    const name = e.target.value
+    setPreset(name)
+    const p = PRESETS.find(p => p.label === name)
+    if (p) {
+      if (!lat) setLat(String(p.lat))
+      if (!lon) setLon(String(p.lon))
+      if (!label) setLabel(name)
+    }
+  }
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+    if (!file || !label || !lat || !lon) return
+    setUploading(true)
+    setError(null)
+    setProgress('Laddar upp…')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('label', label)
+      fd.append('lat', lat)
+      fd.append('lon', lon)
+      fd.append('time_slot', 'day')
+      fd.append('image_type', 'motif')
+      await onUpload(fd)
+      onClose?.()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setUploading(false)
+      setProgress(null)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="text-slate-400 text-xs mb-1 block">Snabbval etikett</label>
+        <select
+          value={preset}
+          onChange={handlePreset}
+          className="w-full bg-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-600"
+        >
+          <option value="">Välj förinställd etikett…</option>
+          {PRESETS.map(p => <option key={p.label} value={p.label}>{p.label}</option>)}
+        </select>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-slate-400 text-xs mb-1 block">Etikett</label>
+          <input
+            value={label} onChange={e => setLabel(e.target.value)}
+            placeholder="t.ex. Centrum"
+            required
+            className="w-full bg-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-600"
+          />
+        </div>
+        <div>
+          <label className="text-slate-400 text-xs mb-1 block">Fil (PNG rekommenderas)</label>
+          <input
+            type="file" accept="image/*" required
+            onChange={e => setFile(e.target.files[0])}
+            className="w-full text-slate-300 text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:bg-slate-600 file:text-slate-200"
+          />
+        </div>
+        <div>
+          <label className="text-slate-400 text-xs mb-1 block">Latitud</label>
+          <input
+            value={lat} onChange={e => setLat(e.target.value)}
+            placeholder="57.706" required
+            className="w-full bg-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-600 font-mono"
+          />
+        </div>
+        <div>
+          <label className="text-slate-400 text-xs mb-1 block">Longitud</label>
+          <input
+            value={lon} onChange={e => setLon(e.target.value)}
+            placeholder="11.967" required
+            className="w-full bg-slate-700 text-slate-200 text-sm rounded-lg px-3 py-2 border border-slate-600 font-mono"
+          />
+        </div>
+      </div>
+
+      {error && <p className="text-red-400 text-xs">{error}</p>}
+
+      <div className="flex gap-3 pt-1">
+        <button
+          type="submit" disabled={uploading}
+          className="flex-1 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 text-white text-sm font-medium py-2 rounded-lg transition-colors"
+        >
+          {progress ?? 'Ladda upp motiv'}
+        </button>
+        {onClose && (
+          <button type="button" onClick={onClose}
+            className="px-4 text-slate-400 hover:text-slate-200 text-sm transition-colors"
+          >
+            Avbryt
+          </button>
+        )}
+      </div>
+    </form>
+  )
+}
+
+function MotifSection({ data, onUpload, onDelete }) {
+  const [showUpload, setShowUpload] = useState(false)
+  const motifs = (data ?? []).filter(img => img.image_type === 'motif')
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-white">Motiv</h2>
+          <p className="text-slate-500 text-xs mt-0.5">
+            Transparenta PNG-motiv (byggnader/landmärken) — ett per plats, visas i Nu-vyn
+          </p>
+        </div>
+        <button
+          onClick={() => setShowUpload(o => !o)}
+          className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+        >
+          {showUpload ? 'Avbryt' : '+ Nytt motiv'}
+        </button>
+      </div>
+
+      {showUpload && (
+        <div className="bg-slate-800 rounded-xl p-5">
+          <p className="text-white font-medium mb-4">Ladda upp motiv</p>
+          <MotifUploadForm
+            onUpload={onUpload}
+            onClose={() => setShowUpload(false)}
+          />
+        </div>
+      )}
+
+      {motifs.length === 0 && !showUpload ? (
+        <div className="bg-slate-800 rounded-xl p-6 text-center text-slate-500 text-sm">
+          Inga motiv uppladdade ännu. Klicka "+ Nytt motiv" för att börja.
+        </div>
+      ) : motifs.length > 0 && (
+        <div className="bg-slate-800 rounded-xl overflow-hidden">
+          {motifs.map(img => (
+            <MotifRow key={img.id} img={img} onDelete={onDelete} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MotifRow({ img, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/50 last:border-0">
+      <img src={img.url} alt={img.label}
+        className="w-12 h-12 object-contain rounded bg-slate-700/50 shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="text-white text-sm font-medium truncate">{img.label}</div>
+        <div className="text-slate-500 text-xs font-mono">{img.lat.toFixed(4)}, {img.lon.toFixed(4)}</div>
+      </div>
+      {confirmDelete ? (
+        <div className="flex items-center gap-1.5 shrink-0">
+          <span className="text-xs text-red-400">Radera?</span>
+          <button onClick={() => onDelete(img.id)} className="text-xs text-red-400 hover:text-red-300 font-medium">Ja</button>
+          <button onClick={() => setConfirmDelete(false)} className="text-xs text-slate-500 hover:text-slate-300">Nej</button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="text-slate-700 hover:text-red-400 text-sm shrink-0 transition-colors"
+          title="Ta bort motiv"
+        >🗑</button>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function ImageLibrary({ data, onUpload, onUpdate, onDelete }) {
   const [showNewLocation, setShowNewLocation]   = useState(false)
   const [pendingPos, setPendingPos]             = useState(null)
   const [selectedLocation, setSelectedLocation] = useState(null)
-  const locations = groupByLocation(data)
+  const bgData = (data ?? []).filter(img => img.image_type !== 'motif')
+  const locations = groupByLocation(bgData)
 
   const handleMapClick = (lat, lon) => {
     setPendingPos({ lat, lon })
@@ -405,76 +598,85 @@ export default function ImageLibrary({ data, onUpload, onUpdate, onDelete }) {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-white">Bildbibliotek</h2>
-          <p className="text-slate-500 text-xs mt-0.5">
-            Upp till 4 bilder per plats — en per tidslot · Klicka på kartan för att placera en ny nål
-          </p>
-        </div>
-        <button
-          onClick={() => { setShowNewLocation(o => !o); setPendingPos(null); setSelectedLocation(null) }}
-          className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-        >
-          {showNewLocation ? 'Avbryt' : '+ Ny plats'}
-        </button>
-      </div>
-
-      {/* Map */}
-      <div className="relative">
-        <Suspense fallback={<div className="h-[360px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta…</div>}>
-          <ImageMap
-            locations={locations}
-            pendingPos={pendingPos}
-            onMapClick={handleMapClick}
-            onPinClick={handlePinClick}
-          />
-        </Suspense>
-      </div>
-
-      {/* New location upload form — pre-filled from map click */}
-      {showNewLocation && (
-        <div className="bg-slate-800 rounded-xl p-5">
-          <p className="text-white font-medium mb-4">
-            {selectedLocation ? `Lägg till slot för ${selectedLocation.label}` : 'Lägg till ny plats'}
-          </p>
-          <UploadForm
-            defaultLabel={selectedLocation?.label ?? ''}
-            defaultLat={pendingPos ? String(pendingPos.lat.toFixed(6)) : ''}
-            defaultLon={pendingPos ? String(pendingPos.lon.toFixed(6)) : ''}
-            onUpload={onUpload}
-            onClose={() => { setShowNewLocation(false); setPendingPos(null); setSelectedLocation(null) }}
-          />
-        </div>
-      )}
-
-      {/* Compact location table */}
-      {locations.length === 0 && !showNewLocation ? (
-        <div className="bg-slate-800 rounded-xl p-8 text-center text-slate-500 text-sm">
-          Inga bilder uppladdade ännu. Klicka på kartan eller "+ Ny plats" för att börja.
-        </div>
-      ) : locations.length > 0 && (
-        <div className="bg-slate-800 rounded-xl overflow-hidden">
-          {/* Table header */}
-          <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 text-xs text-slate-500">
-            <span className="w-8 shrink-0">Slots</span>
-            <span className="w-28 shrink-0">Stadsdel</span>
-            <span className="flex-1">Etikett</span>
-            <span className="mr-5">Bilder</span>
+    <div className="space-y-8">
+      {/* ── Background images section ── */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Bakgrundsbilder</h2>
+            <p className="text-slate-500 text-xs mt-0.5">
+              Upp till 4 bilder per plats — en per tidslot · Klicka på kartan för att placera en ny nål
+            </p>
           </div>
-          {locations.map(loc => (
-            <LocationRow
-              key={loc.label}
-              location={loc}
-              neighborhood={nearestPreset(loc.lat, loc.lon)}
-              onUpload={onUpload}
-              onUpdate={onUpdate}
-              onDelete={onDelete}
-            />
-          ))}
+          <button
+            onClick={() => { setShowNewLocation(o => !o); setPendingPos(null); setSelectedLocation(null) }}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            {showNewLocation ? 'Avbryt' : '+ Ny plats'}
+          </button>
         </div>
-      )}
+
+        {/* Map */}
+        <div className="relative">
+          <Suspense fallback={<div className="h-[360px] bg-slate-800 rounded-xl flex items-center justify-center text-slate-500 text-sm">Laddar karta…</div>}>
+            <ImageMap
+              locations={locations}
+              pendingPos={pendingPos}
+              onMapClick={handleMapClick}
+              onPinClick={handlePinClick}
+            />
+          </Suspense>
+        </div>
+
+        {/* New location upload form — pre-filled from map click */}
+        {showNewLocation && (
+          <div className="bg-slate-800 rounded-xl p-5">
+            <p className="text-white font-medium mb-4">
+              {selectedLocation ? `Lägg till slot för ${selectedLocation.label}` : 'Lägg till ny plats'}
+            </p>
+            <UploadForm
+              defaultLabel={selectedLocation?.label ?? ''}
+              defaultLat={pendingPos ? String(pendingPos.lat.toFixed(6)) : ''}
+              defaultLon={pendingPos ? String(pendingPos.lon.toFixed(6)) : ''}
+              onUpload={onUpload}
+              onClose={() => { setShowNewLocation(false); setPendingPos(null); setSelectedLocation(null) }}
+            />
+          </div>
+        )}
+
+        {/* Compact location table */}
+        {locations.length === 0 && !showNewLocation ? (
+          <div className="bg-slate-800 rounded-xl p-8 text-center text-slate-500 text-sm">
+            Inga bakgrundsbilder uppladdade ännu. Klicka på kartan eller "+ Ny plats" för att börja.
+          </div>
+        ) : locations.length > 0 && (
+          <div className="bg-slate-800 rounded-xl overflow-hidden">
+            {/* Table header */}
+            <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-700 text-xs text-slate-500">
+              <span className="w-8 shrink-0">Slots</span>
+              <span className="w-28 shrink-0">Stadsdel</span>
+              <span className="flex-1">Etikett</span>
+              <span className="mr-5">Bilder</span>
+            </div>
+            {locations.map(loc => (
+              <LocationRow
+                key={loc.label}
+                location={loc}
+                neighborhood={nearestPreset(loc.lat, loc.lon)}
+                onUpload={onUpload}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Divider */}
+      <div className="border-t border-slate-700" />
+
+      {/* ── Motif section ── */}
+      <MotifSection data={data} onUpload={onUpload} onDelete={onDelete} />
     </div>
   )
 }

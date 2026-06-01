@@ -127,4 +127,5 @@ class CityImage(Base):
     lat: Mapped[float] = mapped_column(Float)
     lon: Mapped[float] = mapped_column(Float)
     time_slot: Mapped[Optional[str]] = mapped_column(String, default="day")  # night|morning|day|evening
+    image_type: Mapped[str] = mapped_column(String, default="background")  # background|motif
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
