@@ -595,14 +595,13 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
         </div>
       )}
 
-      {/* Motif — spans full card width, sits on the dividing line */}
+      {/* Motif — full card width, right-aligned, ~3× taller */}
       {motifImage && (
-        <div className="-mx-6 mt-3">
+        <div className="-mx-6 mt-3 flex justify-end overflow-hidden" style={{ height: 380 }}>
           <img
             src={motifImage.url}
             alt={motifImage.label}
-            className="w-full object-contain object-bottom"
-            style={{ height: 130, display: 'block' }}
+            className="h-full w-auto object-contain object-bottom"
           />
         </div>
       )}
