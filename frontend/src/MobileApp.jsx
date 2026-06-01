@@ -556,26 +556,13 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
 
   return (
     <div className={`${GLASS} rounded-2xl p-6`}>
-      {/* Temp + symbol + motif */}
-      <div className="flex items-end justify-between gap-2">
-        <div className="flex flex-col gap-1 shrink-0">
+      {/* Temp + symbol */}
+      <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-1">
           <span className="text-6xl leading-none"><WeatherSymbol symbol={symbol} /></span>
           <span className="text-slate-400 text-sm mt-2">{label}</span>
         </div>
-
-        {/* Motif image — transparent PNG sticks up between symbol and temperature */}
-        {motifImage && (
-          <div className="flex-1 flex justify-center items-end overflow-hidden" style={{ maxHeight: 120 }}>
-            <img
-              src={motifImage.url}
-              alt={motifImage.label}
-              className="h-28 w-auto object-contain object-bottom"
-              style={{ maxWidth: '90%' }}
-            />
-          </div>
-        )}
-
-        <div className="text-right shrink-0">
+        <div className="text-right">
           <div className="text-7xl font-thin text-white leading-none">
             {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
           </div>
@@ -615,6 +602,18 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
           <p className="text-slate-300 text-sm leading-relaxed">{summary}</p>
         )}
       </div>
+
+      {/* Motif — spans full card width, sits on the dividing line above the hourly table */}
+      {motifImage && (
+        <div className="-mx-6 mt-3">
+          <img
+            src={motifImage.url}
+            alt={motifImage.label}
+            className="w-full object-contain object-bottom"
+            style={{ height: 130, display: 'block' }}
+          />
+        </div>
+      )}
 
       {/* 6-hour table */}
       <SixHourTable forecasts={allForecasts} />
