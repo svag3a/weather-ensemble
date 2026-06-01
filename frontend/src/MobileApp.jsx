@@ -542,7 +542,7 @@ function SixHourTable({ forecasts }) {
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
-function CurrentCard({ fc, radar, allForecasts }) {
+function CurrentCard({ fc, radar, allForecasts, motifImage }) {
   if (!fc) return (
     <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>
       Hämtar prognos…
@@ -556,13 +556,26 @@ function CurrentCard({ fc, radar, allForecasts }) {
 
   return (
     <div className={`${GLASS} rounded-2xl p-6`}>
-      {/* Temp + symbol */}
-      <div className="flex items-start justify-between">
-        <div className="flex flex-col gap-1">
+      {/* Temp + symbol + motif */}
+      <div className="flex items-end justify-between gap-2">
+        <div className="flex flex-col gap-1 shrink-0">
           <span className="text-6xl leading-none"><WeatherSymbol symbol={symbol} /></span>
           <span className="text-slate-400 text-sm mt-2">{label}</span>
         </div>
-        <div className="text-right">
+
+        {/* Motif image — transparent PNG sticks up between symbol and temperature */}
+        {motifImage && (
+          <div className="flex-1 flex justify-center items-end overflow-hidden" style={{ maxHeight: 120 }}>
+            <img
+              src={motifImage.url}
+              alt={motifImage.label}
+              className="h-28 w-auto object-contain object-bottom"
+              style={{ maxWidth: '90%' }}
+            />
+          </div>
+        )}
+
+        <div className="text-right shrink-0">
           <div className="text-7xl font-thin text-white leading-none">
             {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
           </div>
@@ -1617,20 +1630,7 @@ export default function MobileApp() {
           )
         })()}
 
-        {/* Motif image — in front of sky (z-index 5), behind glass cards (z-10) */}
-        {activeTab === 'now' && motifImage && (
-          <div className="absolute bottom-0 left-0 right-0 flex justify-center pointer-events-none"
-               style={{ height: '45%', zIndex: 5 }}>
-            <img
-              src={motifImage.url}
-              alt={motifImage.label}
-              className="h-full w-auto object-contain object-bottom"
-              style={{ maxWidth: '80%' }}
-            />
-          </div>
-        )}
-
-        <AnimatePresence mode="sync" custom={slideDir}>
+<AnimatePresence mode="sync" custom={slideDir}>
           <motion.div
             key={activeTab}
             custom={slideDir}
@@ -1651,7 +1651,7 @@ export default function MobileApp() {
                       <span>{[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}</span>
                     </div>
                   )}
-                  <CurrentCard fc={currentFc} radar={radar} allForecasts={future} />
+                  <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} />
                   {(() => {
                     const visibleDays = days.slice(1).filter(h => h.length >= 23)
                     const allSummaries = visibleDays.map(getDaySummary)
