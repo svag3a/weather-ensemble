@@ -501,25 +501,25 @@ function SixHourTable({ forecasts }) {
   if (!rows.length) return null
 
   return (
-    <div className="mt-4 border-t border-slate-200 pt-4 space-y-1">
+    <div className="mt-4 border-t border-slate-700 pt-4 space-y-1">
       {rows.map((fc, i) => {
         const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
         const drops = fc.precip_probability >= 20 ? rainDrops(fc.precip_mm) : null
         const fl = feelsLike(fc.temperature, fc.wind_speed)
         return (
           <div key={i} className="flex items-center gap-3 py-0.5">
-            <span className="text-slate-500 font-mono text-xs w-12 shrink-0">{formatHour(fc.valid_for)}</span>
+            <span className="text-slate-400 font-mono text-xs w-12 shrink-0">{formatHour(fc.valid_for)}</span>
             <span className="text-lg w-6 text-center leading-none"><WeatherSymbol symbol={symbol} /></span>
             <span className="flex items-baseline gap-1 w-20 shrink-0">
               <span className="text-white text-sm font-medium">
                 {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
               </span>
-              {fl != null && <span className="text-slate-500 text-xs">({fl}°)</span>}
+              {fl != null && <span className="text-slate-400 text-xs">({fl}°)</span>}
             </span>
-            <span className={`text-xs w-10 ${fc.precip_probability >= 40 ? 'text-blue-500' : 'text-slate-400'}`}>
+            <span className={`text-xs w-10 ${fc.precip_probability >= 40 ? 'text-blue-300' : 'text-slate-500'}`}>
               {Math.round(fc.precip_probability)}%
             </span>
-            <span className="text-slate-500 text-xs flex-1">
+            <span className="text-slate-400 text-xs flex-1">
               {fc.wind_speed != null && fc.wind_speed >= 3
                 ? `${Math.round(fc.wind_speed)} m/s ${windDirArrow(fc.wind_direction)}`
                 : ''}
@@ -531,7 +531,7 @@ function SixHourTable({ forecasts }) {
       {todayHours.length > 6 && (
         <button
           onClick={() => setExpanded(o => !o)}
-          className="w-full text-center text-xs text-slate-400 pt-2 pb-1 active:text-slate-600 transition-colors"
+          className="w-full text-center text-xs text-slate-600 pt-2 pb-1 active:text-slate-400 transition-colors"
         >
           {expanded ? '↑ Visa färre' : `↓ Visa hela dagen`}
         </button>
@@ -540,7 +540,7 @@ function SixHourTable({ forecasts }) {
   )
 }
 
-const GLASS = 'bg-white/75 backdrop-blur-sm border border-slate-200/80 shadow-sm'
+const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
 function CurrentCard({ fc, radar, allForecasts, motifImage }) {
   if (!fc) return (
@@ -560,21 +560,21 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
           <span className="text-6xl leading-none"><WeatherSymbol symbol={symbol} /></span>
-          <span className="text-slate-500 text-sm mt-2">{label}</span>
+          <span className="text-slate-400 text-sm mt-2">{label}</span>
         </div>
         <div className="text-right">
           <div className="text-7xl font-thin text-white leading-none">
             {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
           </div>
           {feels != null && (
-            <div className="text-slate-500 text-sm mt-1">Känns som {feels}°</div>
+            <div className="text-slate-400 text-sm mt-1">Känns som {feels}°</div>
           )}
         </div>
       </div>
 
       {/* Wind */}
       {fc.wind_speed != null && fc.wind_speed >= 3 && (
-        <div className="mt-3 flex items-center gap-2 text-slate-700 text-sm">
+        <div className="mt-3 flex items-center gap-2 text-slate-300 text-sm">
           <span>💨</span>
           <span>
             {Math.round(fc.wind_speed)} m/s {windDirArrow(fc.wind_direction)}
@@ -617,7 +617,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
       <div className="mt-4 flex flex-col gap-2">
         <ConfidenceBadge conf={conf} />
         {summary && (
-          <p className="text-slate-700 text-sm leading-relaxed">{summary}</p>
+          <p className="text-slate-300 text-sm leading-relaxed">{summary}</p>
         )}
       </div>
 
@@ -633,17 +633,17 @@ function HourRow({ fc }) {
   const drops = fc.precip_probability >= 20 ? rainDrops(fc.precip_mm) : null
   const fl = feelsLike(fc.temperature, fc.wind_speed)
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-slate-200/80 last:border-0">
-      <span className="text-slate-500 font-mono text-xs w-12 shrink-0">{formatHour(fc.valid_for)}</span>
+    <div className="flex items-center gap-3 py-2 border-b border-slate-700/50 last:border-0">
+      <span className="text-slate-400 font-mono text-xs w-12 shrink-0">{formatHour(fc.valid_for)}</span>
       <span className="text-xl w-7 text-center"><WeatherSymbol symbol={symbol} /></span>
       <span className="flex items-baseline gap-1 w-20 shrink-0">
-        <span className="text-slate-900 font-medium">
+        <span className="text-white font-medium">
           {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
         </span>
-        {fl != null && <span className="text-slate-500 text-xs">({fl}°)</span>}
+        {fl != null && <span className="text-slate-400 text-xs">({fl}°)</span>}
       </span>
       {fc.wind_speed != null && fc.wind_speed >= 3
-        ? <span className="text-slate-500 text-xs flex-1">
+        ? <span className="text-slate-400 text-xs flex-1">
             {Math.round(fc.wind_speed)} m/s {windDirArrow(fc.wind_direction)}
           </span>
         : <span className="flex-1" />
@@ -664,12 +664,12 @@ function DayRow({ hours, warnings, weekMin, weekMax }) {
     <div className={`${GLASS} rounded-2xl overflow-hidden`}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 px-5 py-4 active:bg-slate-100 transition-colors"
+        className="w-full flex items-center gap-3 px-5 py-4 active:bg-white/5 transition-colors"
       >
         {/* Day name + date */}
         <div className="w-24 shrink-0 text-left">
-          <div className="text-slate-900 font-medium">{label}</div>
-          <div className="text-slate-500 text-xs">{date}</div>
+          <div className="text-white font-medium">{label}</div>
+          <div className="text-slate-400 text-xs">{date}</div>
         </div>
 
         {/* Symbol */}
@@ -678,7 +678,7 @@ function DayRow({ hours, warnings, weekMin, weekMax }) {
         {/* Temp bar + range */}
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-slate-500 text-xs font-mono w-7 text-right shrink-0">
+            <span className="text-slate-400 text-xs font-mono w-7 text-right shrink-0">
               {minTemp != null ? `${minTemp}°` : ''}
             </span>
             <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
@@ -692,11 +692,11 @@ function DayRow({ hours, warnings, weekMin, weekMax }) {
         <span className="w-4 text-center shrink-0"><WarningTriangle warning={warning} /></span>
 
         {/* Chevron */}
-        <span className={`text-slate-600 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
+        <span className={`text-white/50 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>
 
       {open && (
-        <div className="px-5 pb-4 border-t border-slate-200/60">
+        <div className="px-5 pb-4 border-t border-slate-700/50">
           {hours.map((fc, i) => <HourRow key={i} fc={fc} />)}
         </div>
       )}
@@ -815,7 +815,7 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
     : hours.filter(h => parseTS(h.valid_for).getHours() % 6 === 0)
 
   return (
-    <div className="border-b border-slate-200/80 last:border-0">
+    <div className="border-b border-slate-700/50 last:border-0">
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-slate-700/50 transition-colors"
@@ -823,7 +823,7 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
         {/* Day name + date */}
         <div className="w-24 shrink-0 text-left">
           <div className="text-white text-sm font-medium leading-tight">{label}</div>
-          <div className="text-slate-500 text-xs">{date}</div>
+          <div className="text-slate-400 text-xs">{date}</div>
         </div>
 
         {/* Symbol */}
@@ -832,7 +832,7 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
         {/* Temp bar + secondary info */}
         <div className="flex-1 min-w-0 space-y-1">
           <div className="flex items-center gap-2">
-            <span className="text-slate-500 text-xs font-mono w-7 text-right shrink-0">
+            <span className="text-slate-400 text-xs font-mono w-7 text-right shrink-0">
               {minTemp != null ? `${minTemp}°` : ''}
             </span>
             <TempBar dayMin={minTemp ?? weekMin} dayMax={maxTemp ?? weekMax} weekMin={weekMin} weekMax={weekMax} />
@@ -852,13 +852,13 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
         <span className="w-4 text-center shrink-0"><WarningTriangle warning={warning} /></span>
 
         {/* Chevron */}
-        <span className={`text-slate-600 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
+        <span className={`text-white/50 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>
 
       {open && (
-        <div className="px-5 pb-4 border-t border-slate-200/60">
+        <div className="px-5 pb-4 border-t border-slate-700/50">
           {!isHourly && (
-            <p className="text-slate-600 text-xs py-2">Prognos var 6:e timme</p>
+            <p className="text-white/50 text-xs py-2">Prognos var 6:e timme</p>
           )}
           {detailRows.map((fc, j) => <HourRow key={j} fc={fc} />)}
         </div>
@@ -897,16 +897,16 @@ function WarningCard({ warning }) {
   return (
     <div className={`rounded-2xl border-l-4 p-5 space-y-3 ${style.border} ${style.bg}`}>
       <div className="flex items-start justify-between gap-3">
-        <span className="text-slate-900 font-medium">{warning.event}</span>
+        <span className="text-white font-medium">{warning.event}</span>
         <span className={`shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${style.badge}`}>
           {warning.level_label}
         </span>
       </div>
       {period && (
-        <p className="text-slate-500 text-xs">{period}</p>
+        <p className="text-slate-400 text-xs">{period}</p>
       )}
       {warning.description && (
-        <p className="text-slate-700 text-sm leading-relaxed">{warning.description}</p>
+        <p className="text-slate-300 text-sm leading-relaxed">{warning.description}</p>
       )}
     </div>
   )
@@ -917,7 +917,7 @@ function WarningsView({ warnings }) {
     return (
       <div className={`${GLASS} rounded-2xl p-8 flex flex-col items-center gap-3 text-center`}>
         <span className="text-3xl">✓</span>
-        <p className="text-slate-900 font-medium">Inga aktiva varningar</p>
+        <p className="text-white font-medium">Inga aktiva varningar</p>
         <p className="text-slate-500 text-sm">Inga SMHI-varningar gäller just nu för Göteborg.</p>
       </div>
     )
@@ -925,11 +925,11 @@ function WarningsView({ warnings }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-slate-500 text-xs px-1">
+      <p className="text-slate-400 text-xs px-1">
         Aktiva SMHI-varningar för Göteborg · Västra Götalands län
       </p>
       {warnings.map((w, i) => <WarningCard key={i} warning={w} />)}
-      <p className="text-slate-600 text-xs px-1 pt-1">
+      <p className="text-white/50 text-xs px-1 pt-1">
         Uppdateras var 30:e minut · Källa: SMHI IBW
       </p>
     </div>
@@ -957,7 +957,7 @@ function CollectButton() {
     <button
       onClick={trigger}
       disabled={state === 'loading'}
-      className="w-full text-center text-xs text-slate-400 py-2 active:text-slate-600 transition-colors disabled:opacity-50"
+      className="w-full text-center text-xs text-slate-600 py-2 active:text-slate-400 transition-colors disabled:opacity-50"
     >
       {state === 'idle'    && '↻ Hämta nu'}
       {state === 'loading' && 'Hämtar…'}
@@ -1038,7 +1038,7 @@ function DivergenceTooltip({ active, payload, label, unit }) {
     return (b.value ?? 0) - (a.value ?? 0)
   })
   return (
-    <div className="bg-slate-900 border border-slate-200 rounded-lg p-3 text-xs shadow-xl">
+    <div className="bg-slate-900 border border-slate-700 rounded-lg p-3 text-xs shadow-xl">
       <p className="text-slate-400 mb-2">{timeStr}</p>
       {sorted.map(p => (
         <div key={p.dataKey} className="flex items-center gap-2 mb-0.5">
@@ -1080,7 +1080,7 @@ function ForecastDivergenceChart({ sources, ensembleFcs }) {
   return (
     <div className={`${GLASS} rounded-2xl p-5 space-y-4`}>
       <div className="flex items-center justify-between">
-        <h2 className="text-slate-900 font-medium text-sm">Källspridning</h2>
+        <h2 className="text-white font-medium text-sm">Källspridning</h2>
         <div className="flex gap-1">
           {[['temperature', 'Temp'], ['precip', 'Regn'], ['wind', 'Vind']].map(([p, label]) => (
             <button
@@ -1231,13 +1231,13 @@ function EnsembleView({ ensembleFc }) {
     <div className="space-y-3">
       {/* Comparison table */}
       <div className={`${GLASS} rounded-2xl overflow-hidden`}>
-        <div className="px-5 pt-4 pb-3 border-b border-slate-200">
-          <h2 className="text-slate-900 font-medium text-sm">Källjämförelse — kl {hourLabel}</h2>
-          <p className="text-slate-500 text-xs mt-0.5">Rankad efter historisk träffsäkerhet · närmaste timme</p>
+        <div className="px-5 pt-4 pb-3 border-b border-slate-700">
+          <h2 className="text-white font-medium text-sm">Källjämförelse — kl {hourLabel}</h2>
+          <p className="text-slate-400 text-xs mt-0.5">Rankad efter historisk träffsäkerhet · närmaste timme</p>
         </div>
 
         {/* Header row */}
-        <div className="flex items-center gap-2 px-5 py-2 text-slate-500 text-xs">
+        <div className="flex items-center gap-2 px-5 py-2 text-slate-400 text-xs">
           <span className="w-5 shrink-0">#</span>
           <span className="flex-1">Källa</span>
           <span className="w-12 text-right">Temp</span>
@@ -1249,15 +1249,15 @@ function EnsembleView({ ensembleFc }) {
         {rankedOrder.map((src, idx) => {
           const fc = currentBySource[src]
           return (
-            <div key={src} className="flex items-center gap-2 px-5 py-2 border-b border-slate-200/40 last:border-0">
-              <span className="text-slate-600 text-xs font-mono w-5 shrink-0">{idx + 1}.</span>
-              <span className="flex-1 text-slate-700 text-sm">
+            <div key={src} className="flex items-center gap-2 px-5 py-2 border-b border-slate-700/40 last:border-0">
+              <span className="text-white/50 text-xs font-mono w-5 shrink-0">{idx + 1}.</span>
+              <span className="flex-1 text-slate-300 text-sm">
                 {SOURCE_LABELS[src] ?? src}{src === 'ensemble' ? ' ★' : ''}
               </span>
-              <span className="w-12 text-right text-slate-700 text-sm font-mono">
+              <span className="w-12 text-right text-slate-300 text-sm font-mono">
                 {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
               </span>
-              <span className={`w-12 text-right text-sm font-mono ${fc.precip_probability >= 40 ? 'text-blue-500' : 'text-slate-400'}`}>
+              <span className={`w-12 text-right text-sm font-mono ${fc.precip_probability >= 40 ? 'text-blue-300' : 'text-slate-500'}`}>
                 {Math.round(fc.precip_probability)}%
               </span>
               <span className="w-14 text-right text-slate-500 text-sm font-mono">
@@ -1281,13 +1281,13 @@ function EnsembleView({ ensembleFc }) {
       {/* Weight explanation */}
       {weightsAt1.length > 0 && (
         <div className={`${GLASS} rounded-2xl p-5 space-y-3`}>
-          <h2 className="text-slate-900 font-medium text-sm">Nuvarande vikter (0–6 h)</h2>
+          <h2 className="text-white font-medium text-sm">Nuvarande vikter (0–6 h)</h2>
           <div className="space-y-2 text-sm">
             {bestTemp.src && (
               <div className="flex items-start gap-2">
                 <span className="text-slate-400 shrink-0">🌡</span>
                 <span className="text-slate-300">
-                  <span className="text-slate-900 font-medium">{SOURCE_LABELS[bestTemp.src]}</span>
+                  <span className="text-white font-medium">{SOURCE_LABELS[bestTemp.src]}</span>
                   {' '}har lägst temperaturavvikelse ({bestTemp.val.toFixed(2)} °C MAE)
                 </span>
               </div>
@@ -1296,7 +1296,7 @@ function EnsembleView({ ensembleFc }) {
               <div className="flex items-start gap-2">
                 <span className="text-slate-400 shrink-0">🌧</span>
                 <span className="text-slate-300">
-                  <span className="text-slate-900 font-medium">{SOURCE_LABELS[bestPrecip.src]}</span>
+                  <span className="text-white font-medium">{SOURCE_LABELS[bestPrecip.src]}</span>
                   {' '}har lägst Brier score för regn ({bestPrecip.val.toFixed(3)})
                 </span>
               </div>
@@ -1305,13 +1305,13 @@ function EnsembleView({ ensembleFc }) {
               <div className="flex items-start gap-2">
                 <span className="text-slate-400 shrink-0">💨</span>
                 <span className="text-slate-300">
-                  <span className="text-slate-900 font-medium">{SOURCE_LABELS[bestWind.src]}</span>
+                  <span className="text-white font-medium">{SOURCE_LABELS[bestWind.src]}</span>
                   {' '}har lägst vindavvikelse ({bestWind.val.toFixed(2)} m/s MAE)
                 </span>
               </div>
             )}
           </div>
-          <p className="text-slate-600 text-xs pt-1">
+          <p className="text-white/50 text-xs pt-1">
             Ensemblen viktar varje källa efter historisk träffsäkerhet. Bättre källa → högre vikt.
           </p>
         </div>
@@ -1419,7 +1419,7 @@ function AnalysView() {
                 )}
               </div>
 
-              <p className="text-slate-700 text-sm leading-relaxed">{summary.summary?.short}</p>
+              <p className="text-slate-300 text-sm leading-relaxed">{summary.summary?.short}</p>
 
               {summary.summary?.detailed && (
                 <>
@@ -1441,28 +1441,28 @@ function AnalysView() {
               <ShieldCheck size={15} className={`shrink-0 mt-0.5 ${confStyle.color}`} />
               <div className="flex-1 min-w-0">
                 <span className={`text-xs font-medium ${confStyle.color}`}>{confStyle.label}</span>
-                <p className="text-slate-500 text-xs leading-relaxed mt-0.5">{summary.confidence?.reason}</p>
+                <p className="text-slate-400 text-xs leading-relaxed mt-0.5">{summary.confidence?.reason}</p>
               </div>
             </div>
 
             {/* Key events */}
             {summary.key_events?.length > 0 && (
               <div className={`${GLASS} rounded-2xl overflow-hidden`}>
-                <div className="px-5 pt-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+                <div className="px-5 pt-4 pb-2 border-b border-slate-700 flex items-center gap-2">
                   <Zap size={14} className="text-slate-400 shrink-0" />
                   <h3 className="text-white text-sm font-medium">Händelser</h3>
                 </div>
                 {summary.key_events.map((ev, i) => (
-                  <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-200/80 last:border-0">
+                  <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
                     <span className="text-xl shrink-0 mt-0.5">{EVENT_ICON[ev.type] ?? '⚡'}</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-white text-sm font-medium">{ev.title}</span>
                         {ev.from && ev.to && (
-                          <span className="text-slate-500 text-xs">{ev.from}–{ev.to}</span>
+                          <span className="text-slate-400 text-xs">{ev.from}–{ev.to}</span>
                         )}
                       </div>
-                      <p className="text-slate-500 text-xs mt-0.5 leading-relaxed">{ev.description}</p>
+                      <p className="text-slate-400 text-xs mt-0.5 leading-relaxed">{ev.description}</p>
                     </div>
                   </div>
                 ))}
@@ -1472,17 +1472,17 @@ function AnalysView() {
             {/* Periods */}
             {summary.periods?.length > 0 && (
               <div className={`${GLASS} rounded-2xl overflow-hidden`}>
-                <div className="px-5 pt-4 pb-2 border-b border-slate-200 flex items-center gap-2">
+                <div className="px-5 pt-4 pb-2 border-b border-slate-700 flex items-center gap-2">
                   <Clock size={14} className="text-slate-400 shrink-0" />
                   <h3 className="text-white text-sm font-medium">Under dagen</h3>
                 </div>
                 {summary.periods.map((p, i) => {
                   const cs = CONF_STYLE[p.confidence] ?? CONF_STYLE.medium
                   return (
-                    <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-200/80 last:border-0">
+                    <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
                       <div className="w-20 shrink-0">
                         <div className="text-white text-xs font-medium">{p.name}</div>
-                        <div className="text-slate-500 text-xs">{p.from}–{p.to}</div>
+                        <div className="text-slate-400 text-xs">{p.from}–{p.to}</div>
                       </div>
                       <p className="text-slate-300 text-xs leading-relaxed flex-1">{p.description}</p>
                       <span className={`shrink-0 text-xs ${cs.color}`}>●</span>
@@ -1502,7 +1502,7 @@ function AnalysView() {
                 {summary.insights.map((ins, i) => (
                   <div key={i} className="space-y-0.5">
                     <div className="text-slate-300 text-xs font-medium">{ins.title}</div>
-                    <p className="text-slate-500 text-xs leading-relaxed">{ins.description}</p>
+                    <p className="text-slate-400 text-xs leading-relaxed">{ins.description}</p>
                   </div>
                 ))}
               </div>
@@ -1516,12 +1516,12 @@ function AnalysView() {
                   <p className="text-white text-sm">{summary.practical_advice.main}</p>
                 </div>
                 {summary.practical_advice.tips?.map((tip, i) => (
-                  <p key={i} className="text-slate-500 text-xs">· {tip}</p>
+                  <p key={i} className="text-slate-400 text-xs">· {tip}</p>
                 ))}
               </div>
             )}
 
-            <p className="text-slate-600 text-xs px-1">
+            <p className="text-white/50 text-xs px-1">
               Genererad av Claude Haiku{summary._generated_at ? ` · ${formatGeneratedAt(summary._generated_at)}` : ''} · Uppdateras var 2:e timme
             </p>
           </>
@@ -1616,7 +1616,7 @@ export default function MobileApp() {
   const days = groupByDay(future)
 
   return (
-    <div className="fixed inset-0 bg-slate-50 text-slate-900 flex flex-col">
+    <div className="fixed inset-0 bg-slate-900 text-slate-100 flex flex-col">
 
       {/* Animated content area */}
       <div className="flex-1 relative overflow-x-hidden min-h-0" {...swipeHandlers}>
@@ -1647,7 +1647,7 @@ export default function MobileApp() {
               {activeTab === 'now' && (
                 <>
                   {geoLocation && (
-                    <div className="flex items-center gap-1.5 px-1 text-slate-600 text-xs">
+                    <div className="flex items-center gap-1.5 px-1 text-white/50 text-xs">
                       <span>📍</span>
                       <span>{[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}</span>
                     </div>
@@ -1687,12 +1687,12 @@ export default function MobileApp() {
       </div>
 
       {/* Bottom tab bar */}
-      <div className="bg-white/95 backdrop-blur border-t border-slate-200 safe-bottom">
+      <div className="bg-slate-800/95 backdrop-blur border-t border-slate-700 safe-bottom">
         <div className="flex max-w-lg mx-auto">
           <button
             onClick={() => changeTab('now')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'now' ? 'text-slate-900' : 'text-slate-400'
+              activeTab === 'now' ? 'text-white' : 'text-slate-500'
             }`}
           >
             <Thermometer size={22} strokeWidth={1.5} />
@@ -1701,7 +1701,7 @@ export default function MobileApp() {
           <button
             onClick={() => changeTab('week')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'week' ? 'text-slate-900' : 'text-slate-400'
+              activeTab === 'week' ? 'text-white' : 'text-slate-500'
             }`}
           >
             <CalendarDays size={22} strokeWidth={1.5} />
@@ -1710,7 +1710,7 @@ export default function MobileApp() {
           <button
             onClick={() => changeTab('analysis')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'analysis' ? 'text-slate-900' : 'text-slate-400'
+              activeTab === 'analysis' ? 'text-white' : 'text-slate-500'
             }`}
           >
             <Sparkles size={22} strokeWidth={1.5} />
@@ -1719,7 +1719,7 @@ export default function MobileApp() {
           <button
             onClick={() => changeTab('warnings')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'warnings' ? 'text-slate-900' : 'text-slate-400'
+              activeTab === 'warnings' ? 'text-white' : 'text-slate-500'
             }`}
           >
             <div className="relative">
@@ -1733,7 +1733,7 @@ export default function MobileApp() {
           <button
             onClick={() => changeTab('sources')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'sources' ? 'text-slate-900' : 'text-slate-400'
+              activeTab === 'sources' ? 'text-white' : 'text-slate-500'
             }`}
           >
             <Layers size={22} strokeWidth={1.5} />
