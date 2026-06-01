@@ -604,9 +604,10 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
             style={{
               position: 'absolute',
               bottom: 0,
-              right: 0,
-              width: '95%',
-              height: 'auto',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              height: 260,
+              width: 'auto',
             }}
           />
         </div>
