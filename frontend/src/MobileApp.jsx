@@ -595,15 +595,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
         </div>
       )}
 
-      {/* Confidence badge + summary */}
-      <div className="mt-4 flex flex-col gap-2">
-        <ConfidenceBadge conf={conf} />
-        {summary && (
-          <p className="text-slate-300 text-sm leading-relaxed">{summary}</p>
-        )}
-      </div>
-
-      {/* Motif — spans full card width, sits on the dividing line above the hourly table */}
+      {/* Motif — spans full card width, sits on the dividing line */}
       {motifImage && (
         <div className="-mx-6 mt-3">
           <img
@@ -614,6 +606,14 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
           />
         </div>
       )}
+
+      {/* Confidence badge + summary */}
+      <div className="mt-4 flex flex-col gap-2">
+        <ConfidenceBadge conf={conf} />
+        {summary && (
+          <p className="text-slate-300 text-sm leading-relaxed">{summary}</p>
+        )}
+      </div>
 
       {/* 6-hour table */}
       <SixHourTable forecasts={allForecasts} />
