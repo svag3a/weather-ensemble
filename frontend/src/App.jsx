@@ -109,7 +109,7 @@ export default function App() {
 
         {/* Tab bar */}
         <div className="flex gap-1 mb-6 border-b border-slate-700">
-          {[['status', 'Status'], ['karta', 'Karta']].map(([id, label]) => (
+          {[['status', 'Status'], ['statistik', 'Statistik'], ['karta', 'Karta']].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -126,9 +126,14 @@ export default function App() {
 
         {activeTab === 'status' && (
           <div className="space-y-6">
-            <EnsembleTrend data={ensembleTrend.data} />
             <EnsembleOptimizer data={ensembleHealth.data} onReload={ensembleHealth.reload} />
             <SystemStatus data={systemStatus.data} />
+          </div>
+        )}
+
+        {activeTab === 'statistik' && (
+          <div className="space-y-6">
+            <EnsembleTrend data={ensembleTrend.data} />
             <EnsembleForecast data={ensemble.data} sources={sources.data} />
             <SourceComparison data={sources.data} />
             <SourceRanking data={weights.data} />
