@@ -1621,19 +1621,15 @@ export default function MobileApp() {
       {/* Animated content area */}
       <div className="flex-1 relative overflow-x-hidden min-h-0" {...swipeHandlers}>
 
-        {/* Sky background for Nu-vyn */}
-        {activeTab === 'now' && (() => {
-          const sky = getSkyCss(currentFc, coords)
-          return (
-            <div className="absolute inset-0 z-0 overflow-hidden"
-                 style={{ background: sky.gradient, filter: sky.filter || undefined }}>
-              <WeatherParticles
-                precip={currentFc?.precip_probability ?? 0}
-                temperature={currentFc?.temperature ?? 10}
-              />
-            </div>
-          )
-        })()}
+        {/* Weather particles (rain/snow) — no sky gradient */}
+        {activeTab === 'now' && (
+          <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+            <WeatherParticles
+              precip={currentFc?.precip_probability ?? 0}
+              temperature={currentFc?.temperature ?? 10}
+            />
+          </div>
+        )}
 
 <AnimatePresence mode="sync" custom={slideDir}>
           <motion.div
