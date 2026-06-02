@@ -592,6 +592,41 @@ function BeaufortGauge({ windSpeed }) {
   )
 }
 
+function PressureTrend({ forecasts }) {
+  if (!forecasts?.length) return null
+
+  const now6h = forecasts.find(fc => {
+    const h = (parseTS(fc.valid_for) - new Date()) / 3_600_000
+    return h >= 5.5 && h <= 7
+  }) ?? forecasts[Math.min(6, forecasts.length - 1)]
+  const now0h = forecasts[0]
+
+  if (!now0h?.pressure || !now6h?.pressure) return null
+
+  const deltaPressure = now6h.pressure - now0h.pressure
+  if (deltaPressure > -4) return null  // only show on significant fall
+
+  const deltaPrec = (now6h.precip_probability ?? 0) - (now0h.precip_probability ?? 0)
+  const confirmed = deltaPrec > 20
+  const color = confirmed ? '#ef4444' : '#fb923c'
+
+  const sym0 = getWeatherInfo(now0h.temperature, now0h.precip_probability, now0h.wind_speed, now0h.cloud_cover, now0h.valid_for, 0, now0h.fog_probability ?? 0, now0h.precip_mm ?? 0).symbol
+  const sym6 = getWeatherInfo(now6h.temperature, now6h.precip_probability, now6h.wind_speed, now6h.cloud_cover, now6h.valid_for, 0, now6h.fog_probability ?? 0, now6h.precip_mm ?? 0).symbol
+
+  return (
+    <div className="mt-2 flex flex-col items-center gap-0.5">
+      <div className="flex items-center gap-1">
+        <span className="text-lg leading-none"><WeatherSymbol symbol={sym0} /></span>
+        <span className="text-xs font-bold" style={{ color }}>→</span>
+        <span className="text-lg leading-none"><WeatherSymbol symbol={sym6} /></span>
+      </div>
+      <div className="text-[10px] font-medium text-center" style={{ color }}>
+        {confirmed ? 'Försämras' : 'Kan försämras'}
+      </div>
+    </div>
+  )
+}
+
 function CurrentCard({ fc, radar, allForecasts, motifImage }) {
   if (!fc) return (
     <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>
@@ -611,6 +646,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
           <span className="text-6xl leading-none" style={{ display: 'block', lineHeight: 1 }}><WeatherSymbol symbol={symbol} /></span>
           <span className="text-slate-400 text-sm" style={{ marginTop: -6 }}>{label}</span>
           <BeaufortGauge windSpeed={fc.wind_speed} />
+          <PressureTrend forecasts={allForecasts} />
         </div>
         {/* Right column: temperature + feels like */}
         <div className="text-right">

@@ -40,12 +40,14 @@ async def fetch(client: httpx.AsyncClient) -> list[HourlyForecast]:
         fog_vis    = (1.0 if (not math.isnan(vis) and vis < 1.0) else
                       0.6 if (not math.isnan(vis) and vis < 5.0) else 0.0)
         fog = max(fog_symbol, fog_vis)
+        pressure = _val(d, "air_pressure_at_mean_sea_level")
 
         results.append(HourlyForecast(
             valid_for=valid_for, temperature=temp, precip_probability=precip,
             wind_speed=wind, cloud_cover=cloud,
             wind_direction=wind_dir, precip_mm=precip_mm,
             fog_probability=fog,
+            pressure=pressure,
         ))
 
     return results

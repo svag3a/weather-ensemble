@@ -335,7 +335,7 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
         lead_hours = max(1, round((valid_for - computed_at).total_seconds() / 3600))
         weights = _get_weights(db, lead_hours)
 
-        temps, precips, winds, clouds, wind_dirs, precip_mms, fog_signals = [], [], [], [], [], [], []
+        temps, precips, winds, clouds, wind_dirs, precip_mms, fog_signals, pressures = [], [], [], [], [], [], [], []
         for source, fcs in forecasts_by_source.items():
             if source in excluded_sources:
                 continue
@@ -361,6 +361,9 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
                 precip_mms.append(match.precip_mm)
             if match.fog_probability is not None and not isnan(match.fog_probability):
                 fog_signals.append(match.fog_probability)
+            match_pressure = getattr(match, 'pressure', float('nan'))
+            if match_pressure is not None and not isnan(match_pressure):
+                pressures.append(match_pressure)
 
         if not precips:
             continue
@@ -395,6 +398,7 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
         ens_precip_mm = sum(precip_mms) / len(precip_mms) if precip_mms else None
         ens_confidence = _compute_confidence(temps, precips)
         ens_fog = sum(fog_signals) / len(fog_signals) if fog_signals else 0.0
+        ens_pressure = sum(pressures) / len(pressures) if pressures else None
 
         # Physical consistency: precipitation requires cloud cover
         if ens_precip is not None and ens_cloud is not None:
@@ -413,6 +417,7 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
             c = round(ens_cloud, 1) if ens_cloud is not None else None
             wd = round(ens_wind_dir, 1) if ens_wind_dir is not None else None
             pm = round(ens_precip_mm, 2) if ens_precip_mm is not None else None
+            pr = round(ens_pressure, 1) if ens_pressure is not None else None
             db.add(EnsembleForecast(
                 computed_at=computed_at,
                 valid_for=valid_for,
@@ -425,6 +430,7 @@ def build_ensemble(db: Session, computed_at: datetime, forecasts_by_source: dict
                 precip_mm=pm,
                 confidence=ens_confidence,
                 fog_probability=round(ens_fog, 3),
+                pressure=pr,
             ))
             # Also track ensemble as a source so its MAE is measured in the ranking
             ens_fc_exists = (

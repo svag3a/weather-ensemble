@@ -39,6 +39,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE source_weights ADD COLUMN manual_override INTEGER DEFAULT 0",
             "ALTER TABLE forecasts ADD COLUMN fog_probability FLOAT",
             "ALTER TABLE ensemble_forecasts ADD COLUMN fog_probability FLOAT",
+            "ALTER TABLE forecasts ADD COLUMN pressure FLOAT",
+            "ALTER TABLE ensemble_forecasts ADD COLUMN pressure FLOAT",
         ]:
             try:
                 conn.execute(text(stmt))
