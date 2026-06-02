@@ -585,7 +585,7 @@ function BeaufortGauge({ windSpeed }) {
           }} />
         ))}
       </div>
-      <div className="text-[10px] font-medium" style={{ color }}>
+      <div className="text-[10px] font-medium text-center" style={{ color }}>
         {bf.label}
       </div>
     </div>
@@ -607,7 +607,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
       {/* Temp + symbol + side indicators */}
       <div className="flex items-start justify-between">
         {/* Left column: symbol + label + Beaufort gauge */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-1 items-center">
           <span className="text-6xl leading-none" style={{ display: 'block', lineHeight: 1 }}><WeatherSymbol symbol={symbol} /></span>
           <span className="text-slate-400 text-sm" style={{ marginTop: -6 }}>{label}</span>
           <BeaufortGauge windSpeed={fc.wind_speed} />
