@@ -553,7 +553,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
   const feels = feelsLike(fc.temperature, fc.wind_speed)
 
   return (
-    <div className={`${GLASS} rounded-2xl p-6`}>
+    <div className={`${GLASS} rounded-2xl p-6 relative overflow-hidden`}>
       {/* Temp + symbol */}
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-1">
@@ -593,22 +593,21 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
         </div>
       )}
 
-      {/* Motif — width drives scale (no stretch), container clips transparent sky */}
+      {/* Motif — covers entire card as transparent overlay, weather info shows through */}
       {motifImage && (
-        <div className="-mx-6 mt-0 relative overflow-hidden" style={{ height: 260 }}>
-          <img
-            src={motifImage.url}
-            alt={motifImage.label}
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: '50%',
-              transform: 'translateX(-50%)',
-              height: 260,
-              width: 'auto',
-            }}
-          />
-        </div>
+        <img
+          src={motifImage.url}
+          alt={motifImage.label}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: 'center bottom',
+            pointerEvents: 'none',
+          }}
+        />
       )}
 
     </div>
