@@ -573,20 +573,20 @@ function BeaufortGauge({ windSpeed }) {
               : bf.bft <= 9 ? '#fb923c'
               : '#ef4444'
   return (
-    <div className="mt-3 flex flex-col gap-1.5">
-      {/* Stacked bars — increasing height, lit up to current Bft */}
+    <div className="mt-2 flex flex-col gap-1">
+      {/* Stacked bars — 20% smaller */}
       <div className="flex items-end gap-0.5">
         {Array.from({ length: 13 }, (_, i) => (
           <div key={i} style={{
-            width: 4,
-            height: 5 + i * 2,
+            width: 3,
+            height: 4 + Math.round(i * 1.6),
             backgroundColor: i <= bf.bft ? color : 'rgba(148,163,184,0.2)',
             borderRadius: 1,
           }} />
         ))}
       </div>
-      <div className="text-[11px] font-medium" style={{ color }}>
-        Bft {bf.bft} · {bf.label}
+      <div className="text-[10px] font-medium" style={{ color }}>
+        {bf.label}
       </div>
     </div>
   )
@@ -609,7 +609,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
         {/* Left column: symbol + label + Beaufort gauge */}
         <div className="flex flex-col gap-1">
           <span className="text-6xl leading-none"><WeatherSymbol symbol={symbol} /></span>
-          <span className="text-slate-400 text-sm mt-2">{label}</span>
+          <span className="text-slate-400 text-sm mt-0.5">{label}</span>
           <BeaufortGauge windSpeed={fc.wind_speed} />
         </div>
         {/* Right column: temperature + feels like */}
