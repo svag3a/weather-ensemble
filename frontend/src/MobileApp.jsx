@@ -551,8 +551,6 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
 
   const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, radar?.cape ?? 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
   const feels = feelsLike(fc.temperature, fc.wind_speed)
-  const conf = summariseConfidence(allForecasts)
-  const summary = generateSummary(allForecasts)
 
   return (
     <div className={`${GLASS} rounded-2xl p-6`}>
@@ -613,16 +611,6 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
         </div>
       )}
 
-      {/* Confidence badge + summary */}
-      <div className="mt-4 flex flex-col gap-2">
-        <ConfidenceBadge conf={conf} />
-        {summary && (
-          <p className="text-slate-300 text-sm leading-relaxed">{summary}</p>
-        )}
-      </div>
-
-      {/* 6-hour table */}
-      <SixHourTable forecasts={allForecasts} />
     </div>
   )
 }
@@ -1653,14 +1641,35 @@ export default function MobileApp() {
                     </div>
                   )}
                   <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} />
+
+                  {/* Prognossäkerhet + sammanfattning — under "just nu"-kortet */}
+                  {(() => {
+                    const conf = summariseConfidence(future)
+                    const summary = generateSummary(future)
+                    if (!conf && !summary) return null
+                    return (
+                      <div className={`${GLASS} rounded-2xl px-5 py-4 flex flex-col gap-2`}>
+                        <ConfidenceBadge conf={conf} />
+                        {summary && <p className="text-slate-300 text-sm leading-relaxed">{summary}</p>}
+                      </div>
+                    )
+                  })()}
+
+                  {/* 6-timmarsprognos + kommande dagar */}
                   {(() => {
                     const visibleDays = days.slice(1).filter(h => h.length >= 23)
                     const allSummaries = visibleDays.map(getDaySummary)
                     const wMin = Math.min(...allSummaries.map(s => s.minTemp ?? 99))
                     const wMax = Math.max(...allSummaries.map(s => s.maxTemp ?? -99))
-                    return visibleDays.map((hours, i) => (
-                      <DayRow key={i} hours={hours} warnings={warnings} weekMin={wMin} weekMax={wMax} />
-                    ))
+                    return (
+                      <>
+                        {/* 6-timmarsprognos precis över "imorgon"-kortet */}
+                        <SixHourTable forecasts={future} />
+                        {visibleDays.map((hours, i) => (
+                          <DayRow key={i} hours={hours} warnings={warnings} weekMin={wMin} weekMax={wMax} />
+                        ))}
+                      </>
+                    )
                   })()}
                 </>
               )}
