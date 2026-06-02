@@ -101,15 +101,6 @@ export default function ImageMap({ locations, pendingPos, onMapClick, onPinClick
         )}
       </MapContainer>
 
-      {/* Legend */}
-      <div className="absolute bottom-2 right-2 bg-slate-900/80 rounded-lg px-3 py-2 text-xs text-slate-400 space-y-1 z-[1000] pointer-events-none">
-        {[['#475569','Inga bilder'],['#f97316','1 slot'],['#eab308','2 slots'],['#22c55e','3 slots'],['#3b82f6','4 slots']].map(([c,l]) => (
-          <div key={l} className="flex items-center gap-2">
-            <span style={{ background: c }} className="w-2.5 h-2.5 rounded-full inline-block" />
-            {l}
-          </div>
-        ))}
-      </div>
     </div>
   )
 }

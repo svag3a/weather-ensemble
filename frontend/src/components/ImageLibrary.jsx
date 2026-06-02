@@ -540,7 +540,7 @@ function MotifSection({ data, onUpload, onDelete }) {
       ) : motifs.length > 0 && (
         <div className="bg-slate-800 rounded-xl overflow-hidden">
           {motifs.map(img => (
-            <MotifRow key={img.id} img={img} onDelete={onDelete} />
+            <MotifRow key={img.id} img={img} onDelete={onDelete} onUpload={onUpload} />
           ))}
         </div>
       )}
@@ -548,29 +548,68 @@ function MotifSection({ data, onUpload, onDelete }) {
   )
 }
 
-function MotifRow({ img, onDelete }) {
+function MotifRow({ img, onDelete, onUpload }) {
+  const [open, setOpen]               = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-700/50 last:border-0">
-      <img src={img.url} alt={img.label}
-        className="w-12 h-12 object-contain rounded bg-slate-700/50 shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="text-white text-sm font-medium truncate">{img.label}</div>
-        <div className="text-slate-500 text-xs font-mono">{img.lat.toFixed(4)}, {img.lon.toFixed(4)}</div>
-      </div>
-      {confirmDelete ? (
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="text-xs text-red-400">Radera?</span>
-          <button onClick={() => onDelete(img.id)} className="text-xs text-red-400 hover:text-red-300 font-medium">Ja</button>
-          <button onClick={() => setConfirmDelete(false)} className="text-xs text-slate-500 hover:text-slate-300">Nej</button>
+    <div className="border-b border-slate-700/50 last:border-0">
+      {/* Compact row */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-700/20 transition-colors text-left"
+      >
+        <span className="w-28 shrink-0 text-slate-400 text-xs truncate">
+          {nearestPreset(img.lat, img.lon) ?? '—'}
+        </span>
+        <span className="flex-1 text-white text-sm font-medium truncate">{img.label}</span>
+        <span className="text-slate-600 text-xs font-mono hidden sm:block">
+          {img.lat.toFixed(3)}, {img.lon.toFixed(3)}
+        </span>
+        <span className={`text-slate-500 text-xs ml-2 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+
+      {/* Expanded — edit / replace / delete */}
+      {open && (
+        <div className="px-4 pb-4 border-t border-slate-700/40 bg-slate-700/10 space-y-3">
+          {/* Preview + metadata */}
+          <div className="flex gap-3 pt-3">
+            <img src={img.url} alt={img.label}
+              className="w-20 h-14 object-contain rounded bg-slate-700/40 shrink-0" />
+            <div className="text-xs text-slate-400 space-y-0.5">
+              <div><span className="text-slate-500">Etikett:</span> {img.label}</div>
+              <div><span className="text-slate-500">Plats:</span> {img.lat.toFixed(5)}, {img.lon.toFixed(5)}</div>
+            </div>
+          </div>
+
+          {/* Replace motif */}
+          <div>
+            <p className="text-slate-400 text-xs mb-2">Ersätt motivbild</p>
+            <MotifUploadForm
+              defaultLabel={img.label}
+              defaultLat={String(img.lat)}
+              defaultLon={String(img.lon)}
+              onUpload={async (fd) => { await onUpload(fd); setOpen(false) }}
+              onClose={() => setOpen(false)}
+            />
+          </div>
+
+          {/* Delete */}
+          <div className="pt-1 border-t border-slate-700/40">
+            {confirmDelete ? (
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-red-400">Radera motivet?</span>
+                <button onClick={() => onDelete(img.id)} className="text-red-400 hover:text-red-300 font-medium">Ja</button>
+                <button onClick={() => setConfirmDelete(false)} className="text-slate-500 hover:text-slate-300">Nej</button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                className="text-xs text-slate-600 hover:text-red-400 transition-colors"
+              >🗑 Ta bort motiv</button>
+            )}
+          </div>
         </div>
-      ) : (
-        <button
-          onClick={() => setConfirmDelete(true)}
-          className="text-slate-700 hover:text-red-400 text-sm shrink-0 transition-colors"
-          title="Ta bort motiv"
-        >🗑</button>
       )}
     </div>
   )
@@ -664,7 +703,7 @@ export default function ImageLibrary({ data, onUpload, onUpdate, onDelete }) {
             <span className="w-8" />
           </div>
           {motifData.map(img => (
-            <MotifRow key={img.id} img={img} onDelete={onDelete} />
+            <MotifRow key={img.id} img={img} onDelete={onDelete} onUpload={onUpload} />
           ))}
         </div>
       )}
