@@ -603,7 +603,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
   const feels = feelsLike(fc.temperature, fc.wind_speed)
 
   return (
-    <div className={`${GLASS} rounded-2xl p-6 relative overflow-hidden`}>
+    <div className={`${GLASS} rounded-2xl p-6 relative overflow-hidden`} style={{ minHeight: 280 }}>
       {/* Temp + symbol + side indicators */}
       <div className="flex items-start justify-between">
         {/* Left column: symbol + label + Beaufort gauge */}
