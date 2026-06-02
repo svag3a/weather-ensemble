@@ -542,6 +542,56 @@ function SixHourTable({ forecasts }) {
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
+// ── Beaufort scale ────────────────────────────────────────────────────────────
+
+const BEAUFORT_SCALE = [
+  { max: 0.2,     bft: 0,  label: 'Stiltje' },
+  { max: 1.5,     bft: 1,  label: 'Svag vind' },
+  { max: 3.3,     bft: 2,  label: 'Svag vind' },
+  { max: 5.4,     bft: 3,  label: 'Lätt bris' },
+  { max: 7.9,     bft: 4,  label: 'Måttlig bris' },
+  { max: 10.7,    bft: 5,  label: 'Frisk bris' },
+  { max: 13.8,    bft: 6,  label: 'Hård bris' },
+  { max: 17.1,    bft: 7,  label: 'Styv bris' },
+  { max: 20.7,    bft: 8,  label: 'Kuling' },
+  { max: 24.4,    bft: 9,  label: 'Hård kuling' },
+  { max: 28.4,    bft: 10, label: 'Storm' },
+  { max: 32.6,    bft: 11, label: 'Hård storm' },
+  { max: Infinity, bft: 12, label: 'Orkan' },
+]
+
+function getBeaufort(ms) {
+  if (ms == null || isNaN(ms)) return null
+  return BEAUFORT_SCALE.find(b => ms <= b.max) ?? BEAUFORT_SCALE[12]
+}
+
+function BeaufortGauge({ windSpeed }) {
+  const bf = getBeaufort(windSpeed)
+  if (!bf) return null
+  const color = bf.bft <= 4 ? '#2dd4bf'
+              : bf.bft <= 7 ? '#facc15'
+              : bf.bft <= 9 ? '#fb923c'
+              : '#ef4444'
+  return (
+    <div className="mt-3 flex flex-col gap-1.5">
+      {/* Stacked bars — increasing height, lit up to current Bft */}
+      <div className="flex items-end gap-0.5">
+        {Array.from({ length: 13 }, (_, i) => (
+          <div key={i} style={{
+            width: 4,
+            height: 5 + i * 2,
+            backgroundColor: i <= bf.bft ? color : 'rgba(148,163,184,0.2)',
+            borderRadius: 1,
+          }} />
+        ))}
+      </div>
+      <div className="text-[11px] font-medium" style={{ color }}>
+        Bft {bf.bft} · {bf.label}
+      </div>
+    </div>
+  )
+}
+
 function CurrentCard({ fc, radar, allForecasts, motifImage }) {
   if (!fc) return (
     <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>
@@ -554,12 +604,15 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
 
   return (
     <div className={`${GLASS} rounded-2xl p-6 relative overflow-hidden`}>
-      {/* Temp + symbol */}
+      {/* Temp + symbol + side indicators */}
       <div className="flex items-start justify-between">
+        {/* Left column: symbol + label + Beaufort gauge */}
         <div className="flex flex-col gap-1">
           <span className="text-6xl leading-none"><WeatherSymbol symbol={symbol} /></span>
           <span className="text-slate-400 text-sm mt-2">{label}</span>
+          <BeaufortGauge windSpeed={fc.wind_speed} />
         </div>
+        {/* Right column: temperature + feels like */}
         <div className="text-right">
           <div className="text-7xl font-thin text-white leading-none">
             {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
