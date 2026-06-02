@@ -623,17 +623,6 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
         </div>
       </div>
 
-      {/* Wind */}
-      {fc.wind_speed != null && fc.wind_speed >= 3 && (
-        <div className="mt-3 flex items-center gap-2 text-slate-300 text-sm">
-          <span>💨</span>
-          <span>
-            {Math.round(fc.wind_speed)} m/s {windDirArrow(fc.wind_direction)}
-            {fc.wind_speed >= 14 ? ' · Hård vind' : fc.wind_speed >= 8 ? ' · Frisk vind' : ''}
-          </span>
-        </div>
-      )}
-
       {/* CAPE */}
       {radar?.cape != null && radar.cape >= 300 && (
         <div className="mt-2 flex items-center gap-2 text-xs text-yellow-300/80">
