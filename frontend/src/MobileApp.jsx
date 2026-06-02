@@ -608,8 +608,8 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
       <div className="flex items-start justify-between">
         {/* Left column: symbol + label + Beaufort gauge */}
         <div className="flex flex-col gap-1">
-          <span className="text-6xl leading-none"><WeatherSymbol symbol={symbol} /></span>
-          <span className="text-slate-400 text-sm mt-0.5">{label}</span>
+          <span className="text-6xl leading-none" style={{ display: 'block', lineHeight: 1 }}><WeatherSymbol symbol={symbol} /></span>
+          <span className="text-slate-400 text-sm" style={{ marginTop: -6 }}>{label}</span>
           <BeaufortGauge windSpeed={fc.wind_speed} />
         </div>
         {/* Right column: temperature + feels like */}
