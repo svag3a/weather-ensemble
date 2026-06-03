@@ -68,8 +68,10 @@ function isNight(validFor, lat = _DEFAULT_LAT, lon = _DEFAULT_LON) {
  * @param {number}      cape               J/kg from radar — optional, enables thunder/hail
  * @param {number}      fogProbability     0–1 ensemble fog signal
  * @param {number}      precipMm           mm/h precipitation amount for intensity
+ * @param {boolean}     radarRaining       live radar confirmation of active rain
+ * @param {number|null} radarDbz           radar reflectivity dBZ (for intensity)
  */
-export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover, validFor = null, cape = 0, fogProbability = 0, precipMm = 0) {
+export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudCover, validFor = null, cape = 0, fogProbability = 0, precipMm = 0, radarRaining = false, radarDbz = null) {
   const precip = precipProbability ?? 0
   const cloud  = cloudCover ?? 0
   const wind   = windSpeed ?? 0
@@ -135,6 +137,21 @@ export function getWeatherInfo(temperature, precipProbability, windSpeed, cloudC
   }
 
   if (windy && !thunder) { symbol += '💨'; label += ', blåsigt' }
+
+  // Live radar override: if radar confirms active rain but forecast missed it,
+  // show rain symbol regardless of precip_probability
+  if (radarRaining && !hail && !thunder) {
+    const precipSymbols = ['🌧', '🌦', '🌨', '⛈', '🌁']
+    const alreadyRain = precipSymbols.some(s => symbol.startsWith(s))
+    if (!alreadyRain) {
+      const rainLabel = radarDbz != null && radarDbz >= 45 ? 'Kraftigt regn'
+                      : radarDbz != null && radarDbz >= 20 ? 'Regn'
+                      : 'Regnar'
+      symbol = '🌧'
+      label  = rainLabel
+      if (windy) { symbol += '💨'; label += ', blåsigt' }
+    }
+  }
 
   return { symbol, label }
 }
