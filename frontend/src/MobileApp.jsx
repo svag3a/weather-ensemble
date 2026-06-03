@@ -638,11 +638,10 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient }) {
   const feels = feelsLike(fc.temperature, fc.wind_speed)
 
   return (
-    <div className={`${GLASS} rounded-2xl p-6 relative overflow-hidden`} style={{ minHeight: 280 }}>
-      {/* Sky colour tint — reflects current sky behind the glass */}
-      {skyGradient && (
-        <div className="absolute inset-0 pointer-events-none" style={{ background: skyGradient, opacity: 0.35 }} />
-      )}
+    <div
+      className="rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm border border-white/10"
+      style={{ minHeight: 280, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
+    >
       {/* Temp + symbol + side indicators */}
       <div className="flex items-start justify-between">
         {/* Left column: symbol + label + Beaufort gauge */}
