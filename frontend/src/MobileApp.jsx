@@ -627,7 +627,7 @@ function PressureTrend({ forecasts }) {
   )
 }
 
-function CurrentCard({ fc, radar, allForecasts, motifImage }) {
+function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient }) {
   if (!fc) return (
     <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>
       Hämtar prognos…
@@ -639,6 +639,10 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
 
   return (
     <div className={`${GLASS} rounded-2xl p-6 relative overflow-hidden`} style={{ minHeight: 280 }}>
+      {/* Sky colour tint — reflects current sky behind the glass */}
+      {skyGradient && (
+        <div className="absolute inset-0 pointer-events-none" style={{ background: skyGradient, opacity: 0.35 }} />
+      )}
       {/* Temp + symbol + side indicators */}
       <div className="flex items-start justify-between">
         {/* Left column: symbol + label + Beaufort gauge */}
@@ -1706,7 +1710,7 @@ export default function MobileApp() {
                       <span>{[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}</span>
                     </div>
                   )}
-                  <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} />
+                  <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} skyGradient={getSkyCss(currentFc, coords).gradient} />
 
                   {/* Prognossäkerhet + sammanfattning — under "just nu"-kortet */}
                   {(() => {
