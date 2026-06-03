@@ -231,6 +231,20 @@ function getImageStyle(fc, imageSlot = 'day', coords = null) {
   return { filter, overlay }
 }
 
+function getSkyTheme(gradient) {
+  // Extract bottom hex color from "linear-gradient(to bottom, #xxx, #yyy)"
+  if (!gradient) return 'dark'
+  const match = gradient.match(/#([0-9a-f]{6})\s*\)$/i)
+  if (!match) return 'dark'
+  const hex = match[1]
+  const r = parseInt(hex.slice(0, 2), 16) / 255
+  const g = parseInt(hex.slice(2, 4), 16) / 255
+  const b = parseInt(hex.slice(4, 6), 16) / 255
+  const toLinear = c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4)
+  const lum = 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b)
+  return lum > 0.2 ? 'light' : 'dark'
+}
+
 function getSkyCss(fc, coords) {
   const now = new Date()
   const hour = now.getHours() + now.getMinutes() / 60
@@ -627,7 +641,7 @@ function PressureTrend({ forecasts }) {
   )
 }
 
-function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient }) {
+function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyTheme }) {
   if (!fc) return (
     <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>
       Hämtar prognos…
@@ -637,9 +651,16 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient }) {
   const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, radar?.cape ?? 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0, radar?.raining ?? false, radar?.dbz ?? null)
   const feels = feelsLike(fc.temperature, fc.wind_speed)
 
+  // Text colours adapt to sky brightness
+  const light = skyTheme === 'light'
+  const cPrimary   = light ? 'text-slate-900'  : 'text-white'
+  const cSecondary = light ? 'text-slate-700'  : 'text-slate-300'
+  const cMuted     = light ? 'text-slate-600'  : 'text-slate-400'
+  const border     = light ? 'border-slate-300/60' : 'border-white/10'
+
   return (
     <div
-      className="rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm border border-white/10"
+      className={`rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm border ${border}`}
       style={{ minHeight: 280, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
     >
       {/* Temp + symbol + side indicators */}
@@ -647,17 +668,17 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient }) {
         {/* Left column: symbol + label + Beaufort gauge */}
         <div className="flex flex-col gap-1 items-center">
           <span className="text-6xl leading-none" style={{ display: 'block', lineHeight: 1 }}><WeatherSymbol symbol={symbol} /></span>
-          <span className="text-slate-400 text-sm" style={{ marginTop: -6 }}>{label}</span>
+          <span className={`${cSecondary} text-sm`} style={{ marginTop: -6 }}>{label}</span>
           <BeaufortGauge windSpeed={fc.wind_speed} windDirection={fc.wind_direction} />
           <PressureTrend forecasts={allForecasts} />
         </div>
         {/* Right column: temperature + feels like */}
         <div className="text-right">
-          <div className="text-7xl font-thin text-white leading-none">
+          <div className={`text-7xl font-thin ${cPrimary} leading-none`}>
             {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
           </div>
           {feels != null && (
-            <div className="text-slate-400 text-sm mt-1">Känns som {feels}°</div>
+            <div className={`${cMuted} text-sm mt-1`}>Känns som {feels}°</div>
           )}
         </div>
       </div>
@@ -1709,7 +1730,10 @@ export default function MobileApp() {
                       <span>{[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}</span>
                     </div>
                   )}
-                  <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} skyGradient={getSkyCss(currentFc, coords).gradient} />
+                  {(() => {
+                    const sky = getSkyCss(currentFc, coords)
+                    return <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} skyGradient={sky.gradient} skyTheme={getSkyTheme(sky.gradient)} />
+                  })()}
 
                   {/* Prognossäkerhet + sammanfattning — under "just nu"-kortet */}
                   {(() => {
