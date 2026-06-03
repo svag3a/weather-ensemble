@@ -594,7 +594,7 @@ function BeaufortGauge({ windSpeed, windDirection, skyTheme }) {
           <div key={i} style={{
             width: 3,
             height: 4 + Math.round(i * 1.6),
-            backgroundColor: i <= bf.bft ? color : skyTheme === 'light' ? 'rgba(71,85,105,0.35)' : 'rgba(148,163,184,0.2)',
+            backgroundColor: i <= bf.bft ? color : skyTheme === 'light' ? 'rgba(30,41,59,0.5)' : 'rgba(148,163,184,0.2)',
             borderRadius: 1,
           }} />
         ))}
