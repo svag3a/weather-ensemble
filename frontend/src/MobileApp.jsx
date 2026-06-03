@@ -579,7 +579,7 @@ function getBeaufort(ms) {
   return BEAUFORT_SCALE.find(b => ms <= b.max) ?? BEAUFORT_SCALE[12]
 }
 
-function BeaufortGauge({ windSpeed, windDirection }) {
+function BeaufortGauge({ windSpeed, windDirection, skyTheme }) {
   const bf = getBeaufort(windSpeed)
   if (!bf) return null
   const color = bf.bft <= 4 ? '#2dd4bf'
@@ -599,7 +599,7 @@ function BeaufortGauge({ windSpeed, windDirection }) {
           }} />
         ))}
       </div>
-      <div className="text-[10px] font-medium text-center" style={{ color }}>
+      <div className="text-[10px] font-medium text-center" style={{ color: skyTheme === 'light' ? '#475569' : '#cbd5e1' }}>
         {windDirArrow(windDirection)} {bf.label}
       </div>
     </div>
@@ -669,7 +669,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
         <div className="flex flex-col gap-1 items-center">
           <span className="text-6xl leading-none" style={{ display: 'block', lineHeight: 1 }}><WeatherSymbol symbol={symbol} /></span>
           <span className={`${cSecondary} text-sm`} style={{ marginTop: -6 }}>{label}</span>
-          <BeaufortGauge windSpeed={fc.wind_speed} windDirection={fc.wind_direction} />
+          <BeaufortGauge windSpeed={fc.wind_speed} windDirection={fc.wind_direction} skyTheme={skyTheme} />
           <PressureTrend forecasts={allForecasts} />
         </div>
         {/* Right column: temperature + feels like */}
