@@ -241,20 +241,20 @@ function getSkyCss(fc, coords) {
   const sr = (sunrise + tz + 24) % 24
   const ss = (sunset + tz + 24) % 24
 
-  // [hour, topColor, bottomColor]
+  // [hour, topColor, bottomColor] — lighter, more realistic sky tones
   const anchors = [
-    [0,              '#0a0f1e', '#1a2744'],
-    [sr - 1,         '#1a1040', '#2d1b69'],
-    [sr,             '#7c2d12', '#f97316'],
-    [sr + 1,         '#1d4ed8', '#fed7aa'],
-    [sr + 3,         '#1e40af', '#bfdbfe'],
-    [(sr + ss) / 2,  '#1d4ed8', '#93c5fd'],
-    [ss - 2,         '#1e40af', '#bfdbfe'],
-    [ss - 1,         '#b45309', '#fbbf24'],
-    [ss,             '#7f1d1d', '#c2410c'],
-    [ss + 1,         '#312e81', '#4c1d95'],
-    [ss + 2,         '#1e1b4b', '#0f172a'],
-    [24,             '#0a0f1e', '#1a2744'],
+    [0,              '#0f172a', '#1e3a5f'],  // midnight — deep but not black
+    [sr - 1,         '#1e1b4b', '#3730a3'],  // pre-dawn — purple hint
+    [sr,             '#9a3412', '#fb923c'],  // sunrise — warm orange
+    [sr + 1,         '#0369a1', '#fde68a'],  // early morning — blue meets warm
+    [sr + 3,         '#0284c7', '#bae6fd'],  // morning — sky blue
+    [(sr + ss) / 2,  '#0369a1', '#7dd3fc'],  // midday — clear sky blue
+    [ss - 2,         '#0284c7', '#bae6fd'],  // afternoon — sky blue
+    [ss - 1,         '#c2410c', '#fbbf24'],  // golden hour
+    [ss,             '#991b1b', '#f97316'],  // sunset — warm
+    [ss + 1,         '#4c1d95', '#7c3aed'],  // dusk — purple
+    [ss + 2,         '#1e1b4b', '#172554'],  // early night
+    [24,             '#0f172a', '#1e3a5f'],  // night
   ].filter(([h]) => h >= 0 && h <= 24).sort((a, b) => a[0] - b[0])
 
   // Find surrounding anchors and lerp colors
