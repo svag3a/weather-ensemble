@@ -659,17 +659,6 @@ function CurrentCard({ fc, radar, allForecasts, motifImage }) {
         </div>
       </div>
 
-      {/* CAPE */}
-      {radar?.cape != null && radar.cape >= 300 && (
-        <div className="mt-2 flex items-center gap-2 text-xs text-yellow-300/80">
-          <span>⚡</span>
-          <span>
-            {radar.cape >= 2500 ? 'Extremt instabil luft — hagel/åska sannolikt'
-             : radar.cape >= 1000 ? 'Instabil luft — åska möjlig'
-             : 'Viss instabilitet'}
-          </span>
-        </div>
-      )}
 
       {/* Motif — covers entire card as transparent overlay, weather info shows through */}
       {motifImage && (
