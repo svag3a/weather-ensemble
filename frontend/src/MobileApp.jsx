@@ -663,6 +663,8 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
       className={`rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm border ${border}`}
       style={{ minHeight: 280, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
     >
+      {/* Rain/snow particles — clipped to card bounds */}
+      <WeatherParticles precip={fc.precip_probability ?? 0} temperature={fc.temperature ?? 10} />
       {/* Temp + symbol + side indicators */}
       <div className="flex items-start justify-between">
         {/* Left column: symbol + label + Beaufort gauge */}
@@ -1699,15 +1701,6 @@ export default function MobileApp() {
       {/* Animated content area */}
       <div className="flex-1 relative overflow-x-hidden min-h-0" {...swipeHandlers}>
 
-        {/* Weather particles (rain/snow) — no sky gradient */}
-        {activeTab === 'now' && (
-          <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-            <WeatherParticles
-              precip={currentFc?.precip_probability ?? 0}
-              temperature={currentFc?.temperature ?? 10}
-            />
-          </div>
-        )}
 
 <AnimatePresence mode="sync" custom={slideDir}>
           <motion.div
