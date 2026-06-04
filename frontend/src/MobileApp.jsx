@@ -572,33 +572,37 @@ function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0 }) {
     const h = canvas.height
     ctx.clearRect(0, 0, w, h)
 
-    const coverage  = Math.max(0, cloudCover - 15) / 85          // 0–1, starts at 15%
+    const coverage  = Math.max(0, cloudCover - 15) / 85
     const isRainy   = precipProbability > 40
     const isGloomy  = cloudCover > 70
-    const lightness = isRainy ? 120 : isGloomy ? 175 : 230        // cloud grey tone
-    const maxAlpha  = isRainy ? 200 : 180
-    const threshold = 0.25 - coverage * 0.7                       // lower = more cloud
+    // Base lightness: 230 (bright white) → 170 (grey) → 120 (storm dark)
+    const baseLightness = isRainy ? 120 : isGloomy ? 170 : 230
+    const maxAlpha  = 100   // more transparent overall (#3)
+    const threshold = 0.25 - coverage * 0.7
 
     const noise = noise2D.current
     const idata = ctx.createImageData(w, h)
     const data  = idata.data
 
-    const tileW = w / 2   // tile width = one card width (right half mirrors left)
+    const tileW = w / 2
     for (let x = 0; x < w; x++) {
-      for (let y = 0; y < h * 0.75; y++) {          // clouds occupy upper 75%
-        const nx = (x % tileW) / tileW * 4.5        // wrap at tileW → seamless
-        const ny = y / h * 3.0                       // vertical frequency
-        // Three octaves — broad shapes + medium detail + fine texture
-        const n = noise(nx, ny)        * 0.55
-               + noise(nx*2, ny*2)    * 0.30
-               + noise(nx*4, ny*4)    * 0.15
+      for (let y = 0; y < h; y++) {               // full card height (#4)
+        const nx = (x % tileW) / tileW * 4.5
+        const ny = y / h * 3.0
+        const n = noise(nx, ny)      * 0.55
+               + noise(nx*2, ny*2)  * 0.30
+               + noise(nx*4, ny*4)  * 0.15
         if (n > threshold) {
           const density = Math.min(1, (n - threshold) / 0.45)
           const alpha   = Math.round(density * density * maxAlpha)
-          if (alpha > 4) {
+          if (alpha > 3) {
+            // Color variation: slow noise adds ±25 for natural cloud shading (#5)
+            const colorVar = Math.round(noise(nx * 0.3, ny * 0.3) * 25)
+            const r = Math.min(255, Math.max(0, baseLightness + colorVar))
+            const g = Math.min(255, Math.max(0, baseLightness + Math.round(colorVar * 0.9)))
+            const b = Math.min(255, Math.max(0, baseLightness + Math.round(colorVar * 0.8)))
             const i = (y * w + x) * 4
-            data[i] = data[i+1] = data[i+2] = lightness
-            data[i+3] = alpha
+            data[i] = r; data[i+1] = g; data[i+2] = b; data[i+3] = alpha
           }
         }
       }
@@ -621,7 +625,7 @@ function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0 }) {
   useEffect(() => {
     if (cloudCover < 15) return
     // Beaufort 3 ≈ 4 m/s → moderate drift; Beaufort 8 ≈ 20 m/s → fast
-    const speed = Math.max(0.1, (windSpeed ?? 2) * 0.2)
+    const speed = Math.max(0.03, (windSpeed ?? 2) * 0.067)  // 1/3 of previous
     const cardW = () => (canvasRef.current?.parentElement?.offsetWidth ?? 360)
 
     const step = () => {
@@ -758,11 +762,11 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
       className={`rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm border ${border}`}
       style={{ minHeight: 280, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
     >
-      {/* Clouds — simplex-noise, drift with wind */}
+      {/* Clouds (z-1) and rain (z-1) sit below content and motif */}
       <CloudCanvas cloudCover={fc.cloud_cover ?? 0} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} />
-      {/* Rain/snow particles — clipped to card bounds */}
       <WeatherParticles precip={fc.precip_probability ?? 0} temperature={fc.temperature ?? 10} />
-      {/* Temp + symbol + side indicators */}
+      {/* Content wrapper (z-3) ensures text is above clouds and rain */}
+      <div style={{ position: 'relative', zIndex: 3 }}>
       <div className="flex items-start justify-between">
         {/* Left column: symbol + label + Beaufort gauge */}
         <div className="flex flex-col gap-1 items-center">
@@ -782,6 +786,8 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
         </div>
       </div>
 
+
+      </div>{/* end content wrapper */}
 
       {/* Motif — covers entire card as transparent overlay, weather info shows through */}
       {motifImage && (
