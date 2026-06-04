@@ -557,11 +557,11 @@ function SixHourTable({ forecasts }) {
 
 // ── Cloud canvas ──────────────────────────────────────────────────────────────
 
-function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0 }) {
+function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0, speedMult = 1, opacityMult = 1, seed }) {
   const canvasRef  = useRef(null)
   const animRef    = useRef(null)
   const offsetRef  = useRef(0)
-  const noise2D    = useRef(createNoise2D())
+  const noise2D    = useRef(createNoise2D(seed ? () => seed : undefined))
 
   // Draw cloud texture into the canvas (3× card width for seamless drift)
   const draw = useCallback(() => {
@@ -577,7 +577,7 @@ function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0 }) {
     const isGloomy  = cloudCover > 70
     // Base lightness: 230 (bright white) → 170 (grey) → 120 (storm dark)
     const baseLightness = isRainy ? 120 : isGloomy ? 170 : 230
-    const maxAlpha  = 100   // more transparent overall (#3)
+    const maxAlpha  = Math.round(100 * opacityMult)
     const threshold = 0.25 - coverage * 0.7
 
     const noise = noise2D.current
@@ -625,7 +625,7 @@ function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0 }) {
   useEffect(() => {
     if (cloudCover < 15) return
     // Beaufort 3 ≈ 4 m/s → moderate drift; Beaufort 8 ≈ 20 m/s → fast
-    const speed = Math.max(0.03, (windSpeed ?? 2) * 0.067)  // 1/3 of previous
+    const speed = Math.max(0.02, (windSpeed ?? 2) * 0.067 * speedMult)
     const cardW = () => (canvasRef.current?.parentElement?.offsetWidth ?? 360)
 
     const step = () => {
@@ -762,8 +762,9 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
       className={`rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm border ${border}`}
       style={{ minHeight: 280, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
     >
-      {/* Clouds (z-1) and rain (z-1) sit below content and motif */}
-      <CloudCanvas cloudCover={fc.cloud_cover ?? 0} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} />
+      {/* Two cloud layers at different speeds for depth parallax */}
+      <CloudCanvas cloudCover={Math.max(0, (fc.cloud_cover ?? 0) - 10)} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} speedMult={0.55} opacityMult={0.75} seed={1} />
+      <CloudCanvas cloudCover={fc.cloud_cover ?? 0} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} speedMult={1.45} opacityMult={1.0} seed={2} />
       <WeatherParticles precip={fc.precip_probability ?? 0} temperature={fc.temperature ?? 10} />
       {/* Content wrapper (z-3) ensures text is above clouds and rain */}
       <div style={{ position: 'relative', zIndex: 3 }}>
