@@ -1345,18 +1345,26 @@ function ForecastDivergenceChart({ sources, ensembleFcs }) {
 
 // ── EnsembleView ──────────────────────────────────────────────────────────────
 
-function EnsembleView({ ensembleFc }) {
-  const [sources, setSources]         = useState(null)
+function EnsembleView({ ensembleFc, prefetchedSources, prefetchedWeights }) {
+  const [sources, setSources]         = useState(prefetchedSources ?? null)
   const [ensembleFcs, setEnsembleFcs] = useState(null)
-  const [weights, setWeights]         = useState(null)
-  const [loading, setLoading]         = useState(true)
+  const [weights, setWeights]         = useState(prefetchedWeights ?? null)
+  const [loading, setLoading]         = useState(!prefetchedSources || !prefetchedWeights)
 
   useEffect(() => {
-    Promise.all([fetchSources(48), fetchWeights(), fetchEnsemble(48)])
+    // Use prefetched data if available, otherwise fetch
+    const needsSources  = !prefetchedSources
+    const needsWeights  = !prefetchedWeights
+    const promises = [
+      needsSources  ? fetchSources(48)  : Promise.resolve(prefetchedSources),
+      needsWeights  ? fetchWeights()    : Promise.resolve(prefetchedWeights),
+      fetchEnsemble(48),
+    ]
+    Promise.all(promises)
       .then(([s, w, ens]) => { setSources(s); setWeights(w); setEnsembleFcs(ens) })
       .catch(() => {})
       .finally(() => setLoading(false))
-  }, [])
+  }, [prefetchedSources, prefetchedWeights])
 
   if (loading) return (
     <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>
@@ -1754,8 +1762,10 @@ function useSwipeNav(activeTab, setActiveTab) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MobileApp() {
-  const [forecast, setForecast] = useState(null)
-  const [warnings, setWarnings] = useState([])
+  const [forecast, setForecast]   = useState(null)
+  const [warnings, setWarnings]   = useState([])
+  const [sources, setSources]     = useState(null)
+  const [weights, setWeights]     = useState(null)
   const [activeTab, setActiveTab] = useState('now')
   const [slideDir, setSlideDir] = useState(1)
   const { radar, coords } = useRadarLocation()
@@ -1777,6 +1787,17 @@ export default function MobileApp() {
     const loadWarnings = () => fetchWarnings().then(setWarnings).catch(() => {})
     loadWarnings()
     const interval = setInterval(loadWarnings, 30 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Prefetch sources data so the Sources tab opens instantly
+  useEffect(() => {
+    const loadSources = () => Promise.all([
+      fetchSources(48).catch(() => null),
+      fetchWeights().catch(() => null),
+    ]).then(([s, w]) => { setSources(s); setWeights(w) })
+    loadSources()
+    const interval = setInterval(loadSources, 10 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
 
@@ -1880,7 +1901,7 @@ export default function MobileApp() {
               )}
 
               {activeTab === 'sources' && (
-                <EnsembleView ensembleFc={currentFc} />
+                <EnsembleView ensembleFc={currentFc} prefetchedSources={sources} prefetchedWeights={weights} />
               )}
 
             </div>
