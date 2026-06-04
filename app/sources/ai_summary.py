@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL_HOURS = 0.5    # 30 min — keeps summaries fresh after forecast updates
+_CACHE_TTL_HOURS = 1.1    # 66 min — slightly longer than scheduler interval (60 min)
 
 # Stockholm timezone for correct "today/tomorrow" day boundaries
 from zoneinfo import ZoneInfo
