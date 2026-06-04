@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
@@ -554,6 +555,98 @@ function SixHourTable({ forecasts }) {
   )
 }
 
+// ── Cloud canvas ──────────────────────────────────────────────────────────────
+
+function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0 }) {
+  const canvasRef  = useRef(null)
+  const animRef    = useRef(null)
+  const offsetRef  = useRef(0)
+  const noise2D    = useRef(createNoise2D())
+
+  // Draw cloud texture into the canvas (3× card width for seamless drift)
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current
+    if (!canvas || canvas.width === 0) return
+    const ctx = canvas.getContext('2d')
+    const w = canvas.width
+    const h = canvas.height
+    ctx.clearRect(0, 0, w, h)
+
+    const coverage  = Math.max(0, cloudCover - 15) / 85          // 0–1, starts at 15%
+    const isRainy   = precipProbability > 40
+    const isGloomy  = cloudCover > 70
+    const lightness = isRainy ? 120 : isGloomy ? 175 : 230        // cloud grey tone
+    const maxAlpha  = isRainy ? 200 : 180
+    const threshold = 0.25 - coverage * 0.7                       // lower = more cloud
+
+    const noise = noise2D.current
+    const idata = ctx.createImageData(w, h)
+    const data  = idata.data
+
+    for (let x = 0; x < w; x++) {
+      for (let y = 0; y < h * 0.75; y++) {          // clouds occupy upper 75%
+        const nx = x / w * 4.5                       // horizontal frequency
+        const ny = y / h * 3.0                       // vertical frequency
+        // Three octaves — broad shapes + medium detail + fine texture
+        const n = noise(nx, ny)        * 0.55
+               + noise(nx*2, ny*2)    * 0.30
+               + noise(nx*4, ny*4)    * 0.15
+        if (n > threshold) {
+          const density = Math.min(1, (n - threshold) / 0.45)
+          const alpha   = Math.round(density * density * maxAlpha)
+          if (alpha > 4) {
+            const i = (y * w + x) * 4
+            data[i] = data[i+1] = data[i+2] = lightness
+            data[i+3] = alpha
+          }
+        }
+      }
+    }
+    ctx.putImageData(idata, 0, 0)
+  }, [cloudCover, precipProbability])
+
+  // Size canvas to 3× card width after mount, then draw
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const card = canvas.parentElement
+    if (!card) return
+    canvas.width  = card.offsetWidth * 3
+    canvas.height = card.offsetHeight
+    draw()
+  }, [draw])
+
+  // Animate cloud drift (GPU-accelerated CSS transform, no redraw per frame)
+  useEffect(() => {
+    if (cloudCover < 15) return
+    const speed = Math.max(0.15, (windSpeed ?? 2) * 0.25)
+    const cardW = () => (canvasRef.current?.parentElement?.offsetWidth ?? 360)
+
+    const step = () => {
+      offsetRef.current -= speed
+      if (offsetRef.current < -cardW() * 2) offsetRef.current = 0
+      if (canvasRef.current)
+        canvasRef.current.style.transform = `translateX(${offsetRef.current}px)`
+      animRef.current = requestAnimationFrame(step)
+    }
+    animRef.current = requestAnimationFrame(step)
+    return () => cancelAnimationFrame(animRef.current)
+  }, [cloudCover, windSpeed])
+
+  if (cloudCover < 15) return null
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'absolute', top: 0, left: 0,
+        height: '100%', pointerEvents: 'none',
+        willChange: 'transform', zIndex: 1,
+      }}
+    />
+  )
+}
+
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
 // ── Beaufort scale ────────────────────────────────────────────────────────────
@@ -663,6 +756,8 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
       className={`rounded-2xl p-6 relative overflow-hidden backdrop-blur-sm border ${border}`}
       style={{ minHeight: 280, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
     >
+      {/* Clouds — simplex-noise, drift with wind */}
+      <CloudCanvas cloudCover={fc.cloud_cover ?? 0} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} />
       {/* Rain/snow particles — clipped to card bounds */}
       <WeatherParticles precip={fc.precip_probability ?? 0} temperature={fc.temperature ?? 10} />
       {/* Temp + symbol + side indicators */}
