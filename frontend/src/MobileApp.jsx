@@ -583,9 +583,10 @@ function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0 }) {
     const idata = ctx.createImageData(w, h)
     const data  = idata.data
 
+    const tileW = w / 2   // tile width = one card width (right half mirrors left)
     for (let x = 0; x < w; x++) {
       for (let y = 0; y < h * 0.75; y++) {          // clouds occupy upper 75%
-        const nx = x / w * 4.5                       // horizontal frequency
+        const nx = (x % tileW) / tileW * 4.5        // wrap at tileW → seamless
         const ny = y / h * 3.0                       // vertical frequency
         // Three octaves — broad shapes + medium detail + fine texture
         const n = noise(nx, ny)        * 0.55
@@ -605,26 +606,27 @@ function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0 }) {
     ctx.putImageData(idata, 0, 0)
   }, [cloudCover, precipProbability])
 
-  // Size canvas to 3× card width after mount, then draw
+  // Size canvas to 2× card width (seamless tile: right half = left half), then draw
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
     const card = canvas.parentElement
     if (!card) return
-    canvas.width  = card.offsetWidth * 3
+    canvas.width  = card.offsetWidth * 2   // 2× for seamless loop
     canvas.height = card.offsetHeight
     draw()
   }, [draw])
 
-  // Animate cloud drift (GPU-accelerated CSS transform, no redraw per frame)
+  // Seamless drift animation: canvas is 2× wide, reset at -cardWidth → no jump
   useEffect(() => {
     if (cloudCover < 15) return
-    const speed = Math.max(0.15, (windSpeed ?? 2) * 0.25)
+    // Beaufort 3 ≈ 4 m/s → moderate drift; Beaufort 8 ≈ 20 m/s → fast
+    const speed = Math.max(0.1, (windSpeed ?? 2) * 0.2)
     const cardW = () => (canvasRef.current?.parentElement?.offsetWidth ?? 360)
 
     const step = () => {
       offsetRef.current -= speed
-      if (offsetRef.current < -cardW() * 2) offsetRef.current = 0
+      if (offsetRef.current <= -cardW()) offsetRef.current = 0  // seamless reset
       if (canvasRef.current)
         canvasRef.current.style.transform = `translateX(${offsetRef.current}px)`
       animRef.current = requestAnimationFrame(step)
@@ -794,6 +796,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
             objectFit: 'contain',
             objectPosition: 'center bottom',
             pointerEvents: 'none',
+            zIndex: 2,
           }}
         />
       )}
