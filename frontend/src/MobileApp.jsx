@@ -594,7 +594,9 @@ function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0, spe
                + noise(nx*4, ny*4)  * 0.15
         if (n > threshold) {
           const density = Math.min(1, (n - threshold) / 0.45)
-          const alpha   = Math.round(density * density * maxAlpha)
+          // Fade out in bottom third — fully transparent at bottom edge
+          const fade  = y < h * 2/3 ? 1 : Math.max(0, 1 - (y - h * 2/3) / (h / 3))
+          const alpha = Math.round(density * density * maxAlpha * fade)
           if (alpha > 3) {
             // Color variation: slow noise adds ±25 for natural cloud shading (#5)
             const colorVar = Math.round(noise(nx * 0.3, ny * 0.3) * 25)
