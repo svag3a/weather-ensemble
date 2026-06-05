@@ -7,16 +7,12 @@ function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
          stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-      {/* Shoulders + sleeves */}
-      <path d="M4 20 L4 9 L8 4 L12 8 L16 4 L20 9 L20 20" />
-      {/* Bottom of jacket */}
-      <line x1="4" y1="20" x2="20" y2="20" />
-      {/* Left lapel */}
-      <path d="M8 4 L11 10" />
-      {/* Right lapel */}
-      <path d="M16 4 L13 10" />
+      {/* Jacket outline: collar → left shoulder → left sleeve (horizontal) →
+          left armhole → left body → bottom → right body → right armhole →
+          right sleeve → right shoulder → right collar */}
+      <path d="M8 4 L4 7 L3 11 L3 15 L8 15 L8 20 L16 20 L16 15 L21 15 L21 11 L20 7 L16 4 L14 2 L12 5 L10 2 Z" />
       {/* Zipper/button line */}
-      <line x1="12" y1="9" x2="12" y2="20" />
+      <line x1="12" y1="5" x2="12" y2="20" />
     </svg>
   )
 }
