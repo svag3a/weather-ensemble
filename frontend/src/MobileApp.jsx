@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses } from 'lucide-react'
+import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, Bike, Footprints, Sailboat } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -1692,11 +1692,20 @@ function AnalysView() {
                   const wind    = p.wind_max   ?? 0
                   // Clothing: JacketIcon (< 16°C) or Shirt — always white
                   const ClothIcon = tempAvg < 16 ? JacketIcon : Shirt
-                  // Accessory: Umbrella if any rain, Glasses if sunny+warm — always white
+                  // Accessory: Umbrella if any rain, Glasses if sunny+warm
                   const AccIcon =
                     precip > 5                      ? Umbrella :
                     tempAvg > 20 && precip <= 5     ? Glasses  :
                                                       null
+                  // Activity: favorable conditions for outdoor activities
+                  const tMax = p.temp_max ?? tempAvg
+                  const tMin = p.temp_min ?? tempAvg
+                  const ActivityIcon =
+                    tMax > 23 && precip <= 10                          ? Waves      : // strand
+                    wind >= 4 && wind <= 10 && precip <= 15 && tMin > 14 ? Sailboat : // segling
+                    tMin > 10 && tMax < 28 && precip <= 15 && wind < 10 ? Bike      : // cykling
+                    tMin > 12 && precip <= 20                          ? Footprints : // promenad
+                                                                         null
                   return (
                     <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
                       <div className="w-20 shrink-0">
@@ -1705,6 +1714,7 @@ function AnalysView() {
                         <div className="flex gap-1.5 mt-1.5">
                           <ClothIcon size={14} color="white" />
                           {AccIcon && <AccIcon size={14} color="white" />}
+                          {ActivityIcon && <ActivityIcon size={14} color="white" />}
                         </div>
                       </div>
                       <p className="text-slate-300 text-xs leading-relaxed flex-1">{p.description}</p>
