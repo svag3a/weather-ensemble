@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck } from 'lucide-react'
+import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Snowflake, Flame, Wind } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages } from './api'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
@@ -1673,11 +1673,32 @@ function AnalysView() {
                 </div>
                 {summary.periods.map((p, i) => {
                   const cs = CONF_STYLE[p.confidence] ?? CONF_STYLE.medium
+                  const tempAvg = ((p.temp_min ?? 12) + (p.temp_max ?? 16)) / 2
+                  const precip  = p.precip_max ?? 0
+                  const wind    = p.wind_max   ?? 0
+                  // Clothing icon
+                  const [ClothIcon, clothColor] =
+                    tempAvg < 5  ? [Snowflake, '#93c5fd'] :
+                    tempAvg < 12 ? [Layers,    '#94a3b8'] :
+                    tempAvg < 18 ? [Shirt,     '#cbd5e1'] :
+                    tempAvg < 25 ? [Shirt,     '#fde68a'] :
+                                   [Flame,     '#fb923c']
+                  // Accessory icon (optional)
+                  const [AccIcon, accColor] =
+                    precip > 40              ? [Umbrella, '#93c5fd'] :
+                    wind   > 10              ? [Wind,     '#94a3b8'] :
+                    tempAvg > 22 && precip < 20 ? [Glasses, '#fde68a'] :
+                    precip > 25              ? [Umbrella, '#bfdbfe'] :
+                                               [null,     null]
                   return (
                     <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
                       <div className="w-20 shrink-0">
                         <div className="text-white text-xs font-medium">{p.name}</div>
                         <div className="text-slate-400 text-xs">{p.from}–{p.to}</div>
+                        <div className="flex gap-1.5 mt-1.5">
+                          <ClothIcon size={14} color={clothColor} />
+                          {AccIcon && <AccIcon size={14} color={accColor} />}
+                        </div>
                       </div>
                       <p className="text-slate-300 text-xs leading-relaxed flex-1">{p.description}</p>
                       <span className={`shrink-0 text-xs ${cs.color}`}>●</span>
