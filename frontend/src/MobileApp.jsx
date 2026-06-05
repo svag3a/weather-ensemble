@@ -1,7 +1,25 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Layers2 } from 'lucide-react'
+import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses } from 'lucide-react'
+
+function JacketIcon({ size = 24, color = 'currentColor' }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+         stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+      {/* Shoulders + sleeves */}
+      <path d="M4 20 L4 9 L8 4 L12 8 L16 4 L20 9 L20 20" />
+      {/* Bottom of jacket */}
+      <line x1="4" y1="20" x2="20" y2="20" />
+      {/* Left lapel */}
+      <path d="M8 4 L11 10" />
+      {/* Right lapel */}
+      <path d="M16 4 L13 10" />
+      {/* Zipper/button line */}
+      <line x1="12" y1="9" x2="12" y2="20" />
+    </svg>
+  )
+}
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages } from './api'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
@@ -1676,9 +1694,9 @@ function AnalysView() {
                   const tempAvg = ((p.temp_min ?? 12) + (p.temp_max ?? 16)) / 2
                   const precip  = p.precip_max ?? 0
                   const wind    = p.wind_max   ?? 0
-                  // Clothing: Layers2 (< 16°C = jacket weather) or Shirt
+                  // Clothing: JacketIcon (< 16°C) or Shirt
                   const [ClothIcon, clothColor] =
-                    tempAvg < 16 ? [Layers2, '#94a3b8'] :
+                    tempAvg < 16 ? [JacketIcon, '#94a3b8'] :
                     tempAvg < 22 ? [Shirt,  '#cbd5e1'] :
                                    [Shirt,  '#fde68a']
                   // Accessory: Umbrella for rain, Glasses for sunny+warm
