@@ -1690,25 +1690,21 @@ function AnalysView() {
                   const tempAvg = ((p.temp_min ?? 12) + (p.temp_max ?? 16)) / 2
                   const precip  = p.precip_max ?? 0
                   const wind    = p.wind_max   ?? 0
-                  // Clothing: JacketIcon (< 16°C) or Shirt
-                  const [ClothIcon, clothColor] =
-                    tempAvg < 16 ? [JacketIcon, '#94a3b8'] :
-                    tempAvg < 22 ? [Shirt,  '#cbd5e1'] :
-                                   [Shirt,  '#fde68a']
-                  // Accessory: Umbrella for rain, Glasses for sunny+warm
-                  const [AccIcon, accColor] =
-                    precip > 40                     ? [Umbrella, '#93c5fd'] :
-                    precip > 25                     ? [Umbrella, '#bfdbfe'] :
-                    tempAvg > 20 && precip < 20     ? [Glasses,  '#fde68a'] :
-                                                      [null,     null]
+                  // Clothing: JacketIcon (< 16°C) or Shirt — always white
+                  const ClothIcon = tempAvg < 16 ? JacketIcon : Shirt
+                  // Accessory: Umbrella if any rain, Glasses if sunny+warm — always white
+                  const AccIcon =
+                    precip > 5                      ? Umbrella :
+                    tempAvg > 20 && precip <= 5     ? Glasses  :
+                                                      null
                   return (
                     <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
                       <div className="w-20 shrink-0">
                         <div className="text-white text-xs font-medium">{p.name}</div>
                         <div className="text-slate-400 text-xs">{p.from}–{p.to}</div>
                         <div className="flex gap-1.5 mt-1.5">
-                          <ClothIcon size={14} color={clothColor} />
-                          {AccIcon && <AccIcon size={14} color={accColor} />}
+                          <ClothIcon size={14} color="white" />
+                          {AccIcon && <AccIcon size={14} color="white" />}
                         </div>
                       </div>
                       <p className="text-slate-300 text-xs leading-relaxed flex-1">{p.description}</p>
