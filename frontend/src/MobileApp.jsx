@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Snowflake, Flame, Wind } from 'lucide-react'
+import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages } from './api'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
@@ -1676,20 +1676,17 @@ function AnalysView() {
                   const tempAvg = ((p.temp_min ?? 12) + (p.temp_max ?? 16)) / 2
                   const precip  = p.precip_max ?? 0
                   const wind    = p.wind_max   ?? 0
-                  // Clothing icon
+                  // Clothing: Layers (< 12°C = dress in layers) or Shirt
                   const [ClothIcon, clothColor] =
-                    tempAvg < 5  ? [Snowflake, '#93c5fd'] :
-                    tempAvg < 12 ? [Layers,    '#94a3b8'] :
-                    tempAvg < 18 ? [Shirt,     '#cbd5e1'] :
-                    tempAvg < 25 ? [Shirt,     '#fde68a'] :
-                                   [Flame,     '#fb923c']
-                  // Accessory icon (optional)
+                    tempAvg < 12 ? [Layers, '#94a3b8'] :
+                    tempAvg < 20 ? [Shirt,  '#cbd5e1'] :
+                                   [Shirt,  '#fde68a']
+                  // Accessory: Umbrella for rain, Glasses for sunny+warm
                   const [AccIcon, accColor] =
-                    precip > 40              ? [Umbrella, '#93c5fd'] :
-                    wind   > 10              ? [Wind,     '#94a3b8'] :
-                    tempAvg > 22 && precip < 20 ? [Glasses, '#fde68a'] :
-                    precip > 25              ? [Umbrella, '#bfdbfe'] :
-                                               [null,     null]
+                    precip > 40                     ? [Umbrella, '#93c5fd'] :
+                    precip > 25                     ? [Umbrella, '#bfdbfe'] :
+                    tempAvg > 20 && precip < 20     ? [Glasses,  '#fde68a'] :
+                                                      [null,     null]
                   return (
                     <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
                       <div className="w-20 shrink-0">
