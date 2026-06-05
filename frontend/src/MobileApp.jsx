@@ -1676,10 +1676,10 @@ function AnalysView() {
                   const tempAvg = ((p.temp_min ?? 12) + (p.temp_max ?? 16)) / 2
                   const precip  = p.precip_max ?? 0
                   const wind    = p.wind_max   ?? 0
-                  // Clothing: Layers (< 12°C = dress in layers) or Shirt
+                  // Clothing: Layers (< 16°C = jacket weather) or Shirt
                   const [ClothIcon, clothColor] =
-                    tempAvg < 12 ? [Layers, '#94a3b8'] :
-                    tempAvg < 20 ? [Shirt,  '#cbd5e1'] :
+                    tempAvg < 16 ? [Layers, '#94a3b8'] :
+                    tempAvg < 22 ? [Shirt,  '#cbd5e1'] :
                                    [Shirt,  '#fde68a']
                   // Accessory: Umbrella for rain, Glasses for sunny+warm
                   const [AccIcon, accColor] =
