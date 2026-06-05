@@ -227,6 +227,12 @@ async def generate_summary(db: Session, target_date: date, period: str) -> Optio
     ).first()
     if cached:
         age_h = (now - cached.generated_at.replace(tzinfo=timezone.utc)).total_seconds() / 3600
+        # Invalidate if periods lack enriched weather data (one-time migration)
+        if age_h < _CACHE_TTL_HOURS:
+            _data = json.loads(cached.payload)
+            _periods = _data.get("periods", [])
+            if _periods and _periods[0].get("temp_min") is None:
+                age_h = _CACHE_TTL_HOURS  # force regeneration
         if age_h < _CACHE_TTL_HOURS:
             data = json.loads(cached.payload)
             data["_generated_at"] = cached.generated_at.isoformat()
