@@ -1697,15 +1697,16 @@ function AnalysView() {
                     precip > 5                      ? Umbrella :
                     tempAvg > 20 && precip <= 5     ? Glasses  :
                                                       null
-                  // Activity: favorable conditions for outdoor activities
+                  // Activity: only during daytime periods (not Natt)
                   const tMax = p.temp_max ?? tempAvg
                   const tMin = p.temp_min ?? tempAvg
-                  const ActivityIcon =
-                    tMax > 23 && precip <= 10                          ? Waves      : // strand
-                    wind >= 4 && wind <= 10 && precip <= 15 && tMin > 14 ? Sailboat : // segling
-                    tMin > 10 && tMax < 28 && precip <= 15 && wind < 10 ? Bike      : // cykling
-                    tMin > 12 && precip <= 20                          ? Footprints : // promenad
-                                                                         null
+                  const isNight = p.name === 'Natt'
+                  const ActivityIcon = isNight ? null :
+                    tMax > 23 && precip <= 10                             ? Waves      :
+                    wind >= 4 && wind <= 10 && precip <= 15 && tMin > 14  ? Sailboat   :
+                    tMin > 10 && tMax < 28 && precip <= 15 && wind < 10   ? Bike       :
+                    tMin > 12 && precip <= 20                             ? Footprints :
+                                                                            null
                   return (
                     <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
                       <div className="w-20 shrink-0">
