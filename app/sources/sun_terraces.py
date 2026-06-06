@@ -153,6 +153,7 @@ out body;
     resp = await client.post(
         "https://overpass-api.de/api/interpreter",
         data={"data": query},
+        headers={"User-Agent": "gbgvader.se/1.0 sun-terrace-finder (https://gbgvader.se)"},
         timeout=90,
     )
     resp.raise_for_status()
