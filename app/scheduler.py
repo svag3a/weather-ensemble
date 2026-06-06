@@ -14,12 +14,13 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Forecast, Observation, SourceWeight, SourceWeightHistory
+from app.models import Forecast, Observation, SourceWeight, SourceWeightHistory, SunTerrace
 from app.ensemble import update_weights, build_ensemble
 from app.sources import (
     smhi, yr, open_meteo, open_meteo_icon_eu, open_meteo_ecmwf,
     open_meteo_ukmo, open_meteo_knmi, openweathermap, radar_nowcast, smhi_obs,
 )
+from app.sources.sun_terraces import refresh_terraces
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,12 @@ async def collect_and_update() -> None:
             db.rollback()
         _maybe_snapshot_weights(db, issued_at.date())
         await _pregen_ai_summaries(db)
+        # Seed sun terraces on first run if table is empty
+        terrace_count = db.query(SunTerrace).count()
+        if terrace_count == 0:
+            logger.info("Sun terraces table empty — seeding from Overpass…")
+            async with httpx.AsyncClient() as terrace_client:
+                await refresh_terraces(db, terrace_client)
         logger.info("Collection run complete.")
     finally:
         db.close()
@@ -178,7 +185,18 @@ async def _pregen_ai_summaries(db: Session) -> None:
             logger.warning("  AI summary pre-generation failed for %s: %s", period, exc)
 
 
+async def refresh_sun_terraces_job() -> None:
+    """Daily refresh of sun terrace data from Overpass."""
+    db: Session = SessionLocal()
+    try:
+        async with httpx.AsyncClient() as client:
+            await refresh_terraces(db, client)
+    finally:
+        db.close()
+
+
 def create_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
     scheduler.add_job(collect_and_update, "cron", minute=5)  # run at :05 each hour
+    scheduler.add_job(refresh_sun_terraces_job, "cron", hour=3, minute=0)  # daily at 03:00 UTC
     return scheduler

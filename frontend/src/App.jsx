@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchEnsemble, fetchSources, fetchWeights, fetchWeightsHistory, fetchStatus, triggerCollect, fetchCityImages, uploadCityImage, updateCityImage, deleteCityImage, fetchEnsembleHealth, fetchEnsembleTrend } from './api'
+import { fetchEnsemble, fetchSources, fetchWeights, fetchWeightsHistory, fetchStatus, triggerCollect, fetchCityImages, uploadCityImage, updateCityImage, deleteCityImage, fetchEnsembleHealth, fetchEnsembleTrend, fetchSunTerracesAdmin, overrideTerrace } from './api'
 import EnsembleForecast from './components/EnsembleForecast'
 import SourceComparison from './components/SourceComparison'
 import SourceRanking from './components/SourceRanking'
@@ -8,6 +8,7 @@ import SystemStatus from './components/SystemStatus'
 import ImageLibrary from './components/ImageLibrary'
 import EnsembleOptimizer from './components/EnsembleOptimizer'
 import EnsembleTrend from './components/EnsembleTrend'
+import SunTerraceAdmin from './components/SunTerraceAdmin'
 
 function useData(fetcher, deps = []) {
   const [data, setData] = useState(null)
@@ -37,6 +38,7 @@ export default function App() {
   const cityImages     = useData(fetchCityImages)
   const ensembleHealth = useData(fetchEnsembleHealth)
   const ensembleTrend  = useData(fetchEnsembleTrend)
+  const sunTerraces    = useData(fetchSunTerracesAdmin)
 
   useEffect(() => {
     const refresh = () => {
@@ -109,7 +111,7 @@ export default function App() {
 
         {/* Tab bar */}
         <div className="flex gap-1 mb-6 border-b border-slate-700">
-          {[['status', 'Status'], ['statistik', 'Statistik'], ['karta', 'Karta']].map(([id, label]) => (
+          {[['status', 'Status'], ['statistik', 'Statistik'], ['karta', 'Karta'], ['sol', 'Sol']].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -148,6 +150,16 @@ export default function App() {
               onUpload={async (fd) => { await uploadCityImage(fd); cityImages.reload() }}
               onUpdate={async (id, fields) => { await updateCityImage(id, fields); cityImages.reload() }}
               onDelete={async (id) => { await deleteCityImage(id); cityImages.reload() }}
+            />
+          </div>
+        )}
+
+        {activeTab === 'sol' && (
+          <div className="space-y-6">
+            <SunTerraceAdmin
+              data={sunTerraces.data}
+              onOverride={async (id, fields) => { await overrideTerrace(id, fields); sunTerraces.reload() }}
+              onReload={sunTerraces.reload}
             />
           </div>
         )}

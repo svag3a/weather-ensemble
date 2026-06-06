@@ -87,6 +87,29 @@ export async function deleteCityImage(id) {
   if (!res.ok) throw new Error(await res.text())
 }
 
+export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', minScore = 0 } = {}) {
+  const params = new URLSearchParams({ lat, lon, radius, type, min_score: minScore })
+  const res = await fetch(`${BASE}/sun-terraces?${params}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function fetchSunTerracesAdmin() {
+  const res = await fetch(`${BASE}/sun-terraces/admin`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function overrideTerrace(id, { orientation, orientation_confidence }) {
+  const res = await fetch(`${BASE}/sun-terraces/${id}/override`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ orientation, orientation_confidence }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchEnsembleTrend(days = 14) {
   const res = await fetch(`${BASE}/ensemble/trend?days=${days}`)
   if (!res.ok) throw new Error(await res.text())

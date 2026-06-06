@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, 
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
+import math as _math
+
 from app.database import get_db
-from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage
+from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace
 from app.api.auth import get_current_user
 
 router = APIRouter()
@@ -773,4 +775,188 @@ def get_system_status(db: Session = Depends(get_db)):
         "ensemble":         ensemble,
         "ai_summaries":     list(ai_by_period.values()),
         "server_time":      now_naive.isoformat(),
+    }
+
+
+# ── Sun Terraces ──────────────────────────────────────────────────────────────
+
+def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    R = 6371
+    phi1, phi2 = _math.radians(lat1), _math.radians(lat2)
+    dphi = _math.radians(lat2 - lat1)
+    dlambda = _math.radians(lon2 - lon1)
+    a = (_math.sin(dphi / 2) ** 2
+         + _math.cos(phi1) * _math.cos(phi2) * _math.sin(dlambda / 2) ** 2)
+    return R * 2 * _math.atan2(_math.sqrt(a), _math.sqrt(1 - a))
+
+
+def _build_explanation(scores: dict, orientation: Optional[str], confidence: float) -> str:
+    if scores.get("now", {}).get("total_score", 0) >= 70:
+        timing = "Bra solläge just nu"
+    elif scores.get("1h", {}).get("total_score", 0) >= 70:
+        timing = "Bra solläge om en timme"
+    elif scores.get("2h", {}).get("total_score", 0) >= 70:
+        timing = "Bra solläge om två timmar"
+    else:
+        timing = "Begränsat solläge kommande timmarna"
+    conf_str = "hög" if confidence > 0.6 else "medel" if confidence > 0.4 else "låg"
+    return f"{timing} · {conf_str} säkerhet"
+
+
+@router.get("/sun-terraces")
+def get_sun_terraces(
+    lat: float = Query(default=57.7089),
+    lon: float = Query(default=11.9746),
+    radius: float = Query(default=2.0, ge=0.1, le=20.0),
+    type: str = Query(default="all"),
+    min_score: int = Query(default=0, ge=0, le=100),
+    include_low_confidence: bool = Query(default=True),
+    db: Session = Depends(get_db),
+):
+    """Get sun terraces within radius, scored by current solar conditions."""
+    from app.sources.sun_terraces import compute_scores
+
+    # Fetch active terraces within radius
+    all_terraces = db.query(SunTerrace).filter(SunTerrace.active == True).all()  # noqa: E712
+    nearby = [
+        t for t in all_terraces
+        if _haversine_km(lat, lon, t.lat, t.lon) <= radius
+    ]
+
+    # Filter by amenity type
+    if type != "all":
+        nearby = [t for t in nearby if t.amenity_type == type]
+
+    # Get latest ensemble forecast hours for next 3h
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(hours=3)
+    latest_run = (
+        db.query(EnsembleForecast.computed_at)
+        .order_by(EnsembleForecast.computed_at.desc())
+        .first()
+    )
+    forecast_hours: list = []
+    if latest_run:
+        rows = (
+            db.query(EnsembleForecast)
+            .filter(
+                EnsembleForecast.computed_at == latest_run[0],
+                EnsembleForecast.valid_for >= now,
+                EnsembleForecast.valid_for <= cutoff,
+            )
+            .order_by(EnsembleForecast.valid_for)
+            .all()
+        )
+        forecast_hours = [
+            {
+                "temperature": r.temperature,
+                "precip_probability": r.precip_probability,
+                "wind_speed": r.wind_speed,
+                "cloud_cover": r.cloud_cover,
+                "valid_for_ts": r.valid_for.replace(tzinfo=timezone.utc).timestamp()
+                if r.valid_for.tzinfo is None
+                else r.valid_for.timestamp(),
+            }
+            for r in rows
+        ]
+
+    results = []
+    for t in nearby:
+        scores = compute_scores(
+            t.lat, t.lon,
+            t.street_orientation,
+            t.orientation_confidence,
+            forecast_hours,
+        )
+        now_score = scores.get("now", {}).get("total_score", 0)
+        best_score = max(
+            scores.get("now", {}).get("total_score", 0),
+            scores.get("1h", {}).get("total_score", 0),
+            scores.get("2h", {}).get("total_score", 0),
+        )
+        if best_score < min_score:
+            continue
+        if not include_low_confidence and scores["confidence"] < 0.4:
+            continue
+        results.append({
+            "id": t.id,
+            "name": t.name,
+            "lat": t.lat,
+            "lon": t.lon,
+            "amenity_type": t.amenity_type,
+            "address": t.address,
+            "website": t.website,
+            "outdoor_seating": t.outdoor_seating,
+            "street_orientation": t.street_orientation,
+            "orientation_confidence": t.orientation_confidence,
+            "distance_km": round(_haversine_km(lat, lon, t.lat, t.lon), 2),
+            "scores": scores,
+            "now_score": now_score,
+            "best_score": best_score,
+            "explanation": _build_explanation(scores, t.street_orientation, scores["confidence"]),
+        })
+
+    results.sort(key=lambda x: x["best_score"], reverse=True)
+    return results
+
+
+@router.get("/sun-terraces/admin")
+def get_sun_terraces_admin(db: Session = Depends(get_db)):
+    """Return all terraces (active + inactive) for admin debugging."""
+    rows = (
+        db.query(SunTerrace)
+        .order_by(SunTerrace.name)
+        .all()
+    )
+    return [
+        {
+            "id": t.id,
+            "source": t.source,
+            "source_id": t.source_id,
+            "name": t.name,
+            "lat": t.lat,
+            "lon": t.lon,
+            "amenity_type": t.amenity_type,
+            "address": t.address,
+            "website": t.website,
+            "outdoor_seating": t.outdoor_seating,
+            "street_orientation": t.street_orientation,
+            "orientation_confidence": t.orientation_confidence,
+            "active": t.active,
+            "last_seen_at": t.last_seen_at.isoformat() if t.last_seen_at else None,
+            "created_at": t.created_at.isoformat() if t.created_at else None,
+            "updated_at": t.updated_at.isoformat() if t.updated_at else None,
+        }
+        for t in rows
+    ]
+
+
+class SunTerraceOverride(BaseModel):
+    orientation: str
+    orientation_confidence: float
+
+
+@router.post("/sun-terraces/{terrace_id}/override", status_code=200)
+def override_sun_terrace(
+    terrace_id: int,
+    body: SunTerraceOverride,
+    db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Override the orientation and confidence for a terrace."""
+    terrace = db.query(SunTerrace).filter(SunTerrace.id == terrace_id).first()
+    if terrace is None:
+        raise HTTPException(status_code=404, detail="Terrace not found")
+    valid_orientations = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "UNKNOWN"}
+    if body.orientation not in valid_orientations:
+        raise HTTPException(status_code=400, detail=f"Invalid orientation. Must be one of {valid_orientations}")
+    terrace.street_orientation = body.orientation
+    terrace.orientation_confidence = body.orientation_confidence
+    terrace.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+    db.refresh(terrace)
+    return {
+        "id": terrace.id,
+        "street_orientation": terrace.street_orientation,
+        "orientation_confidence": terrace.orientation_confidence,
     }

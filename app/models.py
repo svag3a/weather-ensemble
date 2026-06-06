@@ -131,3 +131,23 @@ class CityImage(Base):
     time_slot: Mapped[Optional[str]] = mapped_column(String, default="day")  # night|morning|day|evening
     image_type: Mapped[str] = mapped_column(String, default="background")  # background|motif
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class SunTerrace(Base):
+    __tablename__ = "sun_terraces"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    source: Mapped[str] = mapped_column(String, default="osm")
+    source_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    lat: Mapped[float] = mapped_column(Float)
+    lon: Mapped[float] = mapped_column(Float)
+    amenity_type: Mapped[str] = mapped_column(String)  # restaurant/cafe/bar/pub
+    address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    website: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    outdoor_seating: Mapped[bool] = mapped_column(Boolean, default=True)
+    street_orientation: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # N/NE/E/SE/S/SW/W/NW/UNKNOWN
+    orientation_confidence: Mapped[float] = mapped_column(Float, default=0.3)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

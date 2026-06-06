@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, Bike, Footprints, Sailboat } from 'lucide-react'
+import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, Bike, Footprints, Sailboat, Sun } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -17,7 +17,8 @@ function JacketIcon({ size = 24, color = 'currentColor' }) {
   )
 }
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages } from './api'
+import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages, fetchSunTerraces } from './api'
+import SolView from './components/SolView'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
 import WeatherSymbol from './components/WeatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
@@ -1809,7 +1810,7 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
 
 // ── Swipe navigation ──────────────────────────────────────────────────────────
 
-const TAB_ORDER = ['now', 'week', 'analysis', 'warnings', 'sources']
+const TAB_ORDER = ['now', 'week', 'analysis', 'warnings', 'sources', 'sol']
 
 // slideDir: 1 = forward (enter from right), -1 = backward (enter from left)
 const slideVariants = {
@@ -1999,6 +2000,10 @@ export default function MobileApp() {
                 <EnsembleView ensembleFc={currentFc} prefetchedSources={sources} prefetchedWeights={weights} />
               )}
 
+              {activeTab === 'sol' && (
+                <SolView coords={coords} />
+              )}
+
             </div>
           </motion.div>
         </AnimatePresence>
@@ -2056,6 +2061,15 @@ export default function MobileApp() {
           >
             <Layers size={22} strokeWidth={1.5} />
             <span>Källor</span>
+          </button>
+          <button
+            onClick={() => changeTab('sol')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
+              activeTab === 'sol' ? 'text-white' : 'text-slate-500'
+            }`}
+          >
+            <Sun size={22} strokeWidth={1.5} />
+            <span>Sol</span>
           </button>
         </div>
       </div>
