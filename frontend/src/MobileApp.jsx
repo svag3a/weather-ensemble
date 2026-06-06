@@ -260,7 +260,29 @@ function getSkyTheme(gradient) {
   return lum > 0.2 ? 'light' : 'dark'
 }
 
-function getSkyCss(fc, coords) {
+// ── Coastal detection ─────────────────────────────────────────────────────────
+
+async function checkIfCoastal(lat, lon) {
+  try {
+    const r = await fetch(
+      `https://marine-api.open-meteo.com/v1/marine?latitude=${lat}&longitude=${lon}&hourly=wave_height&forecast_days=1`
+    )
+    const d = await r.json()
+    const waves = d.hourly?.wave_height ?? []
+    return waves.some(v => v !== null && v > 0)
+  } catch { return false }
+}
+
+function useIsCoastal(coords) {
+  const [isCoastal, setIsCoastal] = useState(false)
+  useEffect(() => {
+    if (!coords) return
+    checkIfCoastal(coords.lat, coords.lon).then(setIsCoastal)
+  }, [coords?.lat, coords?.lon])  // eslint-disable-line react-hooks/exhaustive-deps
+  return isCoastal
+}
+
+function getSkyCss(fc, coords, isCoastal = false) {
   const now = new Date()
   const hour = now.getHours() + now.getMinutes() / 60
   const lat = coords?.lat ?? 57.706
@@ -270,21 +292,38 @@ function getSkyCss(fc, coords) {
   const sr = (sunrise + tz + 24) % 24
   const ss = (sunset + tz + 24) % 24
 
-  // [hour, topColor, bottomColor] — realistic urban sky (no coastal sunrise/sunset colors)
-  const anchors = [
-    [0,              '#0f172a', '#1e3a5f'],  // midnight
-    [sr - 1,         '#1e293b', '#334155'],  // pre-dawn — dark grey-blue
-    [sr,             '#1e3a5f', '#4a7fa5'],  // sunrise — cool lightening blue
-    [sr + 1,         '#1d4ed8', '#93c5fd'],  // early morning — clear blue
+  // Coastal anchors: dramatic warm sunrise/sunset visible over open sea
+  const coastalAnchors = [
+    [0,              '#0f172a', '#1e3a5f'],
+    [sr - 1,         '#1e1b4b', '#3730a3'],  // pre-dawn — purple
+    [sr,             '#9a3412', '#fb923c'],  // sunrise — warm orange
+    [sr + 1,         '#0369a1', '#fde68a'],  // early morning — blue + gold
     [sr + 3,         '#0284c7', '#bae6fd'],  // morning — sky blue
-    [(sr + ss) / 2,  '#0369a1', '#7dd3fc'],  // midday — clear sky blue
+    [(sr + ss) / 2,  '#0369a1', '#7dd3fc'],  // midday
     [ss - 2,         '#0284c7', '#bae6fd'],  // afternoon
-    [ss - 1,         '#1e40af', '#93c5fd'],  // pre-dusk — deeper blue
-    [ss,             '#1e3a5f', '#334155'],  // sunset — cool darkening
-    [ss + 1,         '#1e293b', '#0f172a'],  // dusk
-    [ss + 2,         '#0f172a', '#1e3a5f'],  // early night
-    [24,             '#0f172a', '#1e3a5f'],  // night
-  ].filter(([h]) => h >= 0 && h <= 24).sort((a, b) => a[0] - b[0])
+    [ss - 1,         '#b45309', '#fbbf24'],  // golden hour
+    [ss,             '#7f1d1d', '#c2410c'],  // sunset — red/orange
+    [ss + 1,         '#4c1d95', '#7c3aed'],  // dusk — purple
+    [ss + 2,         '#1e1b4b', '#0f172a'],
+    [24,             '#0f172a', '#1e3a5f'],
+  ]
+  // Urban anchors: cool blue transitions, no warm coastal colors
+  const urbanAnchors = [
+    [0,              '#0f172a', '#1e3a5f'],
+    [sr - 1,         '#1e293b', '#334155'],
+    [sr,             '#1e3a5f', '#4a7fa5'],
+    [sr + 1,         '#1d4ed8', '#93c5fd'],
+    [sr + 3,         '#0284c7', '#bae6fd'],
+    [(sr + ss) / 2,  '#0369a1', '#7dd3fc'],
+    [ss - 2,         '#0284c7', '#bae6fd'],
+    [ss - 1,         '#1e40af', '#93c5fd'],
+    [ss,             '#1e3a5f', '#334155'],
+    [ss + 1,         '#1e293b', '#0f172a'],
+    [ss + 2,         '#0f172a', '#1e3a5f'],
+    [24,             '#0f172a', '#1e3a5f'],
+  ]
+  const anchors = (isCoastal ? coastalAnchors : urbanAnchors)
+    .filter(([h]) => h >= 0 && h <= 24).sort((a, b) => a[0] - b[0])
 
   // Find surrounding anchors and lerp colors
   let i = anchors.length - 2
@@ -1814,6 +1853,7 @@ export default function MobileApp() {
   const [slideDir, setSlideDir] = useState(1)
   const { radar, coords } = useRadarLocation()
   const geoLocation = useReverseGeocode(coords)
+  const isCoastal   = useIsCoastal(coords)
   const bgImage = useCityBackground(coords)
   const motifImage = useCityMotif(coords)
 
@@ -1907,7 +1947,7 @@ export default function MobileApp() {
                     </div>
                   )}
                   {(() => {
-                    const sky = getSkyCss(currentFc, coords)
+                    const sky = getSkyCss(currentFc, coords, isCoastal)
                     return <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} skyGradient={sky.gradient} skyTheme={getSkyTheme(sky.gradient)} />
                   })()}
 
