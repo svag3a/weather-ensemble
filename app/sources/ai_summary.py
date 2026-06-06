@@ -301,12 +301,12 @@ async def generate_summary(db: Session, target_date: date, period: str) -> Optio
         # Enrich LLM periods with pre-computed weather data (temp, precip, wind)
         # so the frontend can compute clothing/accessory icons without re-fetching
         computed = {p["name"]: p for p in input_data.get("periods", [])}
-        for period in payload.get("periods", []):
-            cp = computed.get(period.get("name"), {})
-            period["temp_min"]   = cp.get("temp_min")
-            period["temp_max"]   = cp.get("temp_max")
-            period["precip_max"] = cp.get("precip_max", 0)
-            period["wind_max"]   = cp.get("wind_max",   0)
+        for p_out in payload.get("periods", []):
+            cp = computed.get(p_out.get("name"), {})
+            p_out["temp_min"]   = cp.get("temp_min")
+            p_out["temp_max"]   = cp.get("temp_max")
+            p_out["precip_max"] = cp.get("precip_max", 0)
+            p_out["wind_max"]   = cp.get("wind_max",   0)
     except Exception as exc:
         logger.warning("AI summary generation failed: %s", exc)
         return None
