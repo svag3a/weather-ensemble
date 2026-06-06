@@ -527,6 +527,19 @@ async def trigger_collection(_user: str = Depends(get_current_user)):
     return {"status": "collection started"}
 
 
+@router.post("/sun-terraces/refresh")
+async def refresh_sun_terraces_now(db: Session = Depends(get_db)):
+    """Manually trigger OSM terrace data refresh."""
+    import httpx, traceback
+    from app.sources.sun_terraces import refresh_terraces
+    try:
+        async with httpx.AsyncClient() as client:
+            count = await refresh_terraces(db, client)
+        return {"status": "ok", "imported": count}
+    except Exception as e:
+        return {"status": "error", "error": traceback.format_exc(limit=5)}
+
+
 @router.post("/collect/sync")
 async def trigger_collection_sync(_user: str = Depends(get_current_user)):
     """Run collection synchronously and return any errors — for debugging."""
