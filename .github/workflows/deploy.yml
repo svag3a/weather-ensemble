@@ -40,6 +40,15 @@ jobs:
             frontend/dist \
             ubuntu@${{ secrets.EC2_HOST }}:~/weather-ensemble/frontend/
 
+      # Clean Docker disk before build to prevent "no space left" errors
+      - name: Clean Docker disk space
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=20 \
+            ubuntu@${{ secrets.EC2_HOST }} \
+            "docker system prune -af --volumes || true"
+
       # Rebuild and restart — Docker now only builds Python layer, no Node.js
       - name: Restart app
         run: |
