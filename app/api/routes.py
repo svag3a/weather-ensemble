@@ -528,21 +528,12 @@ async def trigger_collection(_user: str = Depends(get_current_user)):
 
 
 @router.get("/sun-terraces/refresh")
-async def refresh_sun_terraces_now(db: Session = Depends(get_db)):
-    """Manually trigger OSM terrace data refresh."""
-    import httpx, traceback
-    from app.sources.sun_terraces import fetch_from_overpass, refresh_terraces
-    try:
-        async with httpx.AsyncClient() as client:
-            # Test fetch first
-            venues = await fetch_from_overpass(client)
-            if not venues:
-                return {"status": "warning", "message": "Overpass returned 0 venues"}
-            await refresh_terraces(db, client)
-        total = db.query(SunTerrace).filter(SunTerrace.active == True).count()
-        return {"status": "ok", "venues_from_osm": len(venues), "active_in_db": total}
-    except Exception as e:
-        return {"status": "error", "error": traceback.format_exc(limit=8)}
+async def refresh_sun_terraces_now():
+    """Trigger OSM terrace data refresh in the background."""
+    import asyncio
+    from app.scheduler import refresh_sun_terraces_job
+    asyncio.create_task(refresh_sun_terraces_job())
+    return {"status": "started", "message": "Refresh running in background — check /sun-terraces/admin in ~60s"}
 
 
 @router.post("/collect/sync")
