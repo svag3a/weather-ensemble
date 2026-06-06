@@ -150,17 +150,34 @@ async def fetch_from_overpass(client) -> list[dict]:
 );
 out body;
 """
-    resp = await client.post(
+    import urllib.parse
+    encoded = urllib.parse.urlencode({"data": query})
+    # Try multiple Overpass endpoints for resilience
+    endpoints = [
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
         "https://overpass-api.de/api/interpreter",
-        content=f"data={query}".encode(),
-        headers={
-            "User-Agent": "gbgvader.se/1.0 sun-terrace-finder (https://gbgvader.se)",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json",
-        },
-        timeout=90,
-    )
-    resp.raise_for_status()
+    ]
+    resp = None
+    last_exc = None
+    for url in endpoints:
+        try:
+            resp = await client.post(
+                url,
+                content=encoded.encode(),
+                headers={
+                    "User-Agent": "gbgvader.se/1.0 (sun-terrace-finder; https://gbgvader.se)",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                timeout=90,
+            )
+            if resp.status_code == 200:
+                break
+        except Exception as exc:
+            last_exc = exc
+            continue
+    if resp is None or resp.status_code != 200:
+        raise Exception(f"All Overpass endpoints failed. Last: {last_exc or resp.status_code}")
     elements = resp.json().get("elements", [])
     venues = []
     for el in elements:
