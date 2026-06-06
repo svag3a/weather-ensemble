@@ -527,7 +527,7 @@ async def trigger_collection(_user: str = Depends(get_current_user)):
     return {"status": "collection started"}
 
 
-@router.post("/sun-terraces/refresh")
+@router.get("/sun-terraces/refresh")
 async def refresh_sun_terraces_now(db: Session = Depends(get_db)):
     """Manually trigger OSM terrace data refresh."""
     import httpx, traceback
