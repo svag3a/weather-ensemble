@@ -1561,14 +1561,17 @@ function formatGeneratedAt(iso) {
   return `kl ${d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-function AnalysView() {
+function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
   const [period, setPeriod] = useState('today')
-  const [summary, setSummary] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const prefetched = period === 'today' ? prefetchedToday : prefetchedTomorrow
+  const [summary, setSummary] = useState(prefetched ?? null)
+  const [loading, setLoading] = useState(!prefetched)
   const [error, setError] = useState(null)
   const [detailOpen, setDetailOpen] = useState(false)
 
   useEffect(() => {
+    const cached = period === 'today' ? prefetchedToday : prefetchedTomorrow
+    if (cached) { setSummary(cached); setLoading(false); return }
     setLoading(true)
     setError(null)
     setSummary(null)
@@ -1577,7 +1580,7 @@ function AnalysView() {
       .then(setSummary)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [period])
+  }, [period, prefetchedToday, prefetchedTomorrow])
 
   return (
     <div className="space-y-3">
@@ -1803,8 +1806,10 @@ function useSwipeNav(activeTab, setActiveTab) {
 export default function MobileApp() {
   const [forecast, setForecast]   = useState(null)
   const [warnings, setWarnings]   = useState([])
-  const [sources, setSources]     = useState(null)
-  const [weights, setWeights]     = useState(null)
+  const [sources, setSources]         = useState(null)
+  const [weights, setWeights]         = useState(null)
+  const [summaryToday, setSummaryToday]       = useState(null)
+  const [summaryTomorrow, setSummaryTomorrow] = useState(null)
   const [activeTab, setActiveTab] = useState('now')
   const [slideDir, setSlideDir] = useState(1)
   const { radar, coords } = useRadarLocation()
@@ -1837,6 +1842,17 @@ export default function MobileApp() {
     ]).then(([s, w]) => { setSources(s); setWeights(w) })
     loadSources()
     const interval = setInterval(loadSources, 10 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Prefetch AI summaries so the Analysis tab opens instantly
+  useEffect(() => {
+    const loadSummaries = () => {
+      fetchSummary('today').then(setSummaryToday).catch(() => {})
+      fetchSummary('tomorrow').then(setSummaryTomorrow).catch(() => {})
+    }
+    loadSummaries()
+    const interval = setInterval(loadSummaries, 70 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
 
@@ -1932,7 +1948,7 @@ export default function MobileApp() {
               )}
 
               {activeTab === 'analysis' && (
-                <AnalysView />
+                <AnalysView prefetchedToday={summaryToday} prefetchedTomorrow={summaryTomorrow} />
               )}
 
               {activeTab === 'warnings' && (
