@@ -99,24 +99,37 @@ def polygon_orientation_score(sun_azimuth: float, polygon_coords: list) -> float
     # Area-weighted centroid (Shoelace) — reliable for non-convex (L-shaped) polygons.
     # Simple vertex average fails for L-shapes because it lands on the inner corner.
     n = len(polygon_coords)
+    # Translate to origin to avoid catastrophic cancellation.
+    # Raw lat/lon values (~57, ~12) are large; the polygon is tiny (~1e-4 deg).
+    # Products like lo*la1 - lo1*la cancel to ~0 in float64 without this step.
+    ref_la = polygon_coords[0][0]
+    ref_lo = polygon_coords[0][1]
+    pts = [(c[0] - ref_la, c[1] - ref_lo) for c in polygon_coords]
+
     area2 = 0.0   # accumulates 2·A (Shoelace without ×0.5)
     cy = cx = 0.0
     for i in range(n):
-        la, lo   = polygon_coords[i]
-        la1, lo1 = polygon_coords[(i + 1) % n]
+        la, lo   = pts[i]
+        la1, lo1 = pts[(i + 1) % n]
         # Standard 2-D cross product: x=lon, y=lat → cross = x·y' - x'·y
         cross = lo * la1 - lo1 * la
         area2 += cross
         cy += (la + la1) * cross   # lat (y) component
         cx += (lo + lo1) * cross   # lon (x) component
-    if abs(area2) < 1e-20:
+    if abs(area2) < 1e-30:
         # Degenerate polygon — fall back to vertex average
         cent_lat = sum(c[0] for c in polygon_coords) / n
         cent_lon = sum(c[1] for c in polygon_coords) / n
     else:
-        # area2 = 2·A, so centroid = Σ / (3 · area2)
-        cent_lat = cy / (3.0 * area2)
-        cent_lon = cx / (3.0 * area2)
+        # area2 = 2·A, so centroid = Σ / (3 · area2); add back the reference offset
+        cent_lat = ref_la + cy / (3.0 * area2)
+        cent_lon = ref_lo + cx / (3.0 * area2)
+
+    # Scale factor: 1 degree of longitude is shorter than 1 degree of latitude
+    # at high latitudes.  Without correction, east-west edges (south/north faces)
+    # appear 1/cos(lat) ≈ 1.87× longer than north-south edges (east/west faces)
+    # in Göteborg (lat 57.7°), causing west/east exposure to be heavily under-scored.
+    cos_lat = math.cos(math.radians(cent_lat))
 
     edges = []
     max_len = 0.0
@@ -125,17 +138,22 @@ def polygon_orientation_score(sun_azimuth: float, polygon_coords: list) -> float
         b = polygon_coords[(i + 1) % len(polygon_coords)]
         dlat = b[0] - a[0]
         dlon = b[1] - a[1]
-        length = math.sqrt(dlat * dlat + dlon * dlon)
+        # Physical length: scale lon difference by cos(lat) so both components
+        # are in comparable units (proportional to metres on the ground).
+        dlat_m = dlat
+        dlon_m = dlon * cos_lat
+        length = math.sqrt(dlat_m * dlat_m + dlon_m * dlon_m)
         if length < 1e-10:
             continue
 
         mid_lat = (a[0] + b[0]) / 2
         mid_lon = (a[1] + b[1]) / 2
 
-        # Outward normal perpendicular to edge, pointing away from centroid
-        n_lat = -dlon / length   # north component
-        n_lon =  dlat / length   # east component
-        dot = n_lat * (cent_lat - mid_lat) + n_lon * (cent_lon - mid_lon)
+        # Outward normal perpendicular to edge, pointing away from centroid.
+        # Use the same cos_lat-scaled components for consistent direction.
+        n_lat = -dlon_m / length   # north component
+        n_lon =  dlat_m / length   # east component
+        dot = n_lat * (cent_lat - mid_lat) + n_lon * (cent_lon - mid_lon) * cos_lat
         if dot > 0:
             n_lat, n_lon = -n_lat, -n_lon
 
