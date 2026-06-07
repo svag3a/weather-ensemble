@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchSunTerraces } from '../api'
+import { sunTimesUTC } from '../weatherSymbol'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -40,8 +41,57 @@ function amenityLabel(type) {
   return map[type] ?? type
 }
 
-function TerraceCard({ terrace, isFav, onToggleFav }) {
+function scoreToColor(score) {
+  if (score <= 0)  return '#0f172a'
+  if (score < 25)  return '#1e3a5f'
+  if (score < 45)  return '#7c3500'
+  if (score < 65)  return '#c2410c'
+  return '#f59e0b'
+}
+
+function SunTimeline({ scores, coords }) {
+  const now = new Date()
+  const lat = coords?.lat ?? 57.706
+  const lon = coords?.lon ?? 11.967
+  const { sunset } = sunTimesUTC(now, lat, lon)
+  const tz = -now.getTimezoneOffset() / 60
+  const ssLocal = (sunset + tz + 24) % 24
+  const nowH = now.getHours() + now.getMinutes() / 60
+  const hoursToSunset = Math.max(0.1, ssLocal - nowH)
+
+  const s0 = scores?.now?.total_score ?? 0
+  const s1 = scores?.['1h']?.total_score ?? 0
+  const s2 = scores?.['2h']?.total_score ?? 0
+
+  // Position each score as % of now→sunset span
+  const pct = h => Math.min(98, Math.round((h / hoursToSunset) * 100))
+  const p1 = pct(1), p2 = pct(2)
+
+  const gradient = [
+    `${scoreToColor(s0)} 0%`,
+    `${scoreToColor(s1)} ${p1}%`,
+    `${scoreToColor(s2)} ${p2}%`,
+    `#1e293b 100%`,
+  ].join(', ')
+
+  // Sunset label
+  const ssH = Math.floor(ssLocal)
+  const ssM = String(Math.round((ssLocal % 1) * 60)).padStart(2, '0')
+
+  return (
+    <div className="space-y-1">
+      <div className="h-2.5 rounded-full w-full" style={{ background: `linear-gradient(to right, ${gradient})` }} />
+      <div className="flex justify-between text-[10px] text-slate-600">
+        <span>Nu</span>
+        <span>🌅 {ssH}:{ssM}</span>
+      </div>
+    </div>
+  )
+}
+
+function TerraceCard({ terrace, isFav, onToggleFav, coords }) {
   const { id, name, address, amenity_type, street_orientation, scores, explanation } = terrace
+
   const best = scores?.best_time ?? 'now'
   const altitude = scores?.[best]?.sun_altitude
 
@@ -70,18 +120,8 @@ function TerraceCard({ terrace, isFav, onToggleFav }) {
         <ConfidenceChip confidence={scores?.confidence ?? 0.3} />
       </div>
 
-      {/* Symbolic sun timeline: Nu / +1h / +2h */}
-      <div className="flex gap-2">
-        {['now', '1h', '2h'].map(key => {
-          const s = scores?.[key]?.total_score ?? 0
-          return (
-            <div key={key} className="flex-1 flex flex-col items-center gap-1.5 bg-white/5 rounded-xl py-2">
-              <div className="text-[10px] text-slate-500">{bestTimeLabel(key)}</div>
-              <SunDots score={s} />
-            </div>
-          )
-        })}
-      </div>
+      {/* Continuous sun timeline: now → sunset */}
+      <SunTimeline scores={scores} coords={coords} />
 
       {/* Explanation */}
       <p className="text-slate-500 text-xs leading-relaxed">{explanation}</p>
@@ -146,21 +186,22 @@ export default function SolView({ coords }) {
         </p>
       </div>
 
-      {/* Filter bar */}
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-        {/* Sol / Skugga toggle */}
+      {/* Sol / Skugga toggle — own row */}
+      <div className="flex gap-1.5">
         {['sol','skugga'].map(m => (
           <button key={m}
             onClick={() => setMode(m)}
-            className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
               mode === m ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
             }`}
           >
             {m === 'sol' ? '☀️ Sol' : '🌿 Skugga'}
           </button>
         ))}
-        <div className="w-px mx-1 bg-slate-700 self-stretch" />
-        {/* Type filter (no duplicate Alla) */}
+      </div>
+
+      {/* Type filter */}
+      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
         {TYPE_FILTERS.map(f => (
           <button key={f.value}
             onClick={() => setFilter(prev => ({ ...prev, type: f.value }))}
@@ -171,20 +212,6 @@ export default function SolView({ coords }) {
             {f.label}
           </button>
         ))}
-        {/* Bra sol toggle — hidden in skugga mode */}
-        {mode === 'sol' && (
-          <>
-            <div className="w-px mx-1 bg-slate-700 self-stretch" />
-            <button
-              onClick={() => setFilter(prev => ({ ...prev, minScore: prev.minScore === 70 ? 0 : 70 }))}
-              className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-                filter.minScore === 70 ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
-              }`}
-            >
-              Bra sol
-            </button>
-          </>
-        )}
       </div>
 
       {/* Loading */}
@@ -225,7 +252,7 @@ export default function SolView({ coords }) {
             {data.length} uteserveringar inom 2 km
           </p>
           {sortedData.map(t => (
-            <TerraceCard key={t.id} terrace={t} isFav={favs.has(t.id)} onToggleFav={toggleFav} />
+            <TerraceCard key={t.id} terrace={t} isFav={favs.has(t.id)} onToggleFav={toggleFav} coords={coords} />
           ))}
           <p className="text-white/30 text-xs px-1 pt-1">
             Data från OpenStreetMap · Solberäkning uppdateras löpande
