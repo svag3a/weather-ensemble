@@ -51,11 +51,11 @@ function amenityLabel(type) {
 }
 
 function scoreToColor(score) {
-  if (score <= 0)  return '#0f172a'
-  if (score < 25)  return '#1e3a5f'
-  if (score < 45)  return '#7c3500'
-  if (score < 65)  return '#c2410c'
-  return '#f59e0b'
+  if (score <= 0)  return '#0f172a'   // ingen sol — nästan svart
+  if (score < 25)  return '#7c2d12'   // svag sol — mörk brun-orange
+  if (score < 50)  return '#ea580c'   // måttlig sol — orange
+  if (score < 75)  return '#f59e0b'   // bra sol — amber
+  return '#fde047'                    // full sol — gul
 }
 
 // Format hours as "+1h", "+0:30h", "+1:30h"
