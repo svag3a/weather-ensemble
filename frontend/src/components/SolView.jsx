@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchSunTerraces, voteTerrrace } from '../api'
+import { fetchSunTerraces, voteTerrrace, createTerrace } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
 import { Moon, Sun, Parasol, ThumbsUp, ThumbsDown } from 'lucide-react'
 
@@ -195,6 +195,87 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) 
   )
 }
 
+// ── Add venue form ────────────────────────────────────────────────────────────
+const TYPE_OPTIONS = [
+  { value: 'cafe',       label: 'Café' },
+  { value: 'bar',        label: 'Bar' },
+  { value: 'pub',        label: 'Pub' },
+  { value: 'restaurant', label: 'Restaurang' },
+]
+
+function AddVenueForm({ coords, onSaved, onCancel }) {
+  const [name, setName]     = useState('')
+  const [type, setType]     = useState('restaurant')
+  const [saving, setSaving] = useState(false)
+  const [done, setDone]     = useState(false)
+  const [error, setError]   = useState(null)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!name.trim()) return
+    setSaving(true); setError(null)
+    try {
+      await createTerrace({
+        name: name.trim(),
+        lat: coords?.lat ?? 57.7089,
+        lon: coords?.lon ?? 11.9746,
+        amenity_type: type,
+      })
+      setDone(true)
+      setTimeout(onSaved, 1800)
+    } catch (err) {
+      setError('Kunde inte spara – försök igen')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (done) return (
+    <div className={`${GLASS} rounded-2xl p-5 text-center space-y-2`}>
+      <div className="text-2xl">🙌</div>
+      <p className="text-white font-medium text-sm">Tack! Stället är tillagt.</p>
+      <p className="text-slate-400 text-xs">Det dyker upp i listan efter ett ögonblick.</p>
+    </div>
+  )
+
+  return (
+    <div className={`${GLASS} rounded-2xl p-4 space-y-3`}>
+      <div className="flex items-center justify-between">
+        <p className="text-white text-sm font-medium">Lägg till ställe</p>
+        <button onClick={onCancel} className="text-slate-500 text-xs hover:text-slate-300">✕</button>
+      </div>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        <input
+          required
+          value={name} onChange={e => setName(e.target.value)}
+          placeholder="Ställets namn…"
+          className="w-full bg-black/30 text-white text-sm rounded-xl px-3 py-2 border border-white/10 placeholder-slate-500 focus:outline-none focus:border-white/30"
+        />
+        <div className="flex gap-1.5 flex-wrap">
+          {TYPE_OPTIONS.map(o => (
+            <button type="button" key={o.value} onClick={() => setType(o.value)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                type === o.value ? 'bg-white/20 text-white ring-1 ring-white/30' : 'bg-black/20 text-slate-500'
+              }`}>
+              {o.label}
+            </button>
+          ))}
+        </div>
+        {coords && (
+          <p className="text-slate-500 text-xs">
+            📍 Position sätts från din nuvarande plats ({coords.lat.toFixed(4)}, {coords.lon.toFixed(4)})
+          </p>
+        )}
+        {error && <p className="text-red-400 text-xs">{error}</p>}
+        <button type="submit" disabled={saving || !name.trim()}
+          className="w-full py-2 rounded-xl text-sm font-medium bg-white/15 text-white disabled:opacity-40 transition-colors active:bg-white/25">
+          {saving ? 'Sparar…' : 'Skicka in'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 // ── Votes localStorage ────────────────────────────────────────────────────────
 const VOTES_KEY = 'sol_votes'
 function loadVotes() { try { return JSON.parse(localStorage.getItem(VOTES_KEY) || '{}') } catch { return {} } }
@@ -215,6 +296,7 @@ export default function SolView({ coords }) {
   const [debouncedRadius, setDebouncedRadius] = useState(2.0)
   const [favs, setFavs]           = useState(loadFavs)
   const [votes, setVotes]         = useState(loadVotes)
+  const [showAdd, setShowAdd]     = useState(false)
   const [mode, setMode]           = useState('sol')
   const [search, setSearch]       = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -391,6 +473,13 @@ export default function SolView({ coords }) {
           <p className="text-white/30 text-xs px-1 pt-1">
             Data från OpenStreetMap · Solberäkning uppdateras löpande
           </p>
+          {showAdd
+            ? <AddVenueForm coords={coords} onSaved={() => { setShowAdd(false) }} onCancel={() => setShowAdd(false)} />
+            : <button onClick={() => setShowAdd(true)}
+                className="w-full py-2 text-slate-500 text-xs hover:text-slate-300 transition-colors text-center">
+                + Saknas ett ställe?
+              </button>
+          }
         </>
       )}
     </div>

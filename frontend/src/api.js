@@ -95,6 +95,16 @@ export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', m
   return res.json()
 }
 
+export async function createTerrace(fields) {
+  const res = await fetch(`${BASE}/sun-terraces/create`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(fields),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function voteTerrrace(id, vote, userLat, userLon) {
   const res = await fetch(`${BASE}/sun-terraces/${id}/vote`, {
     method: 'POST',

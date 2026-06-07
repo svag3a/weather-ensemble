@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { overrideTerrace, triggerGeocodeTerraces, fetchGeocodeStatus,
+import { overrideTerrace, createTerrace, triggerGeocodeTerraces, fetchGeocodeStatus,
          triggerEnrichOsm, fetchEnrichOsmStatus,
          triggerEnrichAi, fetchEnrichAiStatus } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
@@ -442,6 +442,113 @@ function JobWidget({ label, triggerFn, statusFn, color = 'blue' }) {
   )
 }
 
+// ── Add terrace panel ─────────────────────────────────────────────────────────
+
+function AddTerracePanel({ onSaved, onCancel }) {
+  const [name, setName]           = useState('')
+  const [amenityType, setAmenityType] = useState('restaurant')
+  const [address, setAddress]     = useState('')
+  const [outdoorType, setOutdoorType] = useState('terrace')
+  const [location, setLocation]   = useState(null)   // {lat, lng}
+  const [tileLayer, setTileLayer] = useState('sat')
+  const [saving, setSaving]       = useState(false)
+  const [error, setError]         = useState(null)
+
+  // Start centred on Göteborg
+  const center = location ? [location.lat, location.lng] : [57.7089, 11.9746]
+
+  async function handleSave() {
+    if (!name.trim()) { setError('Namn krävs'); return }
+    if (!location)    { setError('Klicka på kartan för att ange position'); return }
+    setSaving(true); setError(null)
+    try {
+      await createTerrace({
+        name: name.trim(),
+        lat: location.lat,
+        lon: location.lng,
+        amenity_type: amenityType,
+        address: address.trim() || null,
+        outdoor_type: outdoorType,
+      })
+      onSaved()
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-slate-800/80 border border-slate-600 rounded-xl p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-white text-sm font-semibold">Lägg till ställe</h3>
+        <button onClick={onCancel} className="text-slate-500 hover:text-slate-300 text-xs">✕ Avbryt</button>
+      </div>
+
+      {/* Map */}
+      <div className="flex flex-col gap-1">
+        <div className="flex gap-1 mb-1">
+          {[['sat','Satellit'],['osm','Karta']].map(([k,l]) => (
+            <button key={k} onClick={() => setTileLayer(k)}
+              className={`text-xs px-2 py-0.5 rounded border transition-colors ${tileLayer===k ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400'}`}>{l}</button>
+          ))}
+          <span className="text-slate-500 text-xs ml-2 self-center">Klicka på kartan för att ange position</span>
+        </div>
+        <div className="rounded-xl overflow-hidden border border-slate-600" style={{width:'100%', height:240}}>
+          <MapContainer center={center} zoom={13} maxZoom={21}
+            style={{width:'100%',height:'100%'}} zoomControl={true} attributionControl={false}>
+            <TileLayer key={tileLayer} url={TILES[tileLayer]} maxZoom={21}/>
+            {location && <Marker position={[location.lat, location.lng]}/>}
+            <MapClickHandler onClick={latlng => setLocation(latlng)}/>
+          </MapContainer>
+        </div>
+        {location && (
+          <p className="text-slate-500 text-xs">{location.lat.toFixed(5)}, {location.lng.toFixed(5)}</p>
+        )}
+      </div>
+
+      {/* Fields */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="col-span-2 flex flex-col gap-1">
+          <label className="text-slate-400 text-xs">Namn *</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="t.ex. Kaffeverket"
+            className="bg-slate-700 text-slate-200 text-sm rounded px-3 py-1.5 border border-slate-600 focus:outline-none focus:border-blue-500"/>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-slate-400 text-xs">Typ</label>
+          <select value={amenityType} onChange={e => setAmenityType(e.target.value)}
+            className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600">
+            {['restaurant','cafe','bar','pub'].map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-slate-400 text-xs">Uteserveringstyp</label>
+          <select value={outdoorType} onChange={e => setOutdoorType(e.target.value)}
+            className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600">
+            {[['terrace','Uteservering'],['rooftop','Rooftop'],['none','Ingen'],['unknown','Okänd']].map(([v,l]) =>
+              <option key={v} value={v}>{l}</option>)}
+          </select>
+        </div>
+        <div className="col-span-2 flex flex-col gap-1">
+          <label className="text-slate-400 text-xs">Adress (valfritt)</label>
+          <input value={address} onChange={e => setAddress(e.target.value)} placeholder="t.ex. Avenyn 1"
+            className="bg-slate-700 text-slate-200 text-sm rounded px-3 py-1.5 border border-slate-600 focus:outline-none focus:border-blue-500"/>
+        </div>
+      </div>
+
+      <div className="flex gap-2 items-center">
+        <button onClick={handleSave} disabled={saving}
+          className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors">
+          {saving ? 'Sparar…' : 'Spara ställe'}
+        </button>
+        {error && <span className="text-red-400 text-xs">{error}</span>}
+      </div>
+    </div>
+  )
+}
+
+// ── Geocode widget ────────────────────────────────────────────────────────────
+
 function GeocodeWidget() {
   const [status, setStatus] = useState(null)
   const [triggering, setTriggering] = useState(false)
@@ -506,6 +613,7 @@ function GeocodeWidget() {
 
 export default function SunTerraceAdmin({ data, onOverride, onReload }) {
   const [editingId, setEditingId]     = useState(null)
+  const [showAdd, setShowAdd]         = useState(false)
   const [typeFilter, setTypeFilter]   = useState('all')
   const [activeFilter, setActiveFilter] = useState('active')
   const [oriFilter, setOriFilter]     = useState('all')
@@ -551,11 +659,22 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
         <JobWidget label="Orientering OSM" triggerFn={triggerEnrichOsm} statusFn={fetchEnrichOsmStatus} color="emerald"/>
         <JobWidget label="AI-berikning" triggerFn={triggerEnrichAi} statusFn={fetchEnrichAiStatus} color="blue"/>
         <GeocodeWidget />
+        <button onClick={() => setShowAdd(v => !v)}
+          className={`ml-auto text-xs px-3 py-2 rounded-lg border transition-colors ${showAdd ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600'}`}>
+          {showAdd ? '✕ Avbryt' : '+ Lägg till ställe'}
+        </button>
         <button onClick={onReload}
-          className="ml-auto bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-600 transition-colors">
+          className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-600 transition-colors">
           Ladda om
         </button>
       </div>
+
+      {showAdd && (
+        <AddTerracePanel
+          onSaved={() => { setShowAdd(false); onReload?.() }}
+          onCancel={() => setShowAdd(false)}
+        />
+      )}
 
       {/* Search */}
       <input

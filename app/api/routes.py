@@ -1100,3 +1100,48 @@ def vote_terrace(
     db.add(row)
     db.commit()
     return {"status": "ok", "terrace_id": terrace_id, "vote": body.vote}
+
+
+class CreateTerraceBody(BaseModel):
+    name: str
+    lat: float
+    lon: float
+    amenity_type: str = "restaurant"
+    address: Optional[str] = None
+    outdoor_type: str = "unknown"
+    orientation: Optional[str] = None
+    orientation_confidence: float = 0.3
+
+
+@router.post("/sun-terraces/create", status_code=201)
+def create_terrace(body: CreateTerraceBody, db: Session = Depends(get_db)):
+    """Manually create a terrace not in OSM. No auth required — open for user suggestions."""
+    import uuid as _uuid
+    valid_types = {"restaurant", "cafe", "bar", "pub"}
+    if body.amenity_type not in valid_types:
+        raise HTTPException(status_code=400, detail="Invalid amenity_type")
+    valid_ori = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "UNKNOWN", None}
+    if body.orientation not in valid_ori:
+        raise HTTPException(status_code=400, detail="Invalid orientation")
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    t = SunTerrace(
+        source="manual",
+        source_id=f"manual_{_uuid.uuid4().hex[:12]}",
+        name=body.name.strip(),
+        lat=body.lat,
+        lon=body.lon,
+        amenity_type=body.amenity_type,
+        address=body.address,
+        outdoor_seating=True,
+        outdoor_type=body.outdoor_type,
+        street_orientation=body.orientation or "UNKNOWN",
+        orientation_confidence=body.orientation_confidence,
+        active=True,
+        last_seen_at=now,
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(t)
+    db.commit()
+    db.refresh(t)
+    return {"id": t.id, "name": t.name, "source_id": t.source_id}
