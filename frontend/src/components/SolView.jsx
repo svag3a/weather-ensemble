@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchSunTerraces } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
-import { Moon, Sun, Palmtree } from 'lucide-react'
+import { Moon, Sun, Parasol } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -187,7 +187,7 @@ export default function SolView({ coords }) {
 
       {/* Filter bar: Sol/Skugga icons + divider + type filters */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-        {[{m:'sol', Icon:Sun}, {m:'skugga', Icon:Palmtree}].map(({m, Icon}) => (
+        {[{m:'sol', Icon:Sun}, {m:'skugga', Icon:Parasol}].map(({m, Icon}) => (
           <button key={m}
             onClick={() => setMode(m)}
             className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
