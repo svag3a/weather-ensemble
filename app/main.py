@@ -44,6 +44,14 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE sun_terraces ADD COLUMN street_orientation TEXT",
             "ALTER TABLE sun_terraces ADD COLUMN outdoor_type TEXT DEFAULT 'unknown'",
             "ALTER TABLE sun_terraces ADD COLUMN polygon_coords TEXT",
+            """CREATE TABLE IF NOT EXISTS terrace_votes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                terrace_id INTEGER NOT NULL,
+                vote INTEGER NOT NULL,
+                voted_at DATETIME NOT NULL,
+                user_lat REAL,
+                user_lon REAL
+            )""",
         ]:
             try:
                 conn.execute(text(stmt))

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchSunTerraces } from '../api'
+import { fetchSunTerraces, voteTerrrace } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
 import { Moon, Sun, Parasol } from 'lucide-react'
 
@@ -122,25 +122,68 @@ function SunTimeline({ scores, coords }) {
   )
 }
 
+// ── Vote button ───────────────────────────────────────────────────────────────
+function VoteButton({ dir, active, onClick }) {
+  const [burst, setBurst] = useState(false)
+
+  function handleClick() {
+    setBurst(true)
+    setTimeout(() => setBurst(false), 600)
+    onClick()
+  }
+
+  const isUp = dir === 1
+  const emoji = isUp ? '👍' : '👎'
+  const activeColor = isUp ? 'text-green-400' : 'text-red-400'
+  const activeBg   = isUp ? 'bg-green-400/15' : 'bg-red-400/15'
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`relative flex items-center justify-center w-8 h-8 rounded-xl text-base transition-all select-none
+        ${active ? `${activeBg} ${activeColor} scale-110` : 'text-slate-600 hover:text-slate-400'}
+        ${burst ? 'scale-125' : ''}`}
+      style={{ transition: burst ? 'transform 0.1s ease-out' : 'transform 0.3s ease' }}
+    >
+      {emoji}
+      {/* Burst ring */}
+      {burst && (
+        <span className={`absolute inset-0 rounded-xl border-2 ${isUp ? 'border-green-400' : 'border-red-400'} animate-ping opacity-60`}/>
+      )}
+    </button>
+  )
+}
+
 // ── Terrace card ──────────────────────────────────────────────────────────────
-function TerraceCard({ terrace, isFav, onToggleFav, coords }) {
-  const { id, name, address, amenity_type, street_orientation, scores } = terrace
+function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) {
+  const { id, name, address, amenity_type, street_orientation, scores, outdoor_type } = terrace
   const best = scores?.best_time ?? 'now'
   const altitude = scores?.[best]?.sun_altitude
+  const isRooftop = outdoor_type === 'rooftop'
 
   return (
     <div className={`${GLASS} rounded-2xl p-4 space-y-3`}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-white font-medium leading-tight truncate">{name}</div>
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            <span className="text-white font-medium leading-tight truncate">{name}</span>
+            {isRooftop && (
+              <span className="text-amber-400 text-[10px] font-medium tracking-wide shrink-0">ROOFTOP</span>
+            )}
+          </div>
           {address && <div className="text-slate-400 text-xs mt-0.5 truncate">{address}</div>}
           <div className="text-slate-500 text-xs mt-0.5">{amenityLabel(amenity_type)}</div>
         </div>
-        <button onClick={() => onToggleFav(id)}
-          className="shrink-0 text-lg leading-none transition-opacity"
-          style={{ opacity: isFav ? 1 : 0.3 }}>
-          {isFav ? '★' : '☆'}
-        </button>
+        {/* Star + vote buttons stacked */}
+        <div className="flex flex-col items-center gap-1 shrink-0">
+          <button onClick={() => onToggleFav(id)}
+            className="text-lg leading-none transition-opacity"
+            style={{ opacity: isFav ? 1 : 0.3 }}>
+            {isFav ? '★' : '☆'}
+          </button>
+          <VoteButton dir={1}  active={userVote === 1}  onClick={() => onVote(id, 1)}  />
+          <VoteButton dir={-1} active={userVote === -1} onClick={() => onVote(id, -1)} />
+        </div>
       </div>
       <div className="flex items-center gap-3 text-xs text-slate-500">
         {altitude != null && altitude > 0 && <span>Sol {Math.round(altitude)}°</span>}
@@ -151,6 +194,11 @@ function TerraceCard({ terrace, isFav, onToggleFav, coords }) {
     </div>
   )
 }
+
+// ── Votes localStorage ────────────────────────────────────────────────────────
+const VOTES_KEY = 'sol_votes'
+function loadVotes() { try { return JSON.parse(localStorage.getItem(VOTES_KEY) || '{}') } catch { return {} } }
+function saveVotes(obj) { localStorage.setItem(VOTES_KEY, JSON.stringify(obj)) }
 
 // ── Favourites ────────────────────────────────────────────────────────────────
 const FAVS_KEY = 'sol_favourites'
@@ -166,6 +214,7 @@ export default function SolView({ coords }) {
   const [radius, setRadius]       = useState(2.0)
   const [debouncedRadius, setDebouncedRadius] = useState(2.0)
   const [favs, setFavs]           = useState(loadFavs)
+  const [votes, setVotes]         = useState(loadVotes)
   const [mode, setMode]           = useState('sol')
   const [search, setSearch]       = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -180,6 +229,19 @@ export default function SolView({ coords }) {
       return next
     })
   }, [])
+
+  const handleVote = useCallback((id, dir) => {
+    setVotes(prev => {
+      // Toggle: clicking same direction again removes the vote
+      const next = { ...prev, [id]: prev[id] === dir ? 0 : dir }
+      saveVotes(next)
+      return next
+    })
+    // Fire-and-forget to backend (include user location if available)
+    const lat = coords?.lat ?? null
+    const lon = coords?.lon ?? null
+    voteTerrrace(id, dir, lat, lon).catch(() => {})
+  }, [coords])
 
   function toggleType(t) {
     setSelectedTypes(prev => {
@@ -321,7 +383,10 @@ export default function SolView({ coords }) {
             {data.length} uteserveringar{debouncedSearch ? '' : ` inom ${debouncedRadius} km`}
           </p>
           {sortedData.map(t => (
-            <TerraceCard key={t.id} terrace={t} isFav={favs.has(t.id)} onToggleFav={toggleFav} coords={coords}/>
+            <TerraceCard key={t.id} terrace={t}
+              isFav={favs.has(t.id)} onToggleFav={toggleFav}
+              userVote={votes[t.id] ?? 0} onVote={handleVote}
+              coords={coords}/>
           ))}
           <p className="text-white/30 text-xs px-1 pt-1">
             Data från OpenStreetMap · Solberäkning uppdateras löpande

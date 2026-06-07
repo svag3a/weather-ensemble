@@ -153,3 +153,13 @@ class SunTerrace(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TerraceVote(Base):
+    __tablename__ = "terrace_votes"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    terrace_id: Mapped[int] = mapped_column(Integer, index=True)
+    vote: Mapped[int] = mapped_column(Integer)        # +1 thumbs up, -1 thumbs down
+    voted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    user_lat: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    user_lon: Mapped[Optional[float]] = mapped_column(Float, nullable=True)

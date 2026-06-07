@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import math as _math
 
 from app.database import get_db
-from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace
+from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace, TerraceVote
 from app.api.auth import get_current_user
 
 router = APIRouter()
@@ -1070,3 +1070,33 @@ def override_sun_terrace(
         "amenity_type": terrace.amenity_type,
         "active": terrace.active,
     }
+
+
+class TerraceVoteBody(BaseModel):
+    vote: int           # +1 or -1
+    user_lat: Optional[float] = None
+    user_lon: Optional[float] = None
+
+
+@router.post("/sun-terraces/{terrace_id}/vote", status_code=201)
+def vote_terrace(
+    terrace_id: int,
+    body: TerraceVoteBody,
+    db: Session = Depends(get_db),
+):
+    """Submit a thumbs-up (+1) or thumbs-down (-1) vote for a terrace."""
+    if body.vote not in (1, -1):
+        raise HTTPException(status_code=400, detail="vote must be +1 or -1")
+    terrace = db.query(SunTerrace).filter(SunTerrace.id == terrace_id).first()
+    if terrace is None:
+        raise HTTPException(status_code=404, detail="Terrace not found")
+    row = TerraceVote(
+        terrace_id=terrace_id,
+        vote=body.vote,
+        voted_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        user_lat=body.user_lat,
+        user_lon=body.user_lon,
+    )
+    db.add(row)
+    db.commit()
+    return {"status": "ok", "terrace_id": terrace_id, "vote": body.vote}
