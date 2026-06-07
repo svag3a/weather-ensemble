@@ -35,6 +35,12 @@ function amenityLabel(type) {
   return map[type] ?? type
 }
 
+function cardGradient(score) {
+  if (score >= 70) return 'linear-gradient(135deg, #1e3a5f 0%, #92400e 50%, #f59e0b 100%)'
+  if (score >= 40) return 'linear-gradient(135deg, #1e3a5f 0%, #374151 60%, #78716c 100%)'
+  return 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
+}
+
 function TerraceCard({ terrace }) {
   const { name, address, amenity_type, street_orientation, scores, best_score, explanation } = terrace
   const now_score = scores?.now?.total_score ?? 0
@@ -44,8 +50,8 @@ function TerraceCard({ terrace }) {
 
   return (
     <div
-      className={`${GLASS} rounded-2xl p-4 space-y-3`}
-      style={{ borderLeft: `3px solid ${scoreColor(best_score)}` }}
+      className="rounded-2xl p-4 space-y-3 backdrop-blur-sm border border-white/10"
+      style={{ background: cardGradient(best_score) }}
     >
       {/* Header: score badge + name */}
       <div className="flex items-start gap-3">
