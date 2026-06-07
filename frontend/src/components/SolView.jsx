@@ -99,6 +99,7 @@ export default function SolView({ coords }) {
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState({ type: 'all', minScore: 0 })
   const [favs, setFavs] = useState(loadFavs)
+  const [mode, setMode] = useState('sol')   // 'sol' | 'skugga'
 
   const toggleFav = useCallback((id) => {
     setFavs(prev => {
@@ -125,48 +126,65 @@ export default function SolView({ coords }) {
     { value: 'bar',        label: 'Bar' },
     { value: 'restaurant', label: 'Restaurang' },
   ]
-  const SCORE_FILTERS = [
-    { value: 0,  label: 'Alla' },
-    { value: 70, label: 'Bra sol' },
-  ]
+
+  // Sort/filter based on mode
+  const sortedData = data ? [...data].sort((a, b) => {
+    const favDiff = (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0)
+    if (favDiff !== 0) return favDiff
+    return mode === 'skugga'
+      ? (a.best_score ?? 0) - (b.best_score ?? 0)   // low score first
+      : (b.best_score ?? 0) - (a.best_score ?? 0)    // high score first
+  }) : []
 
   return (
     <div className="space-y-3">
       {/* Header */}
       <div className="px-1">
         <h1 className="text-white font-semibold text-lg">Solsökaren</h1>
-        <p className="text-slate-400 text-xs mt-0.5">Uteserveringar med bäst solläge just nu</p>
+        <p className="text-slate-400 text-xs mt-0.5">
+          {mode === 'sol' ? 'Uteserveringar med bäst solläge just nu' : 'Uteserveringar i skugga just nu'}
+        </p>
       </div>
 
-      {/* Filter bar — type */}
+      {/* Filter bar */}
       <div className="flex gap-1.5 overflow-x-auto pb-0.5">
-        {TYPE_FILTERS.map(f => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(prev => ({ ...prev, type: f.value }))}
+        {/* Sol / Skugga toggle */}
+        {['sol','skugga'].map(m => (
+          <button key={m}
+            onClick={() => setMode(m)}
             className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-              filter.type === f.value
-                ? 'bg-white/20 text-white'
-                : 'bg-black/20 text-slate-400'
+              mode === m ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
             }`}
           >
-            {f.label}
+            {m === 'sol' ? '☀️ Sol' : '🌿 Skugga'}
           </button>
         ))}
         <div className="w-px mx-1 bg-slate-700 self-stretch" />
-        {SCORE_FILTERS.map(f => (
-          <button
-            key={f.value}
-            onClick={() => setFilter(prev => ({ ...prev, minScore: f.value }))}
+        {/* Type filter (no duplicate Alla) */}
+        {TYPE_FILTERS.map(f => (
+          <button key={f.value}
+            onClick={() => setFilter(prev => ({ ...prev, type: f.value }))}
             className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
-              filter.minScore === f.value
-                ? 'bg-white/20 text-white'
-                : 'bg-black/20 text-slate-400'
+              filter.type === f.value ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
             }`}
           >
             {f.label}
           </button>
         ))}
+        {/* Bra sol toggle — hidden in skugga mode */}
+        {mode === 'sol' && (
+          <>
+            <div className="w-px mx-1 bg-slate-700 self-stretch" />
+            <button
+              onClick={() => setFilter(prev => ({ ...prev, minScore: prev.minScore === 70 ? 0 : 70 }))}
+              className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                filter.minScore === 70 ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
+              }`}
+            >
+              Bra sol
+            </button>
+          </>
+        )}
       </div>
 
       {/* Loading */}
@@ -206,10 +224,9 @@ export default function SolView({ coords }) {
           <p className="text-slate-500 text-xs px-1">
             {data.length} uteserveringar inom 2 km
           </p>
-          {[...data].sort((a, b) => (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0))
-            .map(t => (
-              <TerraceCard key={t.id} terrace={t} isFav={favs.has(t.id)} onToggleFav={toggleFav} />
-            ))}
+          {sortedData.map(t => (
+            <TerraceCard key={t.id} terrace={t} isFav={favs.has(t.id)} onToggleFav={toggleFav} />
+          ))}
           <p className="text-white/30 text-xs px-1 pt-1">
             Data från OpenStreetMap · Solberäkning uppdateras löpande
           </p>
