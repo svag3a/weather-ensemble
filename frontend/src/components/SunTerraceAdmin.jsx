@@ -323,17 +323,21 @@ function EditPanel({ terrace, onSave, onCancel }) {
 
   return (
     <tr>
-      <td colSpan={8} className="px-4 py-4 bg-slate-800/60 border-t border-b border-slate-600">
+      <td colSpan={7} className="px-4 py-4 bg-slate-800/60 border-t border-b border-slate-600">
         <div className="flex gap-6 flex-wrap items-start">
 
           {/* Map */}
           <div className="flex flex-col gap-1.5 flex-shrink-0">
-            {/* Tile toggle */}
-            <div className="flex gap-1">
+            {/* Tile toggle + arc mode indicator */}
+            <div className="flex items-center gap-2 flex-wrap">
               {[['sat','Satellit'],['osm','Karta']].map(([k,l]) => (
                 <button key={k} onClick={() => setTileLayer(k)}
                   className={`text-xs px-2 py-0.5 rounded border transition-colors ${tileLayer===k ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400'}`}>{l}</button>
               ))}
+              <div className="w-px bg-slate-600 self-stretch mx-0.5"/>
+              <span className="text-xs px-2 py-0.5 rounded border bg-amber-700 border-amber-500 text-white">
+                ☀ Rita solbåge
+              </span>
             </div>
             {/* Instruction */}
             <p className="text-slate-500 text-xs">
