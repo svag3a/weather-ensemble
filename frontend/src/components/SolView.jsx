@@ -396,6 +396,15 @@ export default function SolView({ coords }) {
         className="w-full bg-black/20 text-white text-sm rounded-xl px-3 py-2 border border-white/10 placeholder-slate-500 focus:outline-none focus:border-white/30"
       />
 
+      {/* Add venue */}
+      {showAdd
+        ? <AddVenueForm coords={coords} onSaved={() => setShowAdd(false)} onCancel={() => setShowAdd(false)} />
+        : <button onClick={() => setShowAdd(true)}
+            className="w-full py-1.5 rounded-xl text-xs text-slate-500 hover:text-slate-300 bg-black/10 border border-white/5 transition-colors">
+            + Saknas ett ställe?
+          </button>
+      }
+
       {/* Filter bar: Sol/Skugga | type toggles */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
         {[{m:'sol', Icon:Sun}, {m:'skugga', Icon:Parasol}].map(({m, Icon}) => (
@@ -473,13 +482,6 @@ export default function SolView({ coords }) {
           <p className="text-white/30 text-xs px-1 pt-1">
             Data från OpenStreetMap · Solberäkning uppdateras löpande
           </p>
-          {showAdd
-            ? <AddVenueForm coords={coords} onSaved={() => { setShowAdd(false) }} onCancel={() => setShowAdd(false)} />
-            : <button onClick={() => setShowAdd(true)}
-                className="w-full py-2 text-slate-500 text-xs hover:text-slate-300 transition-colors text-center">
-                + Saknas ett ställe?
-              </button>
-          }
         </>
       )}
     </div>
