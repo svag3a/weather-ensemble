@@ -945,6 +945,41 @@ function DayRow({ hours, warnings, weekMin, weekMax }) {
   )
 }
 
+// ── WeekDaysAccordion — accordion wrapper for WeekDayRow list ─────────────────
+
+function WeekDaysAccordion({ visibleDays, summaries, wMin, wMax, cutoff48, warnings }) {
+  const [openIdx, setOpenIdx] = useState(null)
+
+  function toggle(i) {
+    setOpenIdx(prev => prev === i ? null : i)
+  }
+
+  return (
+    <div className={`${GLASS} rounded-2xl overflow-hidden`}>
+      {visibleDays.map((hours, i) => {
+        const { minTemp, maxTemp, symbol, totalPrecipMm, maxWind } = summaries[i]
+        return (
+          <WeekDayRow
+            key={i}
+            hours={hours}
+            minTemp={minTemp}
+            maxTemp={maxTemp}
+            symbol={symbol}
+            totalPrecipMm={totalPrecipMm}
+            maxWind={maxWind}
+            weekMin={wMin}
+            weekMax={wMax}
+            isHourly={parseTS(hours[0].valid_for) < cutoff48}
+            warnings={warnings}
+            open={openIdx === i}
+            onToggle={() => toggle(i)}
+          />
+        )
+      })}
+    </div>
+  )
+}
+
 // ── WeekView ──────────────────────────────────────────────────────────────────
 
 function tempToColor(t) {
@@ -1042,8 +1077,10 @@ function WeekView({ warnings }) {
   )
 }
 
-function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, weekMin, weekMax, isHourly, warnings }) {
-  const [open, setOpen] = useState(false)
+function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, weekMin, weekMax, isHourly, warnings, open: openProp, onToggle }) {
+  const [openInternal, setOpenInternal] = useState(false)
+  const open   = openProp !== undefined ? openProp : openInternal
+  const toggle = onToggle ?? (() => setOpenInternal(o => !o))
   const label      = dayLabel(hours[0].valid_for)
   const date       = dateLabel(hours[0].valid_for)
   const showPrecip = totalPrecipMm >= 0.1
@@ -1058,7 +1095,7 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
   return (
     <div className="border-b border-slate-700/50 last:border-0">
       <button
-        onClick={() => setOpen(o => !o)}
+        onClick={toggle}
         className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-slate-700/50 transition-colors"
       >
         {/* Day name + date */}
@@ -1810,7 +1847,7 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
 
 // ── Swipe navigation ──────────────────────────────────────────────────────────
 
-const TAB_ORDER = ['now', 'week', 'analysis', 'warnings', 'sources', 'sol']
+const TAB_ORDER = ['now', 'analysis', 'warnings', 'sources', 'sol']
 
 // slideDir: 1 = forward (enter from right), -1 = backward (enter from left)
 const slideVariants = {
@@ -1900,8 +1937,8 @@ export default function MobileApp() {
   const load = useCallback(async () => {
     try {
       setForecast(coords
-        ? await fetchLocalForecast(coords.lat, coords.lon, 72)
-        : await fetchEnsemble(72))
+        ? await fetchLocalForecast(coords.lat, coords.lon, 168)
+        : await fetchEnsemble(168))
     } catch {}
   }, [coords])
 
@@ -1965,27 +2002,28 @@ export default function MobileApp() {
                     )
                   })()}
 
-                  {/* 6-timmarsprognos + kommande dagar */}
+                  {/* 6-timmarsprognos + kommande dagar (accordion – bara en dag öppen) */}
                   {(() => {
                     const visibleDays = days.slice(1).filter(h => h.length >= 23)
-                    const allSummaries = visibleDays.map(getDaySummary)
-                    const wMin = Math.min(...allSummaries.map(s => s.minTemp ?? 99))
-                    const wMax = Math.max(...allSummaries.map(s => s.maxTemp ?? -99))
+                    const summaries   = visibleDays.map(getDaySummary)
+                    const wMin = Math.min(...summaries.map(s => s.minTemp ?? 99))
+                    const wMax = Math.max(...summaries.map(s => s.maxTemp ?? -99))
+                    const cutoff48 = new Date(Date.now() + 48 * 3600 * 1000)
                     return (
                       <>
-                        {/* 6-timmarsprognos precis över "imorgon"-kortet */}
                         <SixHourTable forecasts={future} />
-                        {visibleDays.map((hours, i) => (
-                          <DayRow key={i} hours={hours} warnings={warnings} weekMin={wMin} weekMax={wMax} />
-                        ))}
+                        <WeekDaysAccordion
+                          visibleDays={visibleDays}
+                          summaries={summaries}
+                          wMin={wMin}
+                          wMax={wMax}
+                          cutoff48={cutoff48}
+                          warnings={warnings}
+                        />
                       </>
                     )
                   })()}
                 </>
-              )}
-
-              {activeTab === 'week' && (
-                <WeekView warnings={warnings} />
               )}
 
               {activeTab === 'analysis' && (
@@ -2019,16 +2057,7 @@ export default function MobileApp() {
             }`}
           >
             <Thermometer size={22} strokeWidth={1.5} />
-            <span>Nu</span>
-          </button>
-          <button
-            onClick={() => changeTab('week')}
-            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'week' ? 'text-white' : 'text-slate-500'
-            }`}
-          >
-            <CalendarDays size={22} strokeWidth={1.5} />
-            <span>Vecka</span>
+            <span>Väder</span>
           </button>
           <button
             onClick={() => changeTab('analysis')}
