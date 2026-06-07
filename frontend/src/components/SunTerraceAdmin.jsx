@@ -246,6 +246,24 @@ const TILES = {
   osm: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
 }
 
+// Build a sector polygon [[lat,lon],...] for the Leaflet map
+function createSectorPolygon(lat, lon, fromBearing, toBearing, radiusM = 80) {
+  const cosLat = Math.cos(lat * Math.PI / 180)
+  const span = (toBearing - fromBearing + 360) % 360 || 360
+  const steps = Math.max(12, Math.ceil(span / 8))
+  const pts = [[lat, lon]]
+  for (let i = 0; i <= steps; i++) {
+    const b = (fromBearing + span * i / steps) % 360
+    const rad = b * Math.PI / 180
+    pts.push([
+      lat  + (radiusM / 111000) * Math.cos(rad),
+      lon  + (radiusM / (111000 * cosLat)) * Math.sin(rad),
+    ])
+  }
+  pts.push([lat, lon])
+  return pts
+}
+
 const OUTDOOR_TYPES = [
   { value: 'unknown',  label: 'Okänd',     desc: 'Vet ej om det finns uteservering' },
   { value: 'terrace',  label: 'Uteservering', desc: 'Vanlig uteservering' },
@@ -266,8 +284,9 @@ function EditPanel({ terrace, onSave, onCancel }) {
   const [active, setActive]             = useState(terrace.active ?? true)
   const [outdoorType, setOutdoorType]   = useState(terrace.outdoor_type || 'unknown')
   const [tileLayer, setTileLayer]       = useState('sat')
-  const [mapMode, setMapMode]           = useState('direction')  // 'direction' | 'polygon'
+  const [mapMode, setMapMode]           = useState('direction')  // 'direction' | 'polygon' | 'arc'
   const [clickPoint, setClickPoint]     = useState(null)
+  const [arcClickStep, setArcClickStep] = useState(0)  // 0=first point, 1=second point
   // polygon: array of [lat, lon]; null = no polygon yet
   const [polygon, setPolygon]           = useState(() => {
     if (terrace.polygon_coords) {
@@ -287,6 +306,13 @@ function EditPanel({ terrace, onSave, onCancel }) {
       const dir = bearingToDir(calcBearing(terrace.lat, terrace.lon, latlng.lat, latlng.lng))
       setOrientation(dir)
       setConfidence(0.9)
+    } else if (mapMode === 'arc') {
+      const b = Math.round(calcBearing(terrace.lat, terrace.lon, latlng.lat, latlng.lng))
+      if (arcClickStep === 0) {
+        setArcFrom(b); setArcTo(null); setArcClickStep(1)
+      } else {
+        setArcTo(b); setArcClickStep(0); setConfidence(1.0)
+      }
     } else {
       // Polygon mode — add vertex
       setDrawingVerts(prev => [...prev, [latlng.lat, latlng.lng]])
@@ -356,18 +382,26 @@ function EditPanel({ terrace, onSave, onCancel }) {
                   className={`text-xs px-2 py-0.5 rounded border transition-colors ${tileLayer===k ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400'}`}>{l}</button>
               ))}
               <div className="w-px bg-slate-600 self-stretch mx-0.5"/>
-              {[['direction','Punkt-riktning'],['polygon','Rita polygon']].map(([k,l]) => (
-                <button key={k} onClick={() => { setMapMode(k); setDrawingVerts([]) }}
-                  className={`text-xs px-2 py-0.5 rounded border transition-colors ${mapMode===k ? 'bg-emerald-700 border-emerald-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400'}`}>{l}</button>
+              {[['direction','Punkt-riktning'],['polygon','Rita polygon'],['arc','Rita solbåge']].map(([k,l]) => (
+                <button key={k} onClick={() => { setMapMode(k); setDrawingVerts([]); setArcClickStep(0) }}
+                  className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+                    mapMode===k
+                      ? k==='arc' ? 'bg-amber-700 border-amber-500 text-white' : 'bg-emerald-700 border-emerald-500 text-white'
+                      : 'bg-slate-700 border-slate-600 text-slate-400'
+                  }`}>{l}</button>
               ))}
             </div>
             {/* Instruction */}
             <p className="text-slate-500 text-xs">
               {mapMode === 'direction'
-                ? 'Klicka i kartan i riktningen uteserveringen vetter mot'
-                : drawingVerts.length < 3
-                  ? `Klicka för att lägga till hörn (${drawingVerts.length} av minst 3)`
-                  : `${drawingVerts.length} hörn — klicka "Stäng polygon" när du är klar`}
+                ? 'Klicka i riktningen uteserveringen vetter mot'
+                : mapMode === 'arc'
+                  ? arcClickStep === 0
+                    ? 'Klicka för bågstart (var solen börjar nå terrassen)'
+                    : 'Klicka för bågslut (var solen slutar nå terrassen)'
+                  : drawingVerts.length < 3
+                    ? `Klicka för att lägga till hörn (${drawingVerts.length} av minst 3)`
+                    : `${drawingVerts.length} hörn — klicka "Stäng polygon"`}
             </p>
             <div className="rounded-xl overflow-hidden border border-slate-600" style={{width:360, height:280}}>
               <MapContainer center={[terrace.lat, terrace.lon]} zoom={18} maxZoom={21}
@@ -382,6 +416,13 @@ function EditPanel({ terrace, onSave, onCancel }) {
                     <Polyline positions={[[terrace.lat, terrace.lon],[clickPoint.lat, clickPoint.lng]]}
                       pathOptions={{color:'#60a5fa', weight:2, dashArray:'5,5'}}/>
                   </>
+                )}
+                {/* Solar arc sector */}
+                {arcFrom != null && arcTo != null && (
+                  <Polygon
+                    positions={createSectorPolygon(terrace.lat, terrace.lon, arcFrom, arcTo)}
+                    pathOptions={{color:'#f59e0b', fillColor:'#f59e0b', fillOpacity:0.18, weight:2, dashArray: mapMode==='arc' ? null : '4,4'}}
+                  />
                 )}
                 {/* Saved polygon */}
                 {polygon && (
@@ -420,11 +461,36 @@ function EditPanel({ terrace, onSave, onCancel }) {
             {polygon && mapMode !== 'polygon' && (
               <div className="flex items-center gap-2">
                 <p className="text-green-400 text-xs">✓ Polygon ({polygon.length} hörn)</p>
-                <button onClick={clearPolygon}
-                  className="text-xs text-red-400 hover:text-red-300 transition-colors">
-                  Ta bort
-                </button>
+                <button onClick={clearPolygon} className="text-xs text-red-400 hover:text-red-300 transition-colors">Ta bort</button>
               </div>
+            )}
+            {/* Arc status */}
+            {arcFrom != null && (
+              <div className="flex items-center gap-2 flex-wrap">
+                {arcTo != null ? (
+                  <>
+                    <span className="text-amber-400 text-xs">
+                      ☀ Båge {Math.round(arcFrom)}°→{Math.round(arcTo)}° ({Math.round((arcTo-arcFrom+360)%360||360)}°)
+                    </span>
+                    <button onClick={() => { setArcFrom(null); setArcTo(null); setArcClickStep(0) }}
+                      className="text-xs text-red-400 hover:text-red-300 transition-colors">Ta bort</button>
+                    {polygon && (
+                      <button onClick={async () => {
+                        try { const r = await deriveArcFromPolygon(terrace.id); setArcFrom(r.sun_arc_from); setArcTo(r.sun_arc_to) }
+                        catch (e) { alert(e.message) }
+                      }} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">Härledd från polygon</button>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-slate-400 text-xs">Start satt ({Math.round(arcFrom)}°) — klicka för slutpunkt</span>
+                )}
+              </div>
+            )}
+            {arcFrom == null && mapMode === 'arc' && polygon && (
+              <button onClick={async () => {
+                try { const r = await deriveArcFromPolygon(terrace.id); setArcFrom(r.sun_arc_from); setArcTo(r.sun_arc_to) }
+                catch (e) { alert(e.message) }
+              }} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">Härledd från polygon</button>
             )}
           </div>
 
@@ -454,30 +520,6 @@ function EditPanel({ terrace, onSave, onCancel }) {
               <input type="range" min="0" max="1" step="0.05" value={confidence}
                 onChange={e => setConfidence(e.target.value)} className="w-28 accent-blue-500"/>
               <span className="text-slate-400 text-xs">{(confidence*100).toFixed(0)}%</span>
-            </div>
-
-            {/* Solar arc */}
-            <div>
-              <p className="text-slate-400 text-xs mb-1">Solbåge — klicka start sedan slut (medurs)</p>
-              <ArcPicker
-                arcFrom={arcFrom} arcTo={arcTo}
-                onChange={(f, t) => { setArcFrom(f); setArcTo(t) }}
-                onClear={() => { setArcFrom(null); setArcTo(null) }}
-              />
-              {polygon && (
-                <button
-                  onClick={async () => {
-                    try {
-                      const res = await deriveArcFromPolygon(terrace.id)
-                      setArcFrom(res.sun_arc_from)
-                      setArcTo(res.sun_arc_to)
-                    } catch (e) { alert(e.message) }
-                  }}
-                  className="mt-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
-                >
-                  Härledd från polygon
-                </button>
-              )}
             </div>
 
             {/* Outdoor type */}
