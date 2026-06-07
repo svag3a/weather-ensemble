@@ -42,6 +42,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE forecasts ADD COLUMN pressure FLOAT",
             "ALTER TABLE ensemble_forecasts ADD COLUMN pressure FLOAT",
             "ALTER TABLE sun_terraces ADD COLUMN street_orientation TEXT",
+            "ALTER TABLE sun_terraces ADD COLUMN outdoor_type TEXT DEFAULT 'unknown'",
+            "ALTER TABLE sun_terraces ADD COLUMN polygon_coords TEXT",
         ]:
             try:
                 conn.execute(text(stmt))

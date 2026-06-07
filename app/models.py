@@ -145,8 +145,10 @@ class SunTerrace(Base):
     address: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     website: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     outdoor_seating: Mapped[bool] = mapped_column(Boolean, default=True)
+    outdoor_type: Mapped[str] = mapped_column(String, default="unknown")  # unknown/terrace/rooftop/none
     street_orientation: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # N/NE/E/SE/S/SW/W/NW/UNKNOWN
     orientation_confidence: Mapped[float] = mapped_column(Float, default=0.3)
+    polygon_coords: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON [[lat,lon],...]
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

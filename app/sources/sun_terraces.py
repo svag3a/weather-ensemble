@@ -98,6 +98,7 @@ def compute_scores(
     orientation_conf: float,
     forecast_hours: list,
     outdoor_seating: bool = False,
+    is_rooftop: bool = False,
 ) -> dict:
     """Compute now / +1h / +2h scores for a terrace given pre-fetched forecast hours."""
     now = datetime.now(timezone.utc)
@@ -117,6 +118,23 @@ def compute_scores(
         else:
             fc = {}
         ws = weather_score(fc)
+
+        if is_rooftop:
+            # Rooftop: always exposed to sky, no orientation penalty
+            # Score is purely weather-based; high confidence
+            total = int(0.50 * ws["cloud"] + 0.35 * ws["precip"] + 0.10 * ws["temp"] + 0.05 * ws["wind"])
+            total = min(100, total + 10)  # rooftop bonus
+            if ws["precip"] < 40:
+                total = int(total * ws["precip"] / 40)
+            result[key] = {
+                "sun_score": int((alt / 90) * 100),
+                "weather_score": ws["combined"],
+                "total_score": min(100, total),
+                "sun_azimuth": round(az, 1),
+                "sun_altitude": round(alt, 1),
+            }
+            continue
+
         os_val = orientation_score(az, orientation)
         # If orientation unknown, cap orientation contribution
         eff_os = os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60)
@@ -136,7 +154,10 @@ def compute_scores(
         }
     best_time = max(["now", "1h", "2h"], key=lambda k: result[k]["total_score"])
     result["best_time"] = best_time
-    result["confidence"] = orientation_conf if orientation and orientation != "UNKNOWN" else 0.3
+    if is_rooftop:
+        result["confidence"] = 1.0
+    else:
+        result["confidence"] = orientation_conf if orientation and orientation != "UNKNOWN" else 0.3
     return result
 
 

@@ -139,6 +139,7 @@ export default function SolView({ coords }) {
   const [filter, setFilter] = useState({ type: 'all', minScore: 0 })
   const [favs, setFavs] = useState(loadFavs)
   const [mode, setMode] = useState('sol')   // 'sol' | 'skugga'
+  const [search, setSearch] = useState('')
 
   const toggleFav = useCallback((id) => {
     setFavs(prev => {
@@ -167,8 +168,13 @@ export default function SolView({ coords }) {
     { value: 'restaurant', label: 'Restaurang' },
   ]
 
-  // Sort/filter based on mode
-  const sortedData = data ? [...data].sort((a, b) => {
+  // Sort/filter based on mode + search
+  const searchedData = data && search.trim()
+    ? data.filter(t => t.name?.toLowerCase().includes(search.trim().toLowerCase()) ||
+                        t.address?.toLowerCase().includes(search.trim().toLowerCase()))
+    : data
+
+  const sortedData = searchedData ? [...searchedData].sort((a, b) => {
     const favDiff = (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0)
     if (favDiff !== 0) return favDiff
     return mode === 'skugga'
@@ -185,6 +191,13 @@ export default function SolView({ coords }) {
           {mode === 'sol' ? 'Uteserveringar med bäst solläge just nu' : 'Uteserveringar i skugga just nu'}
         </p>
       </div>
+
+      {/* Search */}
+      <input
+        type="search" placeholder="Sök ställe…" value={search}
+        onChange={e => setSearch(e.target.value)}
+        className="w-full bg-black/20 text-white text-sm rounded-xl px-3 py-2 border border-white/10 placeholder-slate-500 focus:outline-none focus:border-white/30"
+      />
 
       {/* Filter bar: Sol/Skugga icons + divider + type filters */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">

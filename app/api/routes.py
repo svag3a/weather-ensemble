@@ -871,12 +871,17 @@ def get_sun_terraces(
 
     results = []
     for t in nearby:
+        outdoor_type = t.outdoor_type or "unknown"
+        # Skip venues explicitly marked as having no outdoor seating
+        if outdoor_type == "none":
+            continue
         scores = compute_scores(
             t.lat, t.lon,
             t.street_orientation,
             t.orientation_confidence,
             forecast_hours,
             outdoor_seating=t.outdoor_seating,
+            is_rooftop=(outdoor_type == "rooftop"),
         )
         now_score = scores.get("now", {}).get("total_score", 0)
         best_score = max(
@@ -897,6 +902,7 @@ def get_sun_terraces(
             "address": t.address,
             "website": t.website,
             "outdoor_seating": t.outdoor_seating,
+            "outdoor_type": outdoor_type,
             "street_orientation": t.street_orientation,
             "orientation_confidence": t.orientation_confidence,
             "distance_km": round(_haversine_km(lat, lon, t.lat, t.lon), 2),
@@ -931,8 +937,10 @@ def get_sun_terraces_admin(db: Session = Depends(get_db)):
             "address": t.address,
             "website": t.website,
             "outdoor_seating": t.outdoor_seating,
+            "outdoor_type": t.outdoor_type or "unknown",
             "street_orientation": t.street_orientation,
             "orientation_confidence": t.orientation_confidence,
+            "polygon_coords": t.polygon_coords,
             "active": t.active,
             "last_seen_at": t.last_seen_at.isoformat() if t.last_seen_at else None,
             "created_at": t.created_at.isoformat() if t.created_at else None,
@@ -947,6 +955,8 @@ class SunTerraceOverride(BaseModel):
     orientation_confidence: float
     amenity_type: Optional[str] = None
     active: Optional[bool] = None
+    outdoor_type: Optional[str] = None
+    polygon_coords: Optional[str] = None  # JSON string "[[lat,lon],...]" or null to clear
 
 
 @router.post("/sun-terraces/{terrace_id}/override", status_code=200)
@@ -956,7 +966,7 @@ def override_sun_terrace(
     db: Session = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    """Override orientation, type and active status for a terrace."""
+    """Override orientation, outdoor type, polygon, and active status for a terrace."""
     terrace = db.query(SunTerrace).filter(SunTerrace.id == terrace_id).first()
     if terrace is None:
         raise HTTPException(status_code=404, detail="Terrace not found")
@@ -966,12 +976,19 @@ def override_sun_terrace(
     valid_amenity_types = {"restaurant", "cafe", "bar", "pub"}
     if body.amenity_type is not None and body.amenity_type not in valid_amenity_types:
         raise HTTPException(status_code=400, detail=f"Invalid amenity_type. Must be one of {valid_amenity_types}")
+    valid_outdoor_types = {"unknown", "terrace", "rooftop", "none"}
+    if body.outdoor_type is not None and body.outdoor_type not in valid_outdoor_types:
+        raise HTTPException(status_code=400, detail=f"Invalid outdoor_type. Must be one of {valid_outdoor_types}")
     terrace.street_orientation = body.orientation
     terrace.orientation_confidence = body.orientation_confidence
     if body.amenity_type is not None:
         terrace.amenity_type = body.amenity_type
     if body.active is not None:
         terrace.active = body.active
+    if body.outdoor_type is not None:
+        terrace.outdoor_type = body.outdoor_type
+    if body.polygon_coords is not None:
+        terrace.polygon_coords = body.polygon_coords if body.polygon_coords != "" else None
     terrace.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(terrace)
