@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchSunTerraces } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
+import { Moon } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -81,9 +82,9 @@ function SunTimeline({ scores, coords }) {
   return (
     <div className="space-y-1">
       <div className="h-2.5 rounded-full w-full" style={{ background: `linear-gradient(to right, ${gradient})` }} />
-      <div className="flex justify-between text-[10px] text-slate-600">
+      <div className="flex justify-between items-center text-[10px] text-slate-600">
         <span>Nu</span>
-        <span>🌅 {ssH}:{ssM}</span>
+        <Moon size={11} />
       </div>
     </div>
   )
@@ -123,8 +124,6 @@ function TerraceCard({ terrace, isFav, onToggleFav, coords }) {
       {/* Continuous sun timeline: now → sunset */}
       <SunTimeline scores={scores} coords={coords} />
 
-      {/* Explanation */}
-      <p className="text-slate-500 text-xs leading-relaxed">{explanation}</p>
     </div>
   )
 }
