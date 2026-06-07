@@ -70,6 +70,95 @@ def orientation_score(sun_azimuth: float, terrace_orientation: Optional[str]) ->
     return max(0, int(100 * (1 - diff / 180)))
 
 
+def orientation_score_deg(sun_azimuth: float, terrace_bearing: float) -> float:
+    """Cosine-based score: 100 when sun faces the edge directly, 0 when perpendicular
+    or behind. Edges facing away from the sun contribute 0 (not 50)."""
+    diff_rad = math.radians(abs((sun_azimuth - terrace_bearing + 180) % 360 - 180))
+    return max(0.0, 100.0 * math.cos(diff_rad))
+
+
+def polygon_orientation_score(sun_azimuth: float, polygon_coords: list) -> float:
+    """Score-weighted orientation score for a polygon terrace.
+
+    Formula: sum(score² × edge_length) / sum(score × edge_length)
+
+    This is a score-biased weighted mean that naturally emphasises the
+    best-lit faces of the polygon.  Examples:
+      • Pure south face, sun due south  → 100
+      • Pure west face, sun due south   →  50
+      • Rectangle (all 4 sides equal), sun due south → 75
+      • L-shape (50% south + 50% west), sun due south or due west → 83
+
+    An L-shaped corner terrace consistently scores ~83 as the sun sweeps
+    across its exposed quadrant, instead of the flat 50 that a naive
+    perimeter-average would produce.
+    """
+    if not polygon_coords or len(polygon_coords) < 3:
+        return 50.0
+
+    # Area-weighted centroid (Shoelace) — reliable for non-convex (L-shaped) polygons.
+    # Simple vertex average fails for L-shapes because it lands on the inner corner.
+    n = len(polygon_coords)
+    area2 = 0.0   # accumulates 2·A (Shoelace without ×0.5)
+    cy = cx = 0.0
+    for i in range(n):
+        la, lo   = polygon_coords[i]
+        la1, lo1 = polygon_coords[(i + 1) % n]
+        # Standard 2-D cross product: x=lon, y=lat → cross = x·y' - x'·y
+        cross = lo * la1 - lo1 * la
+        area2 += cross
+        cy += (la + la1) * cross   # lat (y) component
+        cx += (lo + lo1) * cross   # lon (x) component
+    if abs(area2) < 1e-20:
+        # Degenerate polygon — fall back to vertex average
+        cent_lat = sum(c[0] for c in polygon_coords) / n
+        cent_lon = sum(c[1] for c in polygon_coords) / n
+    else:
+        # area2 = 2·A, so centroid = Σ / (3 · area2)
+        cent_lat = cy / (3.0 * area2)
+        cent_lon = cx / (3.0 * area2)
+
+    edges = []
+    max_len = 0.0
+    for i in range(len(polygon_coords)):
+        a = polygon_coords[i]
+        b = polygon_coords[(i + 1) % len(polygon_coords)]
+        dlat = b[0] - a[0]
+        dlon = b[1] - a[1]
+        length = math.sqrt(dlat * dlat + dlon * dlon)
+        if length < 1e-10:
+            continue
+
+        mid_lat = (a[0] + b[0]) / 2
+        mid_lon = (a[1] + b[1]) / 2
+
+        # Outward normal perpendicular to edge, pointing away from centroid
+        n_lat = -dlon / length   # north component
+        n_lon =  dlat / length   # east component
+        dot = n_lat * (cent_lat - mid_lat) + n_lon * (cent_lon - mid_lon)
+        if dot > 0:
+            n_lat, n_lon = -n_lat, -n_lon
+
+        bearing = (math.degrees(math.atan2(n_lon, n_lat)) + 360) % 360
+        edges.append((bearing, length))
+        if length > max_len:
+            max_len = length
+
+    if max_len < 1e-10:
+        return 50.0
+
+    # Formula: min(100, Σ(cosine_score × edge_length) / longest_edge_length)
+    #
+    # Rationale: each edge contributes proportionally to its length vs. the
+    # dominant face.  A corner terrace with two equally long faces facing the
+    # sun sums to 200 → capped at 100 (full score).  A terrace with a tiny
+    # west edge and a large south face scores ~5 when sun is in the west
+    # (correctly reflecting that almost no seating gets direct afternoon sun).
+    total = sum(orientation_score_deg(sun_azimuth, bearing) * length
+                for bearing, length in edges)
+    return min(100.0, total / max_len)
+
+
 # ── Weather scoring ───────────────────────────────────────────────────────────
 
 def weather_score(fc: dict) -> dict:
@@ -99,6 +188,7 @@ def compute_scores(
     forecast_hours: list,
     outdoor_seating: bool = False,
     is_rooftop: bool = False,
+    polygon_coords_json: Optional[str] = None,
 ) -> dict:
     """Compute now / +1h / +2h scores for a terrace given pre-fetched forecast hours."""
     now = datetime.now(timezone.utc)
@@ -135,14 +225,24 @@ def compute_scores(
             }
             continue
 
-        os_val = orientation_score(az, orientation)
-        # If orientation unknown, cap orientation contribution
-        eff_os = os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60)
+        # Orientation score: polygon beats single direction
+        if polygon_coords_json:
+            try:
+                import json as _json
+                poly = _json.loads(polygon_coords_json)
+                eff_os = polygon_orientation_score(az, poly)
+                has_known_orientation = True
+            except Exception:
+                eff_os = orientation_score(az, orientation)
+                has_known_orientation = orientation and orientation != "UNKNOWN"
+        else:
+            os_val = orientation_score(az, orientation)
+            has_known_orientation = orientation and orientation != "UNKNOWN"
+            eff_os = os_val if has_known_orientation else min(os_val, 60)
+
         total = int(0.55 * eff_os + 0.30 * ws["cloud"] + 0.10 * ws["temp"] + 0.05 * ws["wind"])
-        # outdoor_seating=yes tag confirmed — small bonus for reliability
         if outdoor_seating:
             total = min(100, total + 8)
-        # Rain kills the score
         if ws["precip"] < 40:
             total = int(total * ws["precip"] / 40)
         result[key] = {
@@ -155,6 +255,8 @@ def compute_scores(
     best_time = max(["now", "1h", "2h"], key=lambda k: result[k]["total_score"])
     result["best_time"] = best_time
     if is_rooftop:
+        result["confidence"] = 1.0
+    elif polygon_coords_json:
         result["confidence"] = 1.0
     else:
         result["confidence"] = orientation_conf if orientation and orientation != "UNKNOWN" else 0.3
