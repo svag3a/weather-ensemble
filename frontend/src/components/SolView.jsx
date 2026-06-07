@@ -35,10 +35,21 @@ function amenityLabel(type) {
   return map[type] ?? type
 }
 
-function cardGradient(score) {
-  if (score >= 70) return 'linear-gradient(135deg, #1e3a5f 0%, #92400e 50%, #f59e0b 100%)'
-  if (score >= 40) return 'linear-gradient(135deg, #1e3a5f 0%, #374151 60%, #78716c 100%)'
-  return 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)'
+function scoreToColor(score) {
+  // Maps 0-100 sun score to a sky/sun colour
+  if (score <= 0)  return '#0f172a'   // dark night
+  if (score < 25)  return '#1e3a5f'   // dark blue
+  if (score < 45)  return '#7c3500'   // warm brown
+  if (score < 65)  return '#c2410c'   // orange
+  return '#f59e0b'                    // golden
+}
+
+function cardGradient(scores) {
+  // Left→right timeline: now → +1h → +2h
+  const c0 = scoreToColor(scores?.now?.total_score ?? 0)
+  const c1 = scoreToColor(scores?.['1h']?.total_score ?? 0)
+  const c2 = scoreToColor(scores?.['2h']?.total_score ?? 0)
+  return `linear-gradient(to right, ${c0} 0%, ${c1} 50%, ${c2} 100%)`
 }
 
 function TerraceCard({ terrace }) {
@@ -51,7 +62,7 @@ function TerraceCard({ terrace }) {
   return (
     <div
       className="rounded-2xl p-4 space-y-3 backdrop-blur-sm border border-white/10"
-      style={{ background: cardGradient(best_score) }}
+      style={{ background: cardGradient(scores) }}
     >
       {/* Header: score badge + name */}
       <div className="flex items-start gap-3">
