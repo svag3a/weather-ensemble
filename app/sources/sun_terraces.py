@@ -215,7 +215,7 @@ def compute_scores(
         target = now + timedelta(hours=offset_h)
         az, alt = solar_position(lat, lon, target)
         if alt <= 0:
-            result[key] = {"sun_score": 0, "total_score": 0}
+            result[key] = {"sun_score": 0, "orientation_score": 0, "total_score": 0}
             continue
         # Find closest forecast entry
         if forecast_hours:
@@ -228,14 +228,13 @@ def compute_scores(
         ws = weather_score(fc)
 
         if is_rooftop:
-            # Rooftop: always exposed to sky, no orientation penalty
-            # Score is purely weather-based; high confidence
             total = int(0.50 * ws["cloud"] + 0.35 * ws["precip"] + 0.10 * ws["temp"] + 0.05 * ws["wind"])
-            total = min(100, total + 10)  # rooftop bonus
+            total = min(100, total + 10)
             if ws["precip"] < 40:
                 total = int(total * ws["precip"] / 40)
             result[key] = {
                 "sun_score": int((alt / 90) * 100),
+                "orientation_score": 100,   # rooftop always fully sky-exposed
                 "weather_score": ws["combined"],
                 "total_score": min(100, total),
                 "sun_azimuth": round(az, 1),
@@ -265,6 +264,7 @@ def compute_scores(
             total = int(total * ws["precip"] / 40)
         result[key] = {
             "sun_score": int((alt / 90) * eff_os),
+            "orientation_score": int(eff_os),   # pure directional exposure, 0–100
             "weather_score": ws["combined"],
             "total_score": min(100, total),
             "sun_azimuth": round(az, 1),

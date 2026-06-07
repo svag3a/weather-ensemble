@@ -86,10 +86,12 @@ function SunTimeline({ scores, coords }) {
   const nowH = now.getHours() + now.getMinutes() / 60
   const hoursToSunset = Math.max(0.25, ssLocal - nowH)
 
-  // Use pure solar-geometry score (orientation × altitude) — not weather-blended
-  const s0 = scores?.now?.sun_score ?? 0
-  const s1 = scores?.['1h']?.sun_score ?? 0
-  const s2 = scores?.['2h']?.sun_score ?? 0
+  // Use orientation_score (0–100): how directly the sun faces this terrace.
+  // sun_score was (alt/90)×orientation which gives max ~60 at Göteborg latitudes,
+  // making all thresholds look dark. orientation_score uses the full 0–100 range.
+  const s0 = scores?.now?.orientation_score ?? 0
+  const s1 = scores?.['1h']?.orientation_score ?? 0
+  const s2 = scores?.['2h']?.orientation_score ?? 0
 
   const pct = h => Math.min(100, (h / hoursToSunset) * 100)
   const p1 = pct(1), p2 = pct(2)
