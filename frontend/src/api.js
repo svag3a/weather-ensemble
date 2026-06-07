@@ -95,6 +95,18 @@ export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', m
   return res.json()
 }
 
+export async function triggerGeocodeTerraces() {
+  const res = await fetch(`${BASE}/sun-terraces/geocode`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function fetchGeocodeStatus() {
+  const res = await fetch(`${BASE}/sun-terraces/geocode/status`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchSunTerracesAdmin() {
   const res = await fetch(`${BASE}/sun-terraces/admin`)
   if (!res.ok) throw new Error(await res.text())

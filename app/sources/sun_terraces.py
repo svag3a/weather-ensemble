@@ -211,8 +211,14 @@ out body;
         if not name:
             continue
         amenity = tags.get("amenity", "restaurant")
-        addr_parts = [tags.get("addr:housenumber", ""), tags.get("addr:street", "")]
-        address = " ".join(p for p in addr_parts if p) or None
+        street = (tags.get("addr:street") or tags.get("contact:street") or "")
+        housenr = (tags.get("addr:housenumber") or tags.get("addr:streetnumber") or "")
+        full = tags.get("addr:full") or ""
+        if full:
+            address = full.strip() or None
+        else:
+            addr_parts = [street, housenr]
+            address = " ".join(p for p in addr_parts if p).strip() or None
         # Orientation from OSM tags if available (rare)
         osm_ori = tags.get("terrace:orientation") or tags.get("outdoor:orientation")
         orientation = (

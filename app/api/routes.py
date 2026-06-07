@@ -536,6 +536,26 @@ async def refresh_sun_terraces_now():
     return {"status": "started", "message": "Refresh running in background — check /sun-terraces/admin in ~60s"}
 
 
+@router.post("/sun-terraces/geocode")
+async def geocode_sun_terraces(_user: str = Depends(get_current_user)):
+    """Trigger reverse geocoding for terraces missing an address (background job)."""
+    import asyncio
+    from app.sources.geocode_terraces import run_geocode_job, get_state
+    from app.database import get_db as _get_db
+    state = get_state()
+    if state["running"]:
+        return {"status": "already_running", **state}
+    asyncio.create_task(run_geocode_job(_get_db))
+    return {"status": "started", "message": "Geocoding i bakgrunden — poll /sun-terraces/geocode/status"}
+
+
+@router.get("/sun-terraces/geocode/status")
+def geocode_status(_user: str = Depends(get_current_user)):
+    """Poll geocoding job progress."""
+    from app.sources.geocode_terraces import get_state
+    return get_state()
+
+
 @router.post("/collect/sync")
 async def trigger_collection_sync(_user: str = Depends(get_current_user)):
     """Run collection synchronously and return any errors — for debugging."""
