@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchSunTerraces } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
-import { Moon } from 'lucide-react'
+import { Moon, Sun, Palmtree } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -185,22 +185,19 @@ export default function SolView({ coords }) {
         </p>
       </div>
 
-      {/* Sol / Skugga toggle — own row */}
-      <div className="flex gap-1.5">
-        {['sol','skugga'].map(m => (
+      {/* Filter bar: Sol/Skugga icons + divider + type filters */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+        {[{m:'sol', Icon:Sun}, {m:'skugga', Icon:Palmtree}].map(({m, Icon}) => (
           <button key={m}
             onClick={() => setMode(m)}
-            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
+            className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
               mode === m ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
             }`}
           >
-            {m === 'sol' ? '☀️ Sol' : '🌿 Skugga'}
+            <Icon size={15} />
           </button>
         ))}
-      </div>
-
-      {/* Type filter */}
-      <div className="flex gap-1.5 overflow-x-auto pb-0.5">
+        <div className="w-px h-5 bg-slate-700 shrink-0" />
         {TYPE_FILTERS.map(f => (
           <button key={f.value}
             onClick={() => setFilter(prev => ({ ...prev, type: f.value }))}
