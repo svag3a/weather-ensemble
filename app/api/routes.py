@@ -594,6 +594,25 @@ def enrich_ai_status(_user: str = Depends(get_current_user)):
     return get_ai_state()
 
 
+@router.post("/sun-terraces/fix-addresses", status_code=200)
+def fix_terrace_addresses(
+    db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Fix addresses stored as 'housenr street' → 'street housenr'."""
+    from app.sources.geocode_terraces import normalize_address
+    rows = db.query(SunTerrace).filter(SunTerrace.address.isnot(None)).all()
+    fixed = 0
+    for t in rows:
+        corrected = normalize_address(t.address)
+        if corrected != t.address:
+            t.address = corrected
+            fixed += 1
+    if fixed:
+        db.commit()
+    return {"fixed": fixed, "total": len(rows)}
+
+
 @router.post("/collect/sync")
 async def trigger_collection_sync(_user: str = Depends(get_current_user)):
     """Run collection synchronously and return any errors — for debugging."""

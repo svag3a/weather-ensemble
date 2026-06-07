@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { overrideTerrace, createTerrace, deriveArcFromPolygon, triggerGeocodeTerraces, fetchGeocodeStatus,
+import { overrideTerrace, createTerrace, deriveArcFromPolygon, fixTerraceAddresses, triggerGeocodeTerraces, fetchGeocodeStatus,
          triggerEnrichOsm, fetchEnrichOsmStatus,
          triggerEnrichAi, fetchEnrichAiStatus } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
@@ -623,6 +623,41 @@ function AddTerracePanel({ onSaved, onCancel }) {
   )
 }
 
+// ── Fix addresses button ──────────────────────────────────────────────────────
+
+function FixAddressesButton() {
+  const [state, setState] = useState(null)
+  const [running, setRunning] = useState(false)
+
+  async function run() {
+    setRunning(true)
+    try {
+      const r = await fixTerraceAddresses()
+      setState(r)
+    } catch (e) {
+      setState({ error: e.message })
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-slate-400 text-xs">Adressordning</span>
+        <button onClick={run} disabled={running}
+          className="text-xs bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 text-white px-2 py-0.5 rounded transition-colors">
+          {running ? 'Fixar…' : 'Rätta'}
+        </button>
+      </div>
+      {state?.fixed != null && (
+        <span className="text-green-400 text-[10px]">✓ {state.fixed} adresser rättade</span>
+      )}
+      {state?.error && <span className="text-red-400 text-[10px]">{state.error}</span>}
+    </div>
+  )
+}
+
 // ── Geocode widget ────────────────────────────────────────────────────────────
 
 function GeocodeWidget() {
@@ -732,6 +767,7 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
             <div className="text-slate-400 text-xs">{l}</div>
           </div>
         ))}
+        <FixAddressesButton />
         <JobWidget label="Orientering OSM" triggerFn={triggerEnrichOsm} statusFn={fetchEnrichOsmStatus} color="emerald"/>
         <JobWidget label="AI-berikning" triggerFn={triggerEnrichAi} statusFn={fetchEnrichAiStatus} color="blue"/>
         <GeocodeWidget />

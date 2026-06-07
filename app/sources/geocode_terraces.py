@@ -15,6 +15,20 @@ from app.models import SunTerrace
 
 logger = logging.getLogger(__name__)
 
+
+import re as _re
+
+def normalize_address(address: str | None) -> str | None:
+    """Fix 'housenr street' → 'street housenr' in Swedish addresses.
+    Matches leading standalone numbers like '5 Avenyn' or '12B Kungsportsavenyen'.
+    Leaves already-correct addresses untouched."""
+    if not address:
+        return address
+    m = _re.match(r'^(\d{1,5}[A-Za-z]?)\s+(.+)$', address.strip())
+    if m:
+        return f"{m.group(2)} {m.group(1)}"
+    return address
+
 # In-memory job state (single-worker — one geocode run at a time)
 _state: dict = {
     "running": False,
@@ -48,7 +62,7 @@ async def _reverse_geocode(client: httpx.AsyncClient, lat: float, lon: float) ->
         road = addr.get("road") or addr.get("pedestrian") or addr.get("path") or ""
         housenr = addr.get("house_number") or ""
         parts = [p for p in [road, housenr] if p]
-        return " ".join(parts) or None
+        return normalize_address(" ".join(parts)) or None
     except Exception as exc:
         logger.debug("Nominatim error for (%s, %s): %s", lat, lon, exc)
         return None
