@@ -3,16 +3,21 @@ import { fetchSunTerraces } from '../api'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
-function scoreColor(score) {
-  if (score >= 70) return '#4ade80'
-  if (score >= 40) return '#facc15'
-  return '#94a3b8'
-}
-
-function scoreBg(score) {
-  if (score >= 70) return 'rgba(74,222,128,0.15)'
-  if (score >= 40) return 'rgba(250,204,21,0.15)'
-  return 'rgba(148,163,184,0.10)'
+// 4-dot symbolic rating: ●●●● = full sun, ○○○○ = no sun
+function SunDots({ score }) {
+  const filled = score >= 70 ? 4 : score >= 45 ? 3 : score >= 20 ? 2 : score > 0 ? 1 : 0
+  const color   = score >= 70 ? '#f59e0b' : score >= 45 ? '#fb923c' : score >= 20 ? '#94a3b8' : '#374151'
+  return (
+    <span className="flex gap-0.5">
+      {[0,1,2,3].map(i => (
+        <span key={i} style={{
+          width: 8, height: 8, borderRadius: '50%', display: 'inline-block',
+          background: i < filled ? color : '#1e293b',
+          border: `1px solid ${i < filled ? color : '#334155'}`,
+        }} />
+      ))}
+    </span>
+  )
 }
 
 function ConfidenceChip({ confidence }) {
@@ -36,71 +41,50 @@ function amenityLabel(type) {
 }
 
 function TerraceCard({ terrace, isFav, onToggleFav }) {
-  const { id, name, address, amenity_type, street_orientation, scores, best_score, explanation } = terrace
+  const { id, name, address, amenity_type, street_orientation, scores, explanation } = terrace
   const best = scores?.best_time ?? 'now'
   const altitude = scores?.[best]?.sun_altitude
-  const weather_score = scores?.[best]?.weather_score
 
   return (
     <div className={`${GLASS} rounded-2xl p-4 space-y-3`}>
-      {/* Header: score badge + name + star */}
+      {/* Header: name + star */}
       <div className="flex items-start gap-3">
-        <div
-          className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg"
-          style={{ background: scoreBg(best_score), color: scoreColor(best_score) }}
-        >
-          {best_score}
-        </div>
         <div className="flex-1 min-w-0">
           <div className="text-white font-medium leading-tight truncate">{name}</div>
           {address && <div className="text-slate-400 text-xs mt-0.5 truncate">{address}</div>}
           <div className="text-slate-500 text-xs mt-0.5">{amenityLabel(amenity_type)}</div>
         </div>
-        {/* Favourite star */}
         <button
           onClick={() => onToggleFav(id)}
           className="shrink-0 text-lg leading-none transition-opacity"
-          style={{ opacity: isFav ? 1 : 0.35 }}
-          title={isFav ? 'Ta bort favorit' : 'Spara som favorit'}
+          style={{ opacity: isFav ? 1 : 0.3 }}
         >
           {isFav ? '★' : '☆'}
         </button>
       </div>
 
-      {/* Sub-scores row */}
-      <div className="flex items-center gap-4 text-xs text-slate-400">
-        {altitude != null && altitude > 0 && (
-          <span>Sol {Math.round(altitude)}°</span>
-        )}
-        {weather_score != null && (
-          <span>Väder {weather_score}%</span>
-        )}
-        {street_orientation && street_orientation !== 'UNKNOWN' && (
-          <span>Läge {street_orientation}</span>
-        )}
+      {/* Meta row */}
+      <div className="flex items-center gap-3 text-xs text-slate-500">
+        {altitude != null && altitude > 0 && <span>Sol {Math.round(altitude)}°</span>}
+        {street_orientation && street_orientation !== 'UNKNOWN' && <span>{street_orientation}</span>}
         <ConfidenceChip confidence={scores?.confidence ?? 0.3} />
       </div>
 
-      {/* Score timeline: now / +1h / +2h — colour reflects sun score */}
+      {/* Symbolic sun timeline: Nu / +1h / +2h */}
       <div className="flex gap-2">
         {['now', '1h', '2h'].map(key => {
           const s = scores?.[key]?.total_score ?? 0
           return (
-            <div key={key} className="flex-1 text-center">
-              <div className="text-[10px] text-slate-500 mb-0.5">{bestTimeLabel(key)}</div>
-              <div
-                className="rounded-lg py-1.5 text-xs font-semibold"
-                style={{ background: scoreBg(s), color: scoreColor(s) }}
-              >
-                {s}
-              </div>
+            <div key={key} className="flex-1 flex flex-col items-center gap-1.5 bg-white/5 rounded-xl py-2">
+              <div className="text-[10px] text-slate-500">{bestTimeLabel(key)}</div>
+              <SunDots score={s} />
             </div>
           )
         })}
       </div>
 
       {/* Explanation */}
-      <p className="text-slate-400 text-xs leading-relaxed">{explanation}</p>
+      <p className="text-slate-500 text-xs leading-relaxed">{explanation}</p>
     </div>
   )
 }
@@ -143,8 +127,7 @@ export default function SolView({ coords }) {
   ]
   const SCORE_FILTERS = [
     { value: 0,  label: 'Alla' },
-    { value: 50, label: '50+' },
-    { value: 70, label: '70+' },
+    { value: 70, label: 'Bra sol' },
   ]
 
   return (
