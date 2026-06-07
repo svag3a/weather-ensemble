@@ -154,12 +154,18 @@ export async function fetchSunTerracesAdmin() {
   return res.json()
 }
 
-export async function overrideTerrace(id, { orientation, orientation_confidence, amenity_type, active, outdoor_type, polygon_coords, name, address }) {
+export async function overrideTerrace(id, { orientation, orientation_confidence, amenity_type, active, outdoor_type, polygon_coords, name, address, sun_arc_from, sun_arc_to }) {
   const res = await fetch(`${BASE}/sun-terraces/${id}/override`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orientation, orientation_confidence, amenity_type, active, outdoor_type, polygon_coords, name, address }),
+    body: JSON.stringify({ orientation, orientation_confidence, amenity_type, active, outdoor_type, polygon_coords, name, address, sun_arc_from, sun_arc_to }),
   })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function deriveArcFromPolygon(id) {
+  const res = await fetch(`${BASE}/sun-terraces/${id}/derive-arc`, { method: 'POST' })
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }

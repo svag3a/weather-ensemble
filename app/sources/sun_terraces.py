@@ -177,6 +177,126 @@ def polygon_orientation_score(sun_azimuth: float, polygon_coords: list) -> float
     return min(100.0, total / max_len)
 
 
+def arc_orientation_score(sun_azimuth: float, arc_from: float, arc_to: float) -> float:
+    """Score 0–100 based on whether sun azimuth is within the exposure arc.
+    The arc goes clockwise from arc_from to arc_to.
+    Tapers linearly within 15° of each edge."""
+    az = sun_azimuth % 360
+    f = arc_from % 360
+    t = arc_to % 360
+    arc_span = (t - f + 360) % 360
+    if arc_span < 1:
+        arc_span = 360  # treat 0-span as full circle
+
+    if arc_span >= 359:
+        return 100.0  # full circle (rooftop)
+
+    clockwise_dist = (az - f + 360) % 360
+    if clockwise_dist > arc_span:
+        return 0.0  # outside arc
+
+    TAPER = 15.0
+    d_start = clockwise_dist
+    d_end   = arc_span - clockwise_dist
+    d_min   = min(d_start, d_end)
+    if d_min < TAPER:
+        return 100.0 * d_min / TAPER
+    return 100.0
+
+
+def arc_from_polygon(polygon_coords: list) -> tuple:
+    """Derive (arc_from, arc_to) exposure arc from polygon edge outward normals.
+    Returns (None, None) on failure."""
+    if not polygon_coords or len(polygon_coords) < 3:
+        return None, None
+
+    cos_lat = math.cos(math.radians(
+        sum(c[0] for c in polygon_coords) / len(polygon_coords)
+    ))
+
+    n = len(polygon_coords)
+    ref_la = polygon_coords[0][0]
+    ref_lo = polygon_coords[0][1]
+    pts = [(c[0] - ref_la, c[1] - ref_lo) for c in polygon_coords]
+
+    area2 = cy = cx = 0.0
+    for i in range(n):
+        la, lo   = pts[i]
+        la1, lo1 = pts[(i + 1) % n]
+        cross = lo * la1 - lo1 * la
+        area2 += cross
+        cy += (la + la1) * cross
+        cx += (lo + lo1) * cross
+
+    if abs(area2) < 1e-30:
+        return None, None
+
+    cent_lat = ref_la + cy / (3 * area2)
+    cent_lon = ref_lo + cx / (3 * area2)
+
+    edge_bearings: list = []
+    for i in range(n):
+        a = polygon_coords[i]
+        b = polygon_coords[(i + 1) % n]
+        dlat = b[0] - a[0]
+        dlon = b[1] - a[1]
+        dlat_m = dlat
+        dlon_m = dlon * cos_lat
+        length = math.sqrt(dlat_m ** 2 + dlon_m ** 2)
+        if length < 1e-10:
+            continue
+        mid_la = (a[0] + b[0]) / 2
+        mid_lo = (a[1] + b[1]) / 2
+        n_lat = -dlon_m / length
+        n_lon  =  dlat_m / length
+        dot = n_lat * (cent_lat - mid_la) + n_lon * (cent_lon - mid_lo) * cos_lat
+        if dot > 0:
+            n_lat, n_lon = -n_lat, -n_lon
+        bearing = (math.degrees(math.atan2(n_lon, n_lat)) + 360) % 360
+        edge_bearings.append((bearing, length))
+
+    if not edge_bearings:
+        return None, None
+
+    total_w = sum(w for _, w in edge_bearings)
+
+    # Build a 360-slot exposure map
+    exposure = [0.0] * 360
+    for bearing, weight in edge_bearings:
+        w = weight / total_w
+        for a in range(360):
+            diff = abs((a - bearing + 180) % 360 - 180)
+            if diff < 90:
+                exposure[a] += w
+
+    threshold = 0.02
+    exposed = [e > threshold for e in exposure]
+
+    if all(exposed):
+        return 0.0, 360.0
+    if not any(exposed):
+        return None, None
+
+    # Find first rising edge (unexposed → exposed)
+    start = None
+    for i in range(360):
+        if exposed[i] and not exposed[(i - 1) % 360]:
+            start = i
+            break
+    if start is None:
+        start = next(i for i, e in enumerate(exposed) if e)
+
+    # Walk clockwise from start until exposed ends
+    end = start
+    for i in range(1, 361):
+        idx = (start + i) % 360
+        if not exposed[idx]:
+            end = (start + i - 1) % 360
+            break
+
+    return float(start), float(end)
+
+
 # ── Weather scoring ───────────────────────────────────────────────────────────
 
 def weather_score(fc: dict) -> dict:
@@ -207,6 +327,8 @@ def compute_scores(
     outdoor_seating: bool = False,
     is_rooftop: bool = False,
     polygon_coords_json: Optional[str] = None,
+    sun_arc_from: Optional[float] = None,
+    sun_arc_to:   Optional[float] = None,
 ) -> dict:
     """Compute now / +1h / +2h scores for a terrace given pre-fetched forecast hours."""
     now = datetime.now(timezone.utc)
@@ -242,16 +364,16 @@ def compute_scores(
             }
             continue
 
-        # Orientation score: polygon beats single direction
-        if polygon_coords_json:
+        # Arc takes priority → polygon → single direction
+        if sun_arc_from is not None and sun_arc_to is not None:
+            eff_os = arc_orientation_score(az, sun_arc_from, sun_arc_to)
+        elif polygon_coords_json:
             try:
                 import json as _json
                 poly = _json.loads(polygon_coords_json)
                 eff_os = polygon_orientation_score(az, poly)
-                has_known_orientation = True
             except Exception:
                 eff_os = orientation_score(az, orientation)
-                has_known_orientation = orientation and orientation != "UNKNOWN"
         else:
             os_val = orientation_score(az, orientation)
             has_known_orientation = orientation and orientation != "UNKNOWN"
@@ -273,6 +395,8 @@ def compute_scores(
     best_time = max(["now", "1h", "2h"], key=lambda k: result[k]["total_score"])
     result["best_time"] = best_time
     if is_rooftop:
+        result["confidence"] = 1.0
+    elif sun_arc_from is not None:
         result["confidence"] = 1.0
     elif polygon_coords_json:
         result["confidence"] = 1.0

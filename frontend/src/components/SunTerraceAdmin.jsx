@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { overrideTerrace, createTerrace, triggerGeocodeTerraces, fetchGeocodeStatus,
+import { overrideTerrace, createTerrace, deriveArcFromPolygon, triggerGeocodeTerraces, fetchGeocodeStatus,
          triggerEnrichOsm, fetchEnrichOsmStatus,
          triggerEnrichAi, fetchEnrichAiStatus } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
@@ -102,6 +102,132 @@ function CompassPicker({ value, onChange }) {
   )
 }
 
+// ── Arc compass picker ────────────────────────────────────────────────────────
+function ArcPicker({ arcFrom, arcTo, onChange, onClear }) {
+  const R = 65        // radius
+  const PAD = 18      // padding for labels
+  const SIZE = (R + PAD) * 2
+  const [step, setStep] = useState(arcFrom == null ? 0 : 2)  // 0=click-from, 1=click-to, 2=done
+
+  function svgToBearing(e) {
+    const svg = e.currentTarget.ownerSVGElement || e.currentTarget
+    const rect = svg.getBoundingClientRect()
+    const cx = rect.width / 2
+    const cy = rect.height / 2
+    const dx = e.clientX - rect.left - cx
+    const dy = e.clientY - rect.top - cy
+    return (Math.atan2(dx, -dy) * 180 / Math.PI + 360) % 360
+  }
+
+  function handleClick(e) {
+    const b = svgToBearing(e)
+    if (step === 0 || step === 2) {
+      onChange(Math.round(b), arcTo)
+      setStep(1)
+    } else {
+      onChange(arcFrom, Math.round(b))
+      setStep(2)
+    }
+  }
+
+  function handleClear() {
+    onChange(null, null)
+    setStep(0)
+    onClear?.()
+  }
+
+  // SVG arc path: filled sector from arcFrom to arcTo clockwise
+  function sectorPath(from, to) {
+    const toRad = d => (d - 90) * Math.PI / 180
+    const span = (to - from + 360) % 360 || 360
+    if (span >= 359) {
+      return `M 0 0 m -${R} 0 a ${R} ${R} 0 1 1 ${2*R} 0 a ${R} ${R} 0 1 1 ${-2*R} 0`
+    }
+    const x1 = R * Math.cos(toRad(from))
+    const y1 = R * Math.sin(toRad(from))
+    const x2 = R * Math.cos(toRad(to))
+    const y2 = R * Math.sin(toRad(to))
+    const large = span > 180 ? 1 : 0
+    return `M 0 0 L ${x1} ${y1} A ${R} ${R} 0 ${large} 1 ${x2} ${y2} Z`
+  }
+
+  function dot(bearing, color) {
+    const rad = (bearing - 90) * Math.PI / 180
+    return { x: R * Math.cos(rad), y: R * Math.sin(rad), color }
+  }
+
+  const CARDINAL = [
+    { label: 'N',  deg: 0   },
+    { label: 'NÖ', deg: 45  },
+    { label: 'Ö',  deg: 90  },
+    { label: 'SÖ', deg: 135 },
+    { label: 'S',  deg: 180 },
+    { label: 'SV', deg: 225 },
+    { label: 'V',  deg: 270 },
+    { label: 'NV', deg: 315 },
+  ]
+
+  const hasArc = arcFrom != null && arcTo != null
+  const span   = hasArc ? (arcTo - arcFrom + 360) % 360 || 360 : 0
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-slate-400 text-xs">
+        {step === 0 ? 'Klicka för att sätta startpunkt (grönt)' :
+         step === 1 ? 'Klicka för att sätta slutpunkt (rött)' :
+         `Båge: ${Math.round(span)}° — klicka igen för att ändra`}
+      </p>
+      <svg
+        width={SIZE} height={SIZE}
+        onClick={handleClick}
+        style={{ cursor: 'crosshair', userSelect: 'none' }}
+      >
+        <g transform={`translate(${SIZE/2},${SIZE/2})`}>
+          {/* Sector */}
+          {hasArc && (
+            <path d={sectorPath(arcFrom, arcTo)}
+              fill="#f59e0b" fillOpacity={0.25} stroke="#f59e0b" strokeWidth={1.5} strokeOpacity={0.6}/>
+          )}
+          {/* Ring */}
+          <circle r={R} fill="none" stroke="#334155" strokeWidth={1}/>
+          {/* Cardinal spokes + labels */}
+          {CARDINAL.map(({ label, deg }) => {
+            const rad = (deg - 90) * Math.PI / 180
+            const x = R * Math.cos(rad), y = R * Math.sin(rad)
+            const lx = (R + 12) * Math.cos(rad), ly = (R + 12) * Math.sin(rad)
+            return (
+              <g key={label}>
+                <line x1={x*0.15} y1={y*0.15} x2={x} y2={y} stroke="#1e293b" strokeWidth={0.5}/>
+                <text x={lx} y={ly} textAnchor="middle" dominantBaseline="central"
+                  fill="#475569" fontSize={8} style={{ pointerEvents: 'none' }}>{label}</text>
+              </g>
+            )
+          })}
+          {/* Handle dots */}
+          {hasArc && (() => {
+            const f = dot(arcFrom, '#22c55e')
+            const t = dot(arcTo,   '#ef4444')
+            return <>
+              <circle cx={f.x} cy={f.y} r={5} fill={f.color} stroke="white" strokeWidth={1.5}/>
+              <circle cx={t.x} cy={t.y} r={5} fill={t.color} stroke="white" strokeWidth={1.5}/>
+            </>
+          })()}
+          {/* Center */}
+          <circle r={3} fill="#475569"/>
+        </g>
+      </svg>
+      <div className="flex gap-2 items-center">
+        {hasArc && (
+          <span className="text-amber-400 text-xs">{Math.round(arcFrom)}° → {Math.round(arcTo)}° ({Math.round(span)}°)</span>
+        )}
+        {hasArc && (
+          <button onClick={handleClear} className="text-slate-500 hover:text-slate-300 text-xs">Rensa</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Map helpers ───────────────────────────────────────────────────────────────
 
 function MapRecenter({ lat, lon }) {
@@ -150,6 +276,8 @@ function EditPanel({ terrace, onSave, onCancel }) {
     return null
   })
   const [drawingVerts, setDrawingVerts] = useState([])  // in-progress polygon vertices
+  const [arcFrom, setArcFrom]           = useState(terrace.sun_arc_from ?? null)
+  const [arcTo,   setArcTo]             = useState(terrace.sun_arc_to   ?? null)
   const [saving, setSaving]             = useState(false)
   const [error, setError]               = useState(null)
 
@@ -198,6 +326,8 @@ function EditPanel({ terrace, onSave, onCancel }) {
         active,
         outdoor_type: outdoorType,
         polygon_coords: polygon ? JSON.stringify(polygon) : '',
+        sun_arc_from: arcFrom,
+        sun_arc_to:   arcTo,
       })
       onSave()
     } catch (e) {
@@ -299,6 +429,7 @@ function EditPanel({ terrace, onSave, onCancel }) {
           </div>
 
           {/* Controls */}
+
           <div className="flex flex-col gap-4">
 
             {/* Compass */}
@@ -323,6 +454,30 @@ function EditPanel({ terrace, onSave, onCancel }) {
               <input type="range" min="0" max="1" step="0.05" value={confidence}
                 onChange={e => setConfidence(e.target.value)} className="w-28 accent-blue-500"/>
               <span className="text-slate-400 text-xs">{(confidence*100).toFixed(0)}%</span>
+            </div>
+
+            {/* Solar arc */}
+            <div>
+              <p className="text-slate-400 text-xs mb-1">Solbåge — klicka start sedan slut (medurs)</p>
+              <ArcPicker
+                arcFrom={arcFrom} arcTo={arcTo}
+                onChange={(f, t) => { setArcFrom(f); setArcTo(t) }}
+                onClear={() => { setArcFrom(null); setArcTo(null) }}
+              />
+              {polygon && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await deriveArcFromPolygon(terrace.id)
+                      setArcFrom(res.sun_arc_from)
+                      setArcTo(res.sun_arc_to)
+                    } catch (e) { alert(e.message) }
+                  }}
+                  className="mt-1 text-xs text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Härledd från polygon
+                </button>
+              )}
             </div>
 
             {/* Outdoor type */}

@@ -953,6 +953,8 @@ def get_sun_terraces(
             outdoor_seating=t.outdoor_seating,
             is_rooftop=(outdoor_type == "rooftop"),
             polygon_coords_json=t.polygon_coords,
+            sun_arc_from=getattr(t, 'sun_arc_from', None),
+            sun_arc_to=getattr(t, 'sun_arc_to', None),
         )
         now_score = scores.get("now", {}).get("total_score", 0)
         best_score = max(
@@ -1012,6 +1014,8 @@ def get_sun_terraces_admin(db: Session = Depends(get_db)):
             "street_orientation": t.street_orientation,
             "orientation_confidence": t.orientation_confidence,
             "polygon_coords": t.polygon_coords,
+            "sun_arc_from": t.sun_arc_from,
+            "sun_arc_to":   t.sun_arc_to,
             "active": t.active,
             "last_seen_at": t.last_seen_at.isoformat() if t.last_seen_at else None,
             "created_at": t.created_at.isoformat() if t.created_at else None,
@@ -1030,6 +1034,8 @@ class SunTerraceOverride(BaseModel):
     polygon_coords: Optional[str] = None  # JSON string "[[lat,lon],...]" or null to clear
     name: Optional[str] = None
     address: Optional[str] = None
+    sun_arc_from: Optional[float] = None
+    sun_arc_to:   Optional[float] = None
 
 
 @router.post("/sun-terraces/{terrace_id}/override", status_code=200)
@@ -1062,6 +1068,9 @@ def override_sun_terrace(
         terrace.outdoor_type = body.outdoor_type
     if body.polygon_coords is not None:
         terrace.polygon_coords = body.polygon_coords if body.polygon_coords != "" else None
+    if body.sun_arc_from is not None or body.sun_arc_to is not None:
+        terrace.sun_arc_from = body.sun_arc_from
+        terrace.sun_arc_to   = body.sun_arc_to
     if body.name is not None and body.name.strip():
         terrace.name = body.name.strip()
     if body.address is not None:
@@ -1076,6 +1085,32 @@ def override_sun_terrace(
         "amenity_type": terrace.amenity_type,
         "active": terrace.active,
     }
+
+
+@router.post("/sun-terraces/{terrace_id}/derive-arc", status_code=200)
+def derive_arc(
+    terrace_id: int,
+    db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Derive sun_arc_from/to from the stored polygon and save."""
+    import json as _json
+    from app.sources.sun_terraces import arc_from_polygon as _arc_from_poly
+    terrace = db.query(SunTerrace).filter(SunTerrace.id == terrace_id).first()
+    if terrace is None:
+        raise HTTPException(status_code=404, detail="Terrace not found")
+    if not terrace.polygon_coords:
+        raise HTTPException(status_code=400, detail="No polygon stored for this terrace")
+    poly = _json.loads(terrace.polygon_coords)
+    arc_f, arc_t = _arc_from_poly(poly)
+    if arc_f is None:
+        raise HTTPException(status_code=400, detail="Could not derive arc from polygon")
+    terrace.sun_arc_from = arc_f
+    terrace.sun_arc_to   = arc_t
+    terrace.orientation_confidence = 1.0
+    terrace.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+    return {"sun_arc_from": arc_f, "sun_arc_to": arc_t}
 
 
 class TerraceVoteBody(BaseModel):

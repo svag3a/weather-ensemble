@@ -44,6 +44,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE sun_terraces ADD COLUMN street_orientation TEXT",
             "ALTER TABLE sun_terraces ADD COLUMN outdoor_type TEXT DEFAULT 'unknown'",
             "ALTER TABLE sun_terraces ADD COLUMN polygon_coords TEXT",
+            "ALTER TABLE sun_terraces ADD COLUMN sun_arc_from REAL",
+            "ALTER TABLE sun_terraces ADD COLUMN sun_arc_to REAL",
             """CREATE TABLE IF NOT EXISTS terrace_votes (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 terrace_id INTEGER NOT NULL,
