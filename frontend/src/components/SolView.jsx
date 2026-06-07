@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchSunTerraces, voteTerrrace } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
-import { Moon, Sun, Parasol } from 'lucide-react'
+import { Moon, Sun, Parasol, ThumbsUp, ThumbsDown } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -133,22 +133,22 @@ function VoteButton({ dir, active, onClick }) {
   }
 
   const isUp = dir === 1
-  const emoji = isUp ? '👍' : '👎'
+  const Icon = isUp ? ThumbsUp : ThumbsDown
   const activeColor = isUp ? 'text-green-400' : 'text-red-400'
-  const activeBg   = isUp ? 'bg-green-400/15' : 'bg-red-400/15'
+  const activeBg    = isUp ? 'bg-green-400/15' : 'bg-red-400/15'
+  const ringColor   = isUp ? 'border-green-400' : 'border-red-400'
 
   return (
     <button
       onClick={handleClick}
-      className={`relative flex items-center justify-center w-8 h-8 rounded-xl text-base transition-all select-none
-        ${active ? `${activeBg} ${activeColor} scale-110` : 'text-slate-600 hover:text-slate-400'}
-        ${burst ? 'scale-125' : ''}`}
+      className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-all select-none
+        ${active ? `${activeBg} ${activeColor}` : 'text-slate-600 hover:text-slate-400'}
+        ${burst ? 'scale-125' : active ? 'scale-110' : 'scale-100'}`}
       style={{ transition: burst ? 'transform 0.1s ease-out' : 'transform 0.3s ease' }}
     >
-      {emoji}
-      {/* Burst ring */}
+      <Icon size={14} strokeWidth={active ? 2.5 : 1.5}/>
       {burst && (
-        <span className={`absolute inset-0 rounded-xl border-2 ${isUp ? 'border-green-400' : 'border-red-400'} animate-ping opacity-60`}/>
+        <span className={`absolute inset-0 rounded-lg border-2 ${ringColor} animate-ping opacity-60`}/>
       )}
     </button>
   )
