@@ -25,6 +25,18 @@ function SunDots({ score }) {
   )
 }
 
+// Solar arc or orientation indicator in card meta row
+function ArcChip({ arcFrom, arcTo, orientation }) {
+  if (arcFrom != null && arcTo != null) {
+    const span = Math.round((arcTo - arcFrom + 360) % 360 || 360)
+    return <span>{Math.round(arcFrom)}°–{Math.round(arcTo)}° ({span}°)</span>
+  }
+  if (orientation && orientation !== 'UNKNOWN') {
+    return <span>{orientation}</span>
+  }
+  return null
+}
+
 // Small weather indicator shown only when conditions are noteworthy
 function WeatherChip({ weatherScore }) {
   if (weatherScore == null || weatherScore >= 60) return null
@@ -205,8 +217,7 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) 
       </div>
       <div className="flex items-center gap-3 text-xs text-slate-500">
         {altitude != null && altitude > 0 && <span>Sol {Math.round(altitude)}°</span>}
-        {street_orientation && street_orientation !== 'UNKNOWN' && <span>{street_orientation}</span>}
-        <ConfidenceChip confidence={scores?.confidence ?? 0.3}/>
+        <ArcChip arcFrom={terrace.sun_arc_from} arcTo={terrace.sun_arc_to} orientation={street_orientation}/>
         <WeatherChip weatherScore={scores?.now?.weather_score} />
       </div>
       <SunTimeline scores={scores} coords={coords}/>

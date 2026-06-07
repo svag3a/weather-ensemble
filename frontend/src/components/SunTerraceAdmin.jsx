@@ -278,65 +278,23 @@ const AMENITY_TYPES = ['restaurant', 'cafe', 'bar', 'pub']
 function EditPanel({ terrace, onSave, onCancel }) {
   const [name, setName]                 = useState(terrace.name || '')
   const [address, setAddress]           = useState(terrace.address || '')
-  const [orientation, setOrientation]   = useState(terrace.street_orientation || 'UNKNOWN')
-  const [confidence, setConfidence]     = useState(terrace.orientation_confidence ?? 0.3)
   const [amenityType, setAmenityType]   = useState(terrace.amenity_type || 'restaurant')
   const [active, setActive]             = useState(terrace.active ?? true)
   const [outdoorType, setOutdoorType]   = useState(terrace.outdoor_type || 'unknown')
   const [tileLayer, setTileLayer]       = useState('sat')
-  const [mapMode, setMapMode]           = useState('direction')  // 'direction' | 'polygon' | 'arc'
-  const [clickPoint, setClickPoint]     = useState(null)
   const [arcClickStep, setArcClickStep] = useState(0)  // 0=first point, 1=second point
-  // polygon: array of [lat, lon]; null = no polygon yet
-  const [polygon, setPolygon]           = useState(() => {
-    if (terrace.polygon_coords) {
-      try { return JSON.parse(terrace.polygon_coords) } catch { return null }
-    }
-    return null
-  })
-  const [drawingVerts, setDrawingVerts] = useState([])  // in-progress polygon vertices
   const [arcFrom, setArcFrom]           = useState(terrace.sun_arc_from ?? null)
   const [arcTo,   setArcTo]             = useState(terrace.sun_arc_to   ?? null)
   const [saving, setSaving]             = useState(false)
   const [error, setError]               = useState(null)
 
   function handleMapClick(latlng) {
-    if (mapMode === 'direction') {
-      setClickPoint(latlng)
-      const dir = bearingToDir(calcBearing(terrace.lat, terrace.lon, latlng.lat, latlng.lng))
-      setOrientation(dir)
-      setConfidence(0.9)
-    } else if (mapMode === 'arc') {
-      const b = Math.round(calcBearing(terrace.lat, terrace.lon, latlng.lat, latlng.lng))
-      if (arcClickStep === 0) {
-        setArcFrom(b); setArcTo(null); setArcClickStep(1)
-      } else {
-        setArcTo(b); setArcClickStep(0); setConfidence(1.0)
-      }
+    const b = Math.round(calcBearing(terrace.lat, terrace.lon, latlng.lat, latlng.lng))
+    if (arcClickStep === 0) {
+      setArcFrom(b); setArcTo(null); setArcClickStep(1)
     } else {
-      // Polygon mode — add vertex
-      setDrawingVerts(prev => [...prev, [latlng.lat, latlng.lng]])
+      setArcTo(b); setArcClickStep(0)
     }
-  }
-
-  function closePolygon() {
-    if (drawingVerts.length < 3) return
-    const dir = orientationFromPolygon(drawingVerts)
-    if (dir) setOrientation(dir)
-    setConfidence(1.0)
-    setPolygon(drawingVerts)
-    setDrawingVerts([])
-  }
-
-  function clearPolygon() {
-    setPolygon(null)
-    setDrawingVerts([])
-  }
-
-  function handleOrientationChange(o) {
-    setOrientation(o)
-    setClickPoint(null)
-    setConfidence(o !== 'UNKNOWN' ? 0.9 : 0.3)
   }
 
   async function handleSave() {
@@ -346,12 +304,12 @@ function EditPanel({ terrace, onSave, onCancel }) {
       await overrideTerrace(terrace.id, {
         name,
         address,
-        orientation,
-        orientation_confidence: parseFloat(confidence),
+        orientation: 'UNKNOWN',
+        orientation_confidence: arcFrom != null && arcTo != null ? 1.0 : 0.3,
         amenity_type: amenityType,
         active,
         outdoor_type: outdoorType,
-        polygon_coords: polygon ? JSON.stringify(polygon) : '',
+        polygon_coords: '',
         sun_arc_from: arcFrom,
         sun_arc_to:   arcTo,
       })
@@ -363,11 +321,6 @@ function EditPanel({ terrace, onSave, onCancel }) {
     }
   }
 
-  // Vertices for in-progress polygon: close the last edge back to first for preview
-  const previewLine = drawingVerts.length >= 2
-    ? [...drawingVerts, drawingVerts[0]]
-    : drawingVerts
-
   return (
     <tr>
       <td colSpan={8} className="px-4 py-4 bg-slate-800/60 border-t border-b border-slate-600">
@@ -375,152 +328,55 @@ function EditPanel({ terrace, onSave, onCancel }) {
 
           {/* Map */}
           <div className="flex flex-col gap-1.5 flex-shrink-0">
-            {/* Tile + mode toggles */}
-            <div className="flex gap-1 flex-wrap">
+            {/* Tile toggle */}
+            <div className="flex gap-1">
               {[['sat','Satellit'],['osm','Karta']].map(([k,l]) => (
                 <button key={k} onClick={() => setTileLayer(k)}
                   className={`text-xs px-2 py-0.5 rounded border transition-colors ${tileLayer===k ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400'}`}>{l}</button>
               ))}
-              <div className="w-px bg-slate-600 self-stretch mx-0.5"/>
-              {[['direction','Punkt-riktning'],['polygon','Rita polygon'],['arc','Rita solbåge']].map(([k,l]) => (
-                <button key={k} onClick={() => { setMapMode(k); setDrawingVerts([]); setArcClickStep(0) }}
-                  className={`text-xs px-2 py-0.5 rounded border transition-colors ${
-                    mapMode===k
-                      ? k==='arc' ? 'bg-amber-700 border-amber-500 text-white' : 'bg-emerald-700 border-emerald-500 text-white'
-                      : 'bg-slate-700 border-slate-600 text-slate-400'
-                  }`}>{l}</button>
-              ))}
             </div>
             {/* Instruction */}
             <p className="text-slate-500 text-xs">
-              {mapMode === 'direction'
-                ? 'Klicka i riktningen uteserveringen vetter mot'
-                : mapMode === 'arc'
-                  ? arcClickStep === 0
-                    ? 'Klicka för bågstart (var solen börjar nå terrassen)'
-                    : 'Klicka för bågslut (var solen slutar nå terrassen)'
-                  : drawingVerts.length < 3
-                    ? `Klicka för att lägga till hörn (${drawingVerts.length} av minst 3)`
-                    : `${drawingVerts.length} hörn — klicka "Stäng polygon"`}
+              {arcClickStep === 0
+                ? 'Klick 1: bågstart — var solen börjar nå terrassen'
+                : 'Klick 2: bågslut — var solen slutar nå terrassen'}
             </p>
             <div className="rounded-xl overflow-hidden border border-slate-600" style={{width:360, height:280}}>
               <MapContainer center={[terrace.lat, terrace.lon]} zoom={18} maxZoom={21}
                 style={{width:'100%',height:'100%'}} zoomControl={true} attributionControl={false}>
                 <TileLayer key={tileLayer} url={TILES[tileLayer]} maxZoom={21}/>
-                {/* Main terrace marker */}
                 <Marker position={[terrace.lat, terrace.lon]}/>
-                {/* Direction mode: click point + line */}
-                {mapMode === 'direction' && clickPoint && (
-                  <>
-                    <Marker position={clickPoint} icon={redIcon}/>
-                    <Polyline positions={[[terrace.lat, terrace.lon],[clickPoint.lat, clickPoint.lng]]}
-                      pathOptions={{color:'#60a5fa', weight:2, dashArray:'5,5'}}/>
-                  </>
-                )}
-                {/* Solar arc sector */}
                 {arcFrom != null && arcTo != null && (
                   <Polygon
                     positions={createSectorPolygon(terrace.lat, terrace.lon, arcFrom, arcTo)}
-                    pathOptions={{color:'#f59e0b', fillColor:'#f59e0b', fillOpacity:0.18, weight:2, dashArray: mapMode==='arc' ? null : '4,4'}}
+                    pathOptions={{color:'#f59e0b', fillColor:'#f59e0b', fillOpacity:0.2, weight:2}}
                   />
-                )}
-                {/* Saved polygon */}
-                {polygon && (
-                  <Polygon positions={polygon}
-                    pathOptions={{color:'#22c55e', fillColor:'#22c55e', fillOpacity:0.15, weight:2}}/>
-                )}
-                {/* In-progress polygon */}
-                {drawingVerts.length > 0 && (
-                  <>
-                    {previewLine.length >= 2 && (
-                      <Polyline positions={previewLine}
-                        pathOptions={{color:'#f59e0b', weight:2, dashArray:'4,4'}}/>
-                    )}
-                    {drawingVerts.map((v,i) => (
-                      <Marker key={i} position={v} icon={smallDotIcon('#f59e0b')}/>
-                    ))}
-                  </>
                 )}
                 <MapRecenter lat={terrace.lat} lon={terrace.lon}/>
                 <MapClickHandler onClick={handleMapClick}/>
               </MapContainer>
             </div>
-            {/* Polygon action buttons */}
-            {mapMode === 'polygon' && (
-              <div className="flex gap-2 flex-wrap">
-                <button onClick={closePolygon} disabled={drawingVerts.length < 3}
-                  className="bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
-                  Stäng polygon
-                </button>
-                <button onClick={clearPolygon}
-                  className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                  Avbryt / Rensa allt
-                </button>
-              </div>
-            )}
-            {polygon && mapMode !== 'polygon' && (
-              <div className="flex items-center gap-2">
-                <p className="text-green-400 text-xs">✓ Polygon ({polygon.length} hörn)</p>
-                <button onClick={clearPolygon} className="text-xs text-red-400 hover:text-red-300 transition-colors">Ta bort</button>
-              </div>
-            )}
             {/* Arc status */}
-            {arcFrom != null && (
-              <div className="flex items-center gap-2 flex-wrap">
-                {arcTo != null ? (
-                  <>
-                    <span className="text-amber-400 text-xs">
-                      ☀ Båge {Math.round(arcFrom)}°→{Math.round(arcTo)}° ({Math.round((arcTo-arcFrom+360)%360||360)}°)
-                    </span>
-                    <button onClick={() => { setArcFrom(null); setArcTo(null); setArcClickStep(0) }}
-                      className="text-xs text-red-400 hover:text-red-300 transition-colors">Ta bort</button>
-                    {polygon && (
-                      <button onClick={async () => {
-                        try { const r = await deriveArcFromPolygon(terrace.id); setArcFrom(r.sun_arc_from); setArcTo(r.sun_arc_to) }
-                        catch (e) { alert(e.message) }
-                      }} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">Härledd från polygon</button>
-                    )}
-                  </>
-                ) : (
-                  <span className="text-slate-400 text-xs">Start satt ({Math.round(arcFrom)}°) — klicka för slutpunkt</span>
-                )}
-              </div>
-            )}
-            {arcFrom == null && mapMode === 'arc' && polygon && (
-              <button onClick={async () => {
-                try { const r = await deriveArcFromPolygon(terrace.id); setArcFrom(r.sun_arc_from); setArcTo(r.sun_arc_to) }
-                catch (e) { alert(e.message) }
-              }} className="text-xs text-blue-400 hover:text-blue-300 transition-colors">Härledd från polygon</button>
-            )}
+            <div className="flex items-center gap-2 flex-wrap min-h-[20px]">
+              {arcFrom != null && arcTo != null ? (
+                <>
+                  <span className="text-amber-400 text-xs font-medium">
+                    ☀ {Math.round(arcFrom)}°→{Math.round(arcTo)}°
+                    &nbsp;({Math.round((arcTo - arcFrom + 360) % 360 || 360)}° spann)
+                  </span>
+                  <button onClick={() => { setArcFrom(null); setArcTo(null); setArcClickStep(0) }}
+                    className="text-xs text-red-400 hover:text-red-300 transition-colors">Rensa</button>
+                </>
+              ) : arcFrom != null ? (
+                <span className="text-slate-400 text-xs">Start: {Math.round(arcFrom)}° — klicka för slutpunkt</span>
+              ) : (
+                <span className="text-slate-600 text-xs">Ingen solbåge satt</span>
+              )}
+            </div>
           </div>
 
           {/* Controls */}
-
           <div className="flex flex-col gap-4">
-
-            {/* Compass */}
-            <div>
-              <p className="text-slate-400 text-xs mb-1">Orientering — klicka kompassrosen eller använd kartläget</p>
-              <div className="flex items-center gap-3">
-                <CompassPicker value={orientation} onChange={handleOrientationChange}/>
-                <div className="flex flex-col gap-1">
-                  <span className="text-slate-400 text-xs">Valt</span>
-                  <span className="text-white font-mono text-lg font-bold">{orientation}</span>
-                  <button onClick={() => { setOrientation('UNKNOWN'); setConfidence(0.3); setClickPoint(null) }}
-                    className="text-slate-500 text-xs hover:text-slate-300 transition-colors text-left mt-1">
-                    Rensa
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Confidence */}
-            <div className="flex flex-col gap-1">
-              <label className="text-slate-400 text-xs">Säkerhet</label>
-              <input type="range" min="0" max="1" step="0.05" value={confidence}
-                onChange={e => setConfidence(e.target.value)} className="w-28 accent-blue-500"/>
-              <span className="text-slate-400 text-xs">{(confidence*100).toFixed(0)}%</span>
-            </div>
 
             {/* Outdoor type */}
             <div className="flex flex-col gap-1">
@@ -845,8 +701,8 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
   if (typeFilter !== 'all') filtered = filtered.filter(t => t.amenity_type === typeFilter)
   if (activeFilter === 'active')   filtered = filtered.filter(t => t.active)
   if (activeFilter === 'inactive') filtered = filtered.filter(t => !t.active)
-  if (oriFilter === 'unknown') filtered = filtered.filter(t => !t.street_orientation || t.street_orientation === 'UNKNOWN')
-  if (oriFilter === 'set')     filtered = filtered.filter(t => t.street_orientation && t.street_orientation !== 'UNKNOWN')
+  if (oriFilter === 'unknown') filtered = filtered.filter(t => t.sun_arc_from == null && (!t.street_orientation || t.street_orientation === 'UNKNOWN'))
+  if (oriFilter === 'set')     filtered = filtered.filter(t => t.sun_arc_from != null || (t.street_orientation && t.street_orientation !== 'UNKNOWN'))
   if (search.trim()) {
     const q = search.trim().toLowerCase()
     filtered = filtered.filter(t =>
@@ -927,8 +783,7 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
               <th className="text-left px-4 py-3">Namn</th>
               <th className="text-left px-4 py-3">Typ</th>
               <th className="text-left px-4 py-3">Ute</th>
-              <th className="text-left px-4 py-3">Orientering</th>
-              <th className="text-left px-4 py-3">Säkerhet</th>
+              <th className="text-left px-4 py-3">Solbåge</th>
               <th className="text-left px-4 py-3">Status</th>
               <th className="text-left px-4 py-3">Adress</th>
               <th className="px-4 py-3"></th>
@@ -948,14 +803,15 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
                     {t.polygon_coords && <span className="ml-1 text-emerald-500 text-[10px]">▣</span>}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`font-mono text-xs ${!t.street_orientation||t.street_orientation==='UNKNOWN'?'text-slate-500':'text-green-400'}`}>
-                      {t.street_orientation||'UNKNOWN'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`text-xs ${t.orientation_confidence>0.6?'text-green-400':t.orientation_confidence>0.4?'text-yellow-400':'text-slate-500'}`}>
-                      {(t.orientation_confidence*100).toFixed(0)}%
-                    </span>
+                    {t.sun_arc_from != null && t.sun_arc_to != null ? (
+                      <span className="text-amber-400 text-xs font-mono">
+                        {Math.round(t.sun_arc_from)}°–{Math.round(t.sun_arc_to)}°
+                      </span>
+                    ) : t.street_orientation && t.street_orientation !== 'UNKNOWN' ? (
+                      <span className="text-slate-400 text-xs">{t.street_orientation}</span>
+                    ) : (
+                      <span className="text-slate-600 text-xs">—</span>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`text-xs px-2 py-0.5 rounded-full ${t.active?'bg-green-500/20 text-green-400':'bg-slate-600 text-slate-400'}`}>

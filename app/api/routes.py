@@ -978,6 +978,8 @@ def get_sun_terraces(
             "outdoor_type": outdoor_type,
             "street_orientation": t.street_orientation,
             "orientation_confidence": t.orientation_confidence,
+            "sun_arc_from": t.sun_arc_from,
+            "sun_arc_to": t.sun_arc_to,
             "distance_km": round(_haversine_km(lat, lon, t.lat, t.lon), 2),
             "scores": scores,
             "now_score": now_score,
