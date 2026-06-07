@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchSunTerraces } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
 import { Moon, Sun, Parasol } from 'lucide-react'
@@ -140,6 +140,8 @@ export default function SolView({ coords }) {
   const [favs, setFavs] = useState(loadFavs)
   const [mode, setMode] = useState('sol')   // 'sol' | 'skugga'
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debounceRef = useRef(null)
 
   const toggleFav = useCallback((id) => {
     setFavs(prev => {
@@ -150,15 +152,27 @@ export default function SolView({ coords }) {
     })
   }, [])
 
+  // Debounce search input — wait 400 ms before triggering API call
   useEffect(() => {
-    if (!coords) return
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => setDebouncedSearch(search), 400)
+    return () => clearTimeout(debounceRef.current)
+  }, [search])
+
+  useEffect(() => {
+    if (!coords && !debouncedSearch) return
     setLoading(true)
     setError(null)
-    fetchSunTerraces({ lat: coords.lat, lon: coords.lon, ...filter })
+    fetchSunTerraces({
+      lat: coords?.lat ?? 57.7089,
+      lon: coords?.lon ?? 11.9746,
+      ...filter,
+      name: debouncedSearch,
+    })
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [coords, filter.type, filter.minScore])
+  }, [coords, filter.type, filter.minScore, debouncedSearch])
 
   const TYPE_FILTERS = [
     { value: 'all',        label: 'Alla' },
@@ -168,13 +182,8 @@ export default function SolView({ coords }) {
     { value: 'restaurant', label: 'Restaurang' },
   ]
 
-  // Sort/filter based on mode + search
-  const searchedData = data && search.trim()
-    ? data.filter(t => t.name?.toLowerCase().includes(search.trim().toLowerCase()) ||
-                        t.address?.toLowerCase().includes(search.trim().toLowerCase()))
-    : data
-
-  const sortedData = searchedData ? [...searchedData].sort((a, b) => {
+  // Sort based on mode (data is already filtered by backend)
+  const sortedData = data ? [...data].sort((a, b) => {
     const favDiff = (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0)
     if (favDiff !== 0) return favDiff
     return mode === 'skugga'

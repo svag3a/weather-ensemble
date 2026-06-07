@@ -820,17 +820,28 @@ def get_sun_terraces(
     type: str = Query(default="all"),
     min_score: int = Query(default=0, ge=0, le=100),
     include_low_confidence: bool = Query(default=True),
+    name: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
-    """Get sun terraces within radius, scored by current solar conditions."""
+    """Get sun terraces within radius, scored by current solar conditions.
+    When `name` is provided, radius is ignored and all active terraces matching
+    the name are returned (sorted by distance)."""
     from app.sources.sun_terraces import compute_scores
 
-    # Fetch active terraces within radius
     all_terraces = db.query(SunTerrace).filter(SunTerrace.active == True).all()  # noqa: E712
-    nearby = [
-        t for t in all_terraces
-        if _haversine_km(lat, lon, t.lat, t.lon) <= radius
-    ]
+
+    if name.strip():
+        # Name search: ignore radius, match anywhere in name or address
+        q = name.strip().lower()
+        nearby = [
+            t for t in all_terraces
+            if q in (t.name or "").lower() or q in (t.address or "").lower()
+        ]
+    else:
+        nearby = [
+            t for t in all_terraces
+            if _haversine_km(lat, lon, t.lat, t.lon) <= radius
+        ]
 
     # Filter by amenity type
     if type != "all":

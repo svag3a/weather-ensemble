@@ -87,8 +87,9 @@ export async function deleteCityImage(id) {
   if (!res.ok) throw new Error(await res.text())
 }
 
-export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', minScore = 0 } = {}) {
+export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', minScore = 0, name = '' } = {}) {
   const params = new URLSearchParams({ lat, lon, radius, type, min_score: minScore })
+  if (name) params.set('name', name)
   const res = await fetch(`${BASE}/sun-terraces?${params}`)
   if (!res.ok) throw new Error(await res.text())
   return res.json()
