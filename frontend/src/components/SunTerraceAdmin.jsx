@@ -132,6 +132,8 @@ const AMENITY_TYPES = ['restaurant', 'cafe', 'bar', 'pub']
 // ── Edit panel ────────────────────────────────────────────────────────────────
 
 function EditPanel({ terrace, onSave, onCancel }) {
+  const [name, setName]                 = useState(terrace.name || '')
+  const [address, setAddress]           = useState(terrace.address || '')
   const [orientation, setOrientation]   = useState(terrace.street_orientation || 'UNKNOWN')
   const [confidence, setConfidence]     = useState(terrace.orientation_confidence ?? 0.3)
   const [amenityType, setAmenityType]   = useState(terrace.amenity_type || 'restaurant')
@@ -188,6 +190,8 @@ function EditPanel({ terrace, onSave, onCancel }) {
     setError(null)
     try {
       await overrideTerrace(terrace.id, {
+        name,
+        address,
         orientation,
         orientation_confidence: parseFloat(confidence),
         amenity_type: amenityType,
@@ -335,6 +339,21 @@ function EditPanel({ terrace, onSave, onCancel }) {
                     <span className="text-slate-600 text-xs">{ot.desc}</span>
                   </label>
                 ))}
+              </div>
+            </div>
+
+            {/* Name + address */}
+            <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-400 text-xs">Namn</label>
+                <input value={name} onChange={e => setName(e.target.value)}
+                  className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600 w-52 focus:outline-none focus:border-blue-500"/>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-400 text-xs">Adress</label>
+                <input value={address} onChange={e => setAddress(e.target.value)}
+                  placeholder="(tom = rensa)"
+                  className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600 w-52 focus:outline-none focus:border-blue-500 placeholder-slate-600"/>
               </div>
             </div>
 

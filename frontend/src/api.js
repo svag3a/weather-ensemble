@@ -154,11 +154,11 @@ export async function fetchSunTerracesAdmin() {
   return res.json()
 }
 
-export async function overrideTerrace(id, { orientation, orientation_confidence, amenity_type, active, outdoor_type, polygon_coords }) {
+export async function overrideTerrace(id, { orientation, orientation_confidence, amenity_type, active, outdoor_type, polygon_coords, name, address }) {
   const res = await fetch(`${BASE}/sun-terraces/${id}/override`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ orientation, orientation_confidence, amenity_type, active, outdoor_type, polygon_coords }),
+    body: JSON.stringify({ orientation, orientation_confidence, amenity_type, active, outdoor_type, polygon_coords, name, address }),
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json()

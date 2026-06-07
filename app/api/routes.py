@@ -1028,6 +1028,8 @@ class SunTerraceOverride(BaseModel):
     active: Optional[bool] = None
     outdoor_type: Optional[str] = None
     polygon_coords: Optional[str] = None  # JSON string "[[lat,lon],...]" or null to clear
+    name: Optional[str] = None
+    address: Optional[str] = None
 
 
 @router.post("/sun-terraces/{terrace_id}/override", status_code=200)
@@ -1060,6 +1062,10 @@ def override_sun_terrace(
         terrace.outdoor_type = body.outdoor_type
     if body.polygon_coords is not None:
         terrace.polygon_coords = body.polygon_coords if body.polygon_coords != "" else None
+    if body.name is not None and body.name.strip():
+        terrace.name = body.name.strip()
+    if body.address is not None:
+        terrace.address = body.address.strip() or None
     terrace.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(terrace)
