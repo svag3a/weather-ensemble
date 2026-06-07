@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { overrideTerrace } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -129,16 +130,12 @@ function EditPanel({ terrace, onSave, onCancel }) {
     setSaving(true)
     setError(null)
     try {
-      await fetch(`/api/sun-terraces/${terrace.id}/override`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orientation,
-          orientation_confidence: parseFloat(confidence),
-          amenity_type: amenityType,
-          active,
-        }),
-      }).then(r => { if (!r.ok) throw new Error(r.statusText) })
+      await overrideTerrace(terrace.id, {
+        orientation,
+        orientation_confidence: parseFloat(confidence),
+        amenity_type: amenityType,
+        active,
+      })
       onSave()
     } catch (e) {
       setError(e.message)
