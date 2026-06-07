@@ -97,6 +97,7 @@ def compute_scores(
     orientation: Optional[str],
     orientation_conf: float,
     forecast_hours: list,
+    outdoor_seating: bool = False,
 ) -> dict:
     """Compute now / +1h / +2h scores for a terrace given pre-fetched forecast hours."""
     now = datetime.now(timezone.utc)
@@ -120,6 +121,9 @@ def compute_scores(
         # If orientation unknown, cap orientation contribution
         eff_os = os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60)
         total = int(0.55 * eff_os + 0.30 * ws["cloud"] + 0.10 * ws["temp"] + 0.05 * ws["wind"])
+        # outdoor_seating=yes tag confirmed — small bonus for reliability
+        if outdoor_seating:
+            total = min(100, total + 8)
         # Rain kills the score
         if ws["precip"] < 40:
             total = int(total * ws["precip"] / 40)

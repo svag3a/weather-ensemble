@@ -876,6 +876,7 @@ def get_sun_terraces(
             t.street_orientation,
             t.orientation_confidence,
             forecast_hours,
+            outdoor_seating=t.outdoor_seating,
         )
         now_score = scores.get("now", {}).get("total_score", 0)
         best_score = max(
@@ -905,7 +906,8 @@ def get_sun_terraces(
             "explanation": _build_explanation(scores, t.street_orientation, scores["confidence"]),
         })
 
-    results.sort(key=lambda x: x["best_score"], reverse=True)
+    # Sort: best_score desc, then distance asc (closer wins on tie)
+    results.sort(key=lambda x: (-x["best_score"], x["distance_km"]))
     return results
 
 
