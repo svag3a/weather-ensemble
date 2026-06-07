@@ -71,9 +71,13 @@ function MapRecenter({ lat, lon }) {
   return null
 }
 
+const AMENITY_TYPES = ['restaurant', 'cafe', 'bar', 'pub']
+
 function EditPanel({ terrace, onSave, onCancel }) {
   const [orientation, setOrientation] = useState(terrace.street_orientation || 'UNKNOWN')
   const [confidence, setConfidence] = useState(terrace.orientation_confidence ?? 0.3)
+  const [amenityType, setAmenityType] = useState(terrace.amenity_type || 'restaurant')
+  const [active, setActive] = useState(terrace.active ?? true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
@@ -91,7 +95,12 @@ function EditPanel({ terrace, onSave, onCancel }) {
       await fetch(`/api/sun-terraces/${terrace.id}/override`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orientation, orientation_confidence: parseFloat(confidence) }),
+        body: JSON.stringify({
+          orientation,
+          orientation_confidence: parseFloat(confidence),
+          amenity_type: amenityType,
+          active,
+        }),
       }).then(r => { if (!r.ok) throw new Error(r.statusText) })
       onSave()
     } catch (e) {
@@ -112,7 +121,7 @@ function EditPanel({ terrace, onSave, onCancel }) {
               center={[terrace.lat, terrace.lon]}
               zoom={18}
               style={{ width: '100%', height: '100%' }}
-              zoomControl={false}
+              zoomControl={true}
               attributionControl={false}
             >
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
@@ -124,7 +133,7 @@ function EditPanel({ terrace, onSave, onCancel }) {
           {/* Compass + controls */}
           <div className="flex flex-col gap-4">
             <div>
-              <p className="text-slate-400 text-xs mb-2">Välj orientering (vilken väderstreck terrassen vetter mot)</p>
+              <p className="text-slate-400 text-xs mb-2">Välj orientering (vilket väderstreck terrassen vetter mot)</p>
               <CompassPicker value={orientation} onChange={handleOrientationChange} />
             </div>
 
@@ -139,6 +148,30 @@ function EditPanel({ terrace, onSave, onCancel }) {
                   className="w-28 accent-blue-500"
                 />
                 <span className="text-slate-400 text-xs">{(confidence * 100).toFixed(0)}%</span>
+              </div>
+            </div>
+
+            <div className="flex gap-4 flex-wrap">
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-400 text-xs">Typ</label>
+                <select
+                  value={amenityType}
+                  onChange={e => setAmenityType(e.target.value)}
+                  className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600"
+                >
+                  {AMENITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-slate-400 text-xs">Status</label>
+                <select
+                  value={active ? 'active' : 'inactive'}
+                  onChange={e => setActive(e.target.value === 'active')}
+                  className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600"
+                >
+                  <option value="active">Aktiv</option>
+                  <option value="inactive">Inaktiv</option>
+                </select>
               </div>
             </div>
 

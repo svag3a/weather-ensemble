@@ -163,6 +163,7 @@ export default function SolView({ coords }) {
     { value: 'all',        label: 'Alla' },
     { value: 'cafe',       label: 'Café' },
     { value: 'bar',        label: 'Bar' },
+    { value: 'pub',        label: 'Pub' },
     { value: 'restaurant', label: 'Restaurang' },
   ]
 

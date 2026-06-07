@@ -945,6 +945,8 @@ def get_sun_terraces_admin(db: Session = Depends(get_db)):
 class SunTerraceOverride(BaseModel):
     orientation: str
     orientation_confidence: float
+    amenity_type: Optional[str] = None
+    active: Optional[bool] = None
 
 
 @router.post("/sun-terraces/{terrace_id}/override", status_code=200)
@@ -954,15 +956,22 @@ def override_sun_terrace(
     db: Session = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    """Override the orientation and confidence for a terrace."""
+    """Override orientation, type and active status for a terrace."""
     terrace = db.query(SunTerrace).filter(SunTerrace.id == terrace_id).first()
     if terrace is None:
         raise HTTPException(status_code=404, detail="Terrace not found")
     valid_orientations = {"N", "NE", "E", "SE", "S", "SW", "W", "NW", "UNKNOWN"}
     if body.orientation not in valid_orientations:
         raise HTTPException(status_code=400, detail=f"Invalid orientation. Must be one of {valid_orientations}")
+    valid_amenity_types = {"restaurant", "cafe", "bar", "pub"}
+    if body.amenity_type is not None and body.amenity_type not in valid_amenity_types:
+        raise HTTPException(status_code=400, detail=f"Invalid amenity_type. Must be one of {valid_amenity_types}")
     terrace.street_orientation = body.orientation
     terrace.orientation_confidence = body.orientation_confidence
+    if body.amenity_type is not None:
+        terrace.amenity_type = body.amenity_type
+    if body.active is not None:
+        terrace.active = body.active
     terrace.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
     db.commit()
     db.refresh(terrace)
@@ -970,4 +979,6 @@ def override_sun_terrace(
         "id": terrace.id,
         "street_orientation": terrace.street_orientation,
         "orientation_confidence": terrace.orientation_confidence,
+        "amenity_type": terrace.amenity_type,
+        "active": terrace.active,
     }
