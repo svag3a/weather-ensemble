@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchSunTerraces, voteTerrrace, createTerrace } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
-import { Moon, Sun, Parasol, ThumbsUp, ThumbsDown } from 'lucide-react'
+import { Moon, Sun, Parasol, ThumbsUp, ThumbsDown, Cloud, CloudRain } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -21,6 +21,21 @@ function SunDots({ score }) {
           border: `1px solid ${i < filled ? color : '#334155'}`,
         }}/>
       ))}
+    </span>
+  )
+}
+
+// Small weather indicator shown only when conditions are noteworthy
+function WeatherChip({ weatherScore }) {
+  if (weatherScore == null || weatherScore >= 60) return null
+  if (weatherScore < 30) return (
+    <span className="flex items-center gap-0.5 text-blue-400">
+      <CloudRain size={11}/><span className="text-[10px]">Regn</span>
+    </span>
+  )
+  return (
+    <span className="flex items-center gap-0.5 text-slate-400">
+      <Cloud size={11}/><span className="text-[10px]">Molnigt</span>
     </span>
   )
 }
@@ -71,9 +86,10 @@ function SunTimeline({ scores, coords }) {
   const nowH = now.getHours() + now.getMinutes() / 60
   const hoursToSunset = Math.max(0.25, ssLocal - nowH)
 
-  const s0 = scores?.now?.total_score ?? 0
-  const s1 = scores?.['1h']?.total_score ?? 0
-  const s2 = scores?.['2h']?.total_score ?? 0
+  // Use pure solar-geometry score (orientation × altitude) — not weather-blended
+  const s0 = scores?.now?.sun_score ?? 0
+  const s1 = scores?.['1h']?.sun_score ?? 0
+  const s2 = scores?.['2h']?.sun_score ?? 0
 
   const pct = h => Math.min(100, (h / hoursToSunset) * 100)
   const p1 = pct(1), p2 = pct(2)
@@ -189,6 +205,7 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) 
         {altitude != null && altitude > 0 && <span>Sol {Math.round(altitude)}°</span>}
         {street_orientation && street_orientation !== 'UNKNOWN' && <span>{street_orientation}</span>}
         <ConfidenceChip confidence={scores?.confidence ?? 0.3}/>
+        <WeatherChip weatherScore={scores?.now?.weather_score} />
       </div>
       <SunTimeline scores={scores} coords={coords}/>
     </div>
