@@ -270,19 +270,25 @@ function EditPanel({ terrace, onSave, onCancel }) {
             </div>
             {/* Polygon action buttons */}
             {mapMode === 'polygon' && (
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button onClick={closePolygon} disabled={drawingVerts.length < 3}
                   className="bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500 text-white text-xs px-3 py-1.5 rounded-lg transition-colors">
                   Stäng polygon
                 </button>
                 <button onClick={clearPolygon}
                   className="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-3 py-1.5 rounded-lg transition-colors">
-                  Rensa polygon
+                  Avbryt / Rensa allt
                 </button>
               </div>
             )}
             {polygon && mapMode !== 'polygon' && (
-              <p className="text-green-400 text-xs">✓ Polygon sparad ({polygon.length} hörn)</p>
+              <div className="flex items-center gap-2">
+                <p className="text-green-400 text-xs">✓ Polygon ({polygon.length} hörn)</p>
+                <button onClick={clearPolygon}
+                  className="text-xs text-red-400 hover:text-red-300 transition-colors">
+                  Ta bort
+                </button>
+              </div>
             )}
           </div>
 
