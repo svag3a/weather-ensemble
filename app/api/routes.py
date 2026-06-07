@@ -863,9 +863,10 @@ def get_sun_terraces(
             if _haversine_km(lat, lon, t.lat, t.lon) <= radius
         ]
 
-    # Filter by amenity type
-    if type != "all":
-        nearby = [t for t in nearby if t.amenity_type == type]
+    # Filter by amenity type (supports comma-separated values, e.g. "cafe,bar")
+    if type and type != "all":
+        type_set = {t.strip() for t in type.split(",")}
+        nearby = [t for t in nearby if t.amenity_type in type_set]
 
     # Get latest ensemble forecast hours for next 3h
     now = datetime.now(timezone.utc)
