@@ -75,60 +75,115 @@ def get_osm_state() -> dict:
     return dict(_osm_state)
 
 
-async def _fetch_nearby_roads(client: httpx.AsyncClient, lat: float, lon: float) -> list[dict]:
-    """Return road ways (with geometry) within 80 m of lat/lon."""
+# Göteborg bounding box for bulk road fetch
+GBG_BBOX = (57.60, 11.70, 57.85, 12.10)
+# Grid cell size in degrees for spatial index
+GRID_CELL = 0.005  # ~500 m
+
+
+async def _fetch_all_roads(client: httpx.AsyncClient) -> list[dict]:
+    """Fetch ALL named roads in Göteborg in one Overpass query."""
+    lat_min, lon_min, lat_max, lon_max = GBG_BBOX
     query = f"""
-[out:json][timeout:20];
-way(around:80,{lat},{lon})["highway"]["name"];
+[out:json][timeout:120];
+way["highway"]["name"]({lat_min},{lon_min},{lat_max},{lon_max});
 out geom;
 """
-    encoded = __import__("urllib.parse", fromlist=["urlencode"]).urlencode({"data": query})
+    import urllib.parse
+    encoded = urllib.parse.urlencode({"data": query})
     endpoints = [
         "https://overpass.kumi.systems/api/interpreter",
         "https://overpass-api.de/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     ]
     for url in endpoints:
         try:
+            logger.info("Fetching all Göteborg roads from %s …", url)
             r = await client.post(
                 url, content=encoded.encode(),
                 headers={
                     "User-Agent": "gbgvader.se/1.0 (terrace-orientation; https://gbgvader.se)",
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
-                timeout=25,
+                timeout=150,
             )
             if r.status_code == 200:
-                return r.json().get("elements", [])
-        except Exception:
+                elements = r.json().get("elements", [])
+                logger.info("Fetched %d road ways", len(elements))
+                return elements
+        except Exception as exc:
+            logger.warning("Endpoint %s failed: %s", url, exc)
             continue
-    return []
+    raise RuntimeError("All Overpass endpoints failed for bulk road fetch")
 
 
-def _orientation_from_roads(lat: float, lon: float, ways: list[dict]) -> Optional[str]:
-    """Return orientation string (e.g. 'S') or None if no suitable road found."""
-    cos_lat = math.cos(math.radians(lat))
-    best_d2 = float("inf")
-    best_near_lat = best_near_lon = None
+def _build_segment_index(ways: list[dict]) -> dict:
+    """
+    Build a grid index mapping (grid_row, grid_col) → list of segments.
+    Each segment is (a_lat, a_lon, b_lat, b_lon).
+    """
+    index: dict = {}
+
+    def cell(lat: float, lon: float) -> tuple:
+        return (int(lat / GRID_CELL), int(lon / GRID_CELL))
+
+    def add(seg: tuple, c: tuple) -> None:
+        index.setdefault(c, []).append(seg)
 
     for way in ways:
         geom = way.get("geometry", [])
-        if len(geom) < 2:
-            continue
         for i in range(len(geom) - 1):
             a, b = geom[i], geom[i + 1]
-            # Work in cos-corrected space
-            near_lat, near_lon = nearest_point_on_segment(
-                lat, (lon - a["lon"]) * cos_lat,
-                a["lat"], 0.0,
-                b["lat"], (b["lon"] - a["lon"]) * cos_lat,
-            )
-            # Convert back: near_lon is an offset * cos_lat from a["lon"]
-            near_lon_deg = a["lon"] + near_lon / cos_lat
-            d2 = dist2(lat, lon, near_lat, near_lon_deg, cos_lat)
+            seg = (a["lat"], a["lon"], b["lat"], b["lon"])
+            # Add segment to all cells it might touch
+            lats = sorted([a["lat"], b["lat"]])
+            lons = sorted([a["lon"], b["lon"]])
+            r0, r1 = int(lats[0] / GRID_CELL), int(lats[1] / GRID_CELL)
+            c0, c1 = int(lons[0] / GRID_CELL), int(lons[1] / GRID_CELL)
+            for r in range(r0, r1 + 1):
+                for c in range(c0, c1 + 1):
+                    add(seg, (r, c))
+    return index
+
+
+def _orientation_from_index(
+    lat: float, lon: float,
+    index: dict,
+    radius_cells: int = 2,
+) -> Optional[str]:
+    """Find nearest road segment via grid index and return orientation."""
+    cos_lat = math.cos(math.radians(lat))
+    base_r = int(lat / GRID_CELL)
+    base_c = int(lon / GRID_CELL)
+
+    best_d2 = float("inf")
+    best_near_lat = best_near_lon = None
+
+    # Search expanding rings until we find a hit (up to radius_cells)
+    for radius in range(0, radius_cells + 1):
+        candidates = set()
+        for dr in range(-radius, radius + 1):
+            for dc in range(-radius, radius + 1):
+                if abs(dr) == radius or abs(dc) == radius:  # only the border ring
+                    key = (base_r + dr, base_c + dc)
+                    candidates.update(index.get(key, []))
+
+        for a_lat, a_lon, b_lat, b_lon in candidates:
+            # Project venue onto segment in cos-corrected space
+            px, py = 0.0, 0.0  # venue at origin
+            ax = (a_lon - lon) * cos_lat
+            ay = a_lat - lat
+            bx = (b_lon - lon) * cos_lat
+            by = b_lat - lat
+            nx, ny = nearest_point_on_segment(px, py, ax, ay, bx, by)
+            d2 = nx * nx + ny * ny
             if d2 < best_d2:
                 best_d2 = d2
-                best_near_lat = near_lat
-                best_near_lon = near_lon_deg
+                best_near_lat = lat + ny
+                best_near_lon = lon + nx / cos_lat
+
+        if best_near_lat is not None:
+            break  # found something in this ring
 
     if best_near_lat is None:
         return None
@@ -138,7 +193,13 @@ def _orientation_from_roads(lat: float, lon: float, ways: list[dict]) -> Optiona
 
 
 async def run_osm_orientation_job(get_db_func) -> None:
-    """Background job: assign orientation from nearest road for unset terraces."""
+    """
+    Background job: assign orientation from nearest named road.
+
+    Strategy: one bulk Overpass query fetches all roads in Göteborg,
+    then all venue lookups are done locally via a grid index — no per-venue
+    network calls, runs in seconds instead of minutes.
+    """
     global _osm_state
     if _osm_state["running"]:
         return
@@ -147,36 +208,46 @@ async def run_osm_orientation_job(get_db_func) -> None:
         "started_at": datetime.now(timezone.utc).isoformat(),
         "finished_at": None, "error": None,
     }
-    logger.info("OSM orientation job started")
+    logger.info("OSM orientation job started (bulk mode)")
     try:
         db: Session = next(get_db_func())
         terraces = (
             db.query(SunTerrace)
             .filter(
-                SunTerrace.active == True,         # noqa: E712
-                SunTerrace.orientation_confidence < 0.7,  # skip manual overrides
+                SunTerrace.active == True,                   # noqa: E712
+                SunTerrace.orientation_confidence < 0.7,     # skip manual overrides
             )
             .order_by(SunTerrace.id)
             .all()
         )
         _osm_state["total"] = len(terraces)
-        logger.info("OSM orientation: processing %d terraces", len(terraces))
+        logger.info("OSM orientation: %d terraces to process", len(terraces))
 
+        # ── Step 1: one bulk road fetch ──────────────────────────────────────
         async with httpx.AsyncClient() as client:
-            for t in terraces:
-                ways = await _fetch_nearby_roads(client, t.lat, t.lon)
-                ori = _orientation_from_roads(t.lat, t.lon, ways)
-                _osm_state["done"] += 1
-                if ori and ori != "UNKNOWN":
-                    t.street_orientation = ori
-                    t.orientation_confidence = 0.55  # moderate — road-derived
-                    t.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
-                    db.commit()
-                    _osm_state["updated"] += 1
-                else:
-                    _osm_state["skipped"] += 1
-                await asyncio.sleep(1.1)
+            ways = await _fetch_all_roads(client)
 
+        # ── Step 2: build spatial index ──────────────────────────────────────
+        index = _build_segment_index(ways)
+        logger.info("Road index built: %d cells", len(index))
+
+        # ── Step 3: assign orientation to each terrace ───────────────────────
+        COMMIT_EVERY = 100
+        for i, t in enumerate(terraces):
+            ori = _orientation_from_index(t.lat, t.lon, index)
+            _osm_state["done"] += 1
+            if ori:
+                t.street_orientation = ori
+                t.orientation_confidence = 0.55
+                t.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                _osm_state["updated"] += 1
+            else:
+                _osm_state["skipped"] += 1
+            if (i + 1) % COMMIT_EVERY == 0:
+                db.commit()
+                await asyncio.sleep(0)   # yield to event loop
+
+        db.commit()
         logger.info("OSM orientation done: %d updated", _osm_state["updated"])
     except Exception as exc:
         logger.error("OSM orientation job error: %s", exc)
