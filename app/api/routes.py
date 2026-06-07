@@ -556,6 +556,44 @@ def geocode_status(_user: str = Depends(get_current_user)):
     return get_state()
 
 
+@router.post("/sun-terraces/enrich/osm")
+async def enrich_osm(_user: str = Depends(get_current_user)):
+    """Trigger OSM road-proximity orientation job (background)."""
+    import asyncio
+    from app.sources.enrich_terraces import run_osm_orientation_job, get_osm_state
+    from app.database import get_db as _get_db
+    state = get_osm_state()
+    if state["running"]:
+        return {"status": "already_running", **state}
+    asyncio.create_task(run_osm_orientation_job(_get_db))
+    return {"status": "started"}
+
+
+@router.get("/sun-terraces/enrich/osm/status")
+def enrich_osm_status(_user: str = Depends(get_current_user)):
+    from app.sources.enrich_terraces import get_osm_state
+    return get_osm_state()
+
+
+@router.post("/sun-terraces/enrich/ai")
+async def enrich_ai(_user: str = Depends(get_current_user)):
+    """Trigger Claude AI enrichment job (background)."""
+    import asyncio
+    from app.sources.enrich_terraces import run_ai_enrichment_job, get_ai_state
+    from app.database import get_db as _get_db
+    state = get_ai_state()
+    if state["running"]:
+        return {"status": "already_running", **state}
+    asyncio.create_task(run_ai_enrichment_job(_get_db))
+    return {"status": "started"}
+
+
+@router.get("/sun-terraces/enrich/ai/status")
+def enrich_ai_status(_user: str = Depends(get_current_user)):
+    from app.sources.enrich_terraces import get_ai_state
+    return get_ai_state()
+
+
 @router.post("/collect/sync")
 async def trigger_collection_sync(_user: str = Depends(get_current_user)):
     """Run collection synchronously and return any errors — for debugging."""
@@ -914,6 +952,7 @@ def get_sun_terraces(
             forecast_hours,
             outdoor_seating=t.outdoor_seating,
             is_rooftop=(outdoor_type == "rooftop"),
+            polygon_coords_json=t.polygon_coords,
         )
         now_score = scores.get("now", {}).get("total_score", 0)
         best_score = max(

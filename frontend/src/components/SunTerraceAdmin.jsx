@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { overrideTerrace, triggerGeocodeTerraces, fetchGeocodeStatus } from '../api'
+import { overrideTerrace, triggerGeocodeTerraces, fetchGeocodeStatus,
+         triggerEnrichOsm, fetchEnrichOsmStatus,
+         triggerEnrichAi, fetchEnrichAiStatus } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -377,6 +379,69 @@ function EditPanel({ terrace, onSave, onCancel }) {
 
 // ── Main admin component ──────────────────────────────────────────────────────
 
+// Generic job-widget: trigger + progress bar
+function JobWidget({ label, triggerFn, statusFn, color = 'blue' }) {
+  const [status, setStatus] = useState(null)
+  const [triggering, setTriggering] = useState(false)
+  const pollRef = useRef(null)
+
+  async function start() {
+    setTriggering(true)
+    try {
+      const s = await triggerFn()
+      setStatus(s)
+      if (s.running || s.status === 'started') startPolling()
+    } catch (e) {
+      setStatus({ error: e.message })
+    } finally {
+      setTriggering(false)
+    }
+  }
+
+  function startPolling() {
+    clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await statusFn()
+        setStatus(s)
+        if (!s.running) clearInterval(pollRef.current)
+      } catch { clearInterval(pollRef.current) }
+    }, 2000)
+  }
+
+  useEffect(() => () => clearInterval(pollRef.current), [])
+
+  const pct = status?.total > 0 ? Math.round((status.done / status.total) * 100) : 0
+  const btnClass = color === 'emerald'
+    ? 'bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-600'
+    : 'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600'
+  const barClass = color === 'emerald' ? 'bg-emerald-500' : 'bg-blue-500'
+
+  return (
+    <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1 min-w-[200px]">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-slate-400 text-xs">{label}</span>
+        <button onClick={start} disabled={triggering || status?.running}
+          className={`text-xs ${btnClass} text-white px-2 py-0.5 rounded transition-colors`}>
+          {status?.running ? 'Kör…' : 'Starta'}
+        </button>
+      </div>
+      {status?.running && (
+        <>
+          <div className="w-full bg-slate-600 rounded-full h-1.5">
+            <div className={`${barClass} h-1.5 rounded-full transition-all`} style={{width:`${pct}%`}}/>
+          </div>
+          <span className="text-slate-400 text-[10px]">{status.done}/{status.total} · {status.updated} uppdaterade</span>
+        </>
+      )}
+      {!status?.running && status?.finished_at && (
+        <span className="text-green-400 text-[10px]">✓ {status.updated} uppdaterade</span>
+      )}
+      {status?.error && <span className="text-red-400 text-[10px]">{status.error}</span>}
+    </div>
+  )
+}
+
 function GeocodeWidget() {
   const [status, setStatus] = useState(null)
   const [triggering, setTriggering] = useState(false)
@@ -483,6 +548,8 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
             <div className="text-slate-400 text-xs">{l}</div>
           </div>
         ))}
+        <JobWidget label="Orientering OSM" triggerFn={triggerEnrichOsm} statusFn={fetchEnrichOsmStatus} color="emerald"/>
+        <JobWidget label="AI-berikning" triggerFn={triggerEnrichAi} statusFn={fetchEnrichAiStatus} color="blue"/>
         <GeocodeWidget />
         <button onClick={onReload}
           className="ml-auto bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-600 transition-colors">

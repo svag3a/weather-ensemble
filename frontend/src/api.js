@@ -95,6 +95,27 @@ export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', m
   return res.json()
 }
 
+export async function triggerEnrichOsm() {
+  const res = await fetch(`${BASE}/sun-terraces/enrich/osm`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+export async function fetchEnrichOsmStatus() {
+  const res = await fetch(`${BASE}/sun-terraces/enrich/osm/status`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+export async function triggerEnrichAi() {
+  const res = await fetch(`${BASE}/sun-terraces/enrich/ai`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+export async function fetchEnrichAiStatus() {
+  const res = await fetch(`${BASE}/sun-terraces/enrich/ai/status`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function triggerGeocodeTerraces() {
   const res = await fetch(`${BASE}/sun-terraces/geocode`, { method: 'POST' })
   if (!res.ok) throw new Error(await res.text())
