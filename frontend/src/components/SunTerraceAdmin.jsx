@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -11,27 +11,45 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-const ORIENTATIONS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'UNKNOWN']
+// Red marker icon for the direction click point
+const redIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
+  iconRetinaUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  iconSize: [25, 41], iconAnchor: [12, 41],
+})
 
-// Compass rose — 8-direction picker
+// Bearing helpers
+function calcBearing(lat1, lon1, lat2, lon2) {
+  const dLon = (lon2 - lon1) * Math.PI / 180
+  const lat1r = lat1 * Math.PI / 180
+  const lat2r = lat2 * Math.PI / 180
+  const y = Math.sin(dLon) * Math.cos(lat2r)
+  const x = Math.cos(lat1r) * Math.sin(lat2r) - Math.sin(lat1r) * Math.cos(lat2r) * Math.cos(dLon)
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
+}
+
+function bearingToDir(deg) {
+  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
+  return dirs[Math.round(deg / 45) % 8]
+}
+
+// Compass rose — shows result, still clickable for manual override
 const DIRS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
 const DIR_ANGLES = { N: 0, NE: 45, E: 90, SE: 135, S: 180, SW: 225, W: 270, NW: 315 }
 
 function CompassPicker({ value, onChange }) {
-  const r = 60   // outer radius
-  const btnR = 14 // button circle radius
+  const r = 52
+  const btnR = 13
 
   return (
     <svg width={r * 2 + btnR * 2 + 4} height={r * 2 + btnR * 2 + 4} className="select-none">
       <g transform={`translate(${r + btnR + 2},${r + btnR + 2})`}>
-        {/* Background circle */}
         <circle cx={0} cy={0} r={r} fill="none" stroke="#334155" strokeWidth={1} />
-        {/* Cardinal lines */}
         {[0, 45, 90, 135].map(a => {
           const ra = (a * Math.PI) / 180
-          return <line key={a} x1={Math.sin(ra)*8} y1={-Math.cos(ra)*8} x2={Math.sin(ra)*r} y2={-Math.cos(ra)*r} stroke="#1e293b" strokeWidth={1} />
+          return <line key={a} x1={Math.sin(ra)*7} y1={-Math.cos(ra)*7} x2={Math.sin(ra)*r} y2={-Math.cos(ra)*r} stroke="#1e293b" strokeWidth={1} />
         })}
-        {/* Direction buttons */}
         {DIRS.map(dir => {
           const deg = DIR_ANGLES[dir]
           const rad = (deg * Math.PI) / 180
@@ -42,16 +60,14 @@ function CompassPicker({ value, onChange }) {
             <g key={dir} onClick={() => onChange(dir)} style={{ cursor: 'pointer' }}>
               <circle cx={x} cy={y} r={btnR} fill={active ? '#3b82f6' : '#1e293b'} stroke={active ? '#60a5fa' : '#475569'} strokeWidth={1.5} />
               <text x={x} y={y} textAnchor="middle" dominantBaseline="central"
-                fill={active ? '#fff' : '#94a3b8'} fontSize={dir.length > 1 ? 8 : 10} fontWeight={active ? 700 : 400}
+                fill={active ? '#fff' : '#94a3b8'} fontSize={dir.length > 1 ? 7 : 9} fontWeight={active ? 700 : 400}
                 style={{ pointerEvents: 'none' }}>
                 {dir}
               </text>
             </g>
           )
         })}
-        {/* Center dot */}
         <circle cx={0} cy={0} r={4} fill={value === 'UNKNOWN' ? '#ef4444' : '#3b82f6'} />
-        {/* Arrow pointing toward selected direction */}
         {value && value !== 'UNKNOWN' && (() => {
           const deg = DIR_ANGLES[value]
           const rad = (deg * Math.PI) / 180
@@ -64,26 +80,47 @@ function CompassPicker({ value, onChange }) {
   )
 }
 
-// Helper: re-center map when terrace changes
+// Recenter map when switching terraces
 function MapRecenter({ lat, lon }) {
   const map = useMap()
   useEffect(() => { map.setView([lat, lon], 18) }, [lat, lon])
   return null
 }
 
+// Click handler — fires callback with latlng
+function MapClickHandler({ onClick }) {
+  useMapEvents({ click: e => onClick(e.latlng) })
+  return null
+}
+
 const AMENITY_TYPES = ['restaurant', 'cafe', 'bar', 'pub']
+
+const TILES = {
+  osm: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  sat: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+}
 
 function EditPanel({ terrace, onSave, onCancel }) {
   const [orientation, setOrientation] = useState(terrace.street_orientation || 'UNKNOWN')
   const [confidence, setConfidence] = useState(terrace.orientation_confidence ?? 0.3)
   const [amenityType, setAmenityType] = useState(terrace.amenity_type || 'restaurant')
   const [active, setActive] = useState(terrace.active ?? true)
+  const [clickPoint, setClickPoint] = useState(null)  // {lat, lng} from map click
+  const [tileLayer, setTileLayer] = useState('sat')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
 
-  // Auto-bump confidence when a real direction is chosen
+  function handleMapClick(latlng) {
+    setClickPoint(latlng)
+    const bearing = calcBearing(terrace.lat, terrace.lon, latlng.lat, latlng.lng)
+    const dir = bearingToDir(bearing)
+    setOrientation(dir)
+    setConfidence(0.9)
+  }
+
   function handleOrientationChange(o) {
     setOrientation(o)
+    setClickPoint(null)
     if (o !== 'UNKNOWN') setConfidence(0.9)
     else setConfidence(0.3)
   }
@@ -116,77 +153,105 @@ function EditPanel({ terrace, onSave, onCancel }) {
         <div className="flex gap-6 flex-wrap items-start">
 
           {/* Map */}
-          <div className="rounded-xl overflow-hidden border border-slate-600 flex-shrink-0" style={{ width: 280, height: 220 }}>
-            <MapContainer
-              center={[terrace.lat, terrace.lon]}
-              zoom={18}
-              style={{ width: '100%', height: '100%' }}
-              zoomControl={true}
-              attributionControl={false}
-            >
-              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <Marker position={[terrace.lat, terrace.lon]} />
-              <MapRecenter lat={terrace.lat} lon={terrace.lon} />
-            </MapContainer>
+          <div className="flex flex-col gap-1 flex-shrink-0">
+            {/* Tile toggle */}
+            <div className="flex gap-1 mb-1">
+              {[['sat', 'Satellit'], ['osm', 'Karta']].map(([k, l]) => (
+                <button key={k} onClick={() => setTileLayer(k)}
+                  className={`text-xs px-2 py-0.5 rounded transition-colors border ${
+                    tileLayer === k ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-400'
+                  }`}>{l}</button>
+              ))}
+              <span className="text-slate-500 text-xs ml-2 self-center">Klicka i kartan för att ange riktning</span>
+            </div>
+            <div className="rounded-xl overflow-hidden border border-slate-600" style={{ width: 340, height: 260 }}>
+              <MapContainer
+                center={[terrace.lat, terrace.lon]}
+                zoom={18}
+                style={{ width: '100%', height: '100%' }}
+                zoomControl={true}
+                attributionControl={false}
+              >
+                <TileLayer key={tileLayer} url={TILES[tileLayer]} />
+                {/* Terrace marker */}
+                <Marker position={[terrace.lat, terrace.lon]} />
+                {/* Direction click marker + line */}
+                {clickPoint && (
+                  <>
+                    <Marker position={clickPoint} icon={redIcon} />
+                    <Polyline
+                      positions={[[terrace.lat, terrace.lon], [clickPoint.lat, clickPoint.lng]]}
+                      pathOptions={{ color: '#60a5fa', weight: 2, dashArray: '5,5' }}
+                    />
+                  </>
+                )}
+                <MapRecenter lat={terrace.lat} lon={terrace.lon} />
+                <MapClickHandler onClick={handleMapClick} />
+              </MapContainer>
+            </div>
           </div>
 
-          {/* Compass + controls */}
+          {/* Controls */}
           <div className="flex flex-col gap-4">
-            <div>
-              <p className="text-slate-400 text-xs mb-2">Välj orientering (vilket väderstreck terrassen vetter mot)</p>
-              <CompassPicker value={orientation} onChange={handleOrientationChange} />
-            </div>
 
-            <div className="flex items-center gap-3">
-              <div className="flex flex-col gap-1">
-                <label className="text-slate-400 text-xs">Valt: <span className="text-white font-mono">{orientation}</span></label>
-                <label className="text-slate-400 text-xs">Säkerhet</label>
-                <input
-                  type="range" min="0" max="1" step="0.05"
-                  value={confidence}
-                  onChange={e => setConfidence(e.target.value)}
-                  className="w-28 accent-blue-500"
-                />
-                <span className="text-slate-400 text-xs">{(confidence * 100).toFixed(0)}%</span>
+            {/* Compass — shows result, also manually clickable */}
+            <div>
+              <p className="text-slate-400 text-xs mb-1">
+                Beräknad riktning — eller klicka kompassrosen manuellt
+              </p>
+              <div className="flex items-center gap-3">
+                <CompassPicker value={orientation} onChange={handleOrientationChange} />
+                <div className="flex flex-col gap-1">
+                  <span className="text-slate-400 text-xs">Valt</span>
+                  <span className="text-white font-mono text-lg font-bold">{orientation}</span>
+                  <button
+                    onClick={() => { setOrientation('UNKNOWN'); setConfidence(0.3); setClickPoint(null) }}
+                    className="text-slate-500 text-xs hover:text-slate-300 transition-colors text-left mt-1"
+                  >
+                    Rensa
+                  </button>
+                </div>
               </div>
             </div>
 
+            {/* Confidence */}
+            <div className="flex flex-col gap-1">
+              <label className="text-slate-400 text-xs">Säkerhet</label>
+              <input type="range" min="0" max="1" step="0.05"
+                value={confidence}
+                onChange={e => setConfidence(e.target.value)}
+                className="w-28 accent-blue-500"
+              />
+              <span className="text-slate-400 text-xs">{(confidence * 100).toFixed(0)}%</span>
+            </div>
+
+            {/* Type + status */}
             <div className="flex gap-4 flex-wrap">
               <div className="flex flex-col gap-1">
                 <label className="text-slate-400 text-xs">Typ</label>
-                <select
-                  value={amenityType}
-                  onChange={e => setAmenityType(e.target.value)}
-                  className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600"
-                >
+                <select value={amenityType} onChange={e => setAmenityType(e.target.value)}
+                  className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600">
                   {AMENITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-slate-400 text-xs">Status</label>
-                <select
-                  value={active ? 'active' : 'inactive'}
-                  onChange={e => setActive(e.target.value === 'active')}
-                  className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600"
-                >
+                <select value={active ? 'active' : 'inactive'} onChange={e => setActive(e.target.value === 'active')}
+                  className="bg-slate-700 text-slate-200 text-xs rounded px-2 py-1.5 border border-slate-600">
                   <option value="active">Aktiv</option>
                   <option value="inactive">Inaktiv</option>
                 </select>
               </div>
             </div>
 
+            {/* Actions */}
             <div className="flex gap-2 items-center">
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors"
-              >
+              <button onClick={handleSave} disabled={saving}
+                className="bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600 text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors">
                 {saving ? 'Sparar…' : 'Spara'}
               </button>
-              <button
-                onClick={onCancel}
-                className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-4 py-2 rounded-lg transition-colors"
-              >
+              <button onClick={onCancel}
+                className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-4 py-2 rounded-lg transition-colors">
                 Avbryt
               </button>
               {error && <span className="text-red-400 text-xs">{error}</span>}
@@ -208,8 +273,8 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
     return <div className="text-slate-400 text-sm text-center py-8">Hämtar uteserveringar…</div>
   }
 
-  const active = data.filter(t => t.active)
-  const inactive = data.filter(t => !t.active)
+  const activeCount = data.filter(t => t.active).length
+  const inactiveCount = data.filter(t => !t.active).length
 
   let filtered = data
   if (typeFilter !== 'all') filtered = filtered.filter(t => t.amenity_type === typeFilter)
@@ -228,21 +293,19 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
       {/* Summary */}
       <div className="flex items-center gap-4 flex-wrap">
         <div className="bg-slate-700 rounded-lg px-4 py-2 text-center">
-          <div className="text-white font-semibold text-lg">{active.length}</div>
+          <div className="text-white font-semibold text-lg">{activeCount}</div>
           <div className="text-slate-400 text-xs">Aktiva</div>
         </div>
         <div className="bg-slate-700 rounded-lg px-4 py-2 text-center">
-          <div className="text-white font-semibold text-lg">{inactive.length}</div>
+          <div className="text-white font-semibold text-lg">{inactiveCount}</div>
           <div className="text-slate-400 text-xs">Inaktiva</div>
         </div>
         <div className="bg-slate-700 rounded-lg px-4 py-2 text-center">
           <div className="text-white font-semibold text-lg">{data.filter(t => t.street_orientation && t.street_orientation !== 'UNKNOWN').length}</div>
           <div className="text-slate-400 text-xs">Med orientering</div>
         </div>
-        <button
-          onClick={onReload}
-          className="ml-auto bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-600 transition-colors"
-        >
+        <button onClick={onReload}
+          className="ml-auto bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-600 transition-colors">
           Ladda om
         </button>
       </div>
