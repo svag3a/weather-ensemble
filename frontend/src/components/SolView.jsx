@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { fetchSunTerraces } from '../api'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
@@ -35,36 +35,15 @@ function amenityLabel(type) {
   return map[type] ?? type
 }
 
-function scoreToColor(score) {
-  // Maps 0-100 sun score to a sky/sun colour
-  if (score <= 0)  return '#0f172a'   // dark night
-  if (score < 25)  return '#1e3a5f'   // dark blue
-  if (score < 45)  return '#7c3500'   // warm brown
-  if (score < 65)  return '#c2410c'   // orange
-  return '#f59e0b'                    // golden
-}
-
-function cardGradient(scores) {
-  // Left→right timeline: now → +1h → +2h
-  const c0 = scoreToColor(scores?.now?.total_score ?? 0)
-  const c1 = scoreToColor(scores?.['1h']?.total_score ?? 0)
-  const c2 = scoreToColor(scores?.['2h']?.total_score ?? 0)
-  return `linear-gradient(to right, ${c0} 0%, ${c1} 50%, ${c2} 100%)`
-}
-
-function TerraceCard({ terrace }) {
-  const { name, address, amenity_type, street_orientation, scores, best_score, explanation } = terrace
-  const now_score = scores?.now?.total_score ?? 0
+function TerraceCard({ terrace, isFav, onToggleFav }) {
+  const { id, name, address, amenity_type, street_orientation, scores, best_score, explanation } = terrace
   const best = scores?.best_time ?? 'now'
   const altitude = scores?.[best]?.sun_altitude
   const weather_score = scores?.[best]?.weather_score
 
   return (
-    <div
-      className="rounded-2xl p-4 space-y-3 backdrop-blur-sm border border-white/10"
-      style={{ background: cardGradient(scores) }}
-    >
-      {/* Header: score badge + name */}
+    <div className={`${GLASS} rounded-2xl p-4 space-y-3`}>
+      {/* Header: score badge + name + star */}
       <div className="flex items-start gap-3">
         <div
           className="shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg"
@@ -77,14 +56,15 @@ function TerraceCard({ terrace }) {
           {address && <div className="text-slate-400 text-xs mt-0.5 truncate">{address}</div>}
           <div className="text-slate-500 text-xs mt-0.5">{amenityLabel(amenity_type)}</div>
         </div>
-        <div className="shrink-0 text-right">
-          <div
-            className="text-xs font-semibold px-2 py-0.5 rounded-full"
-            style={{ background: scoreBg(best_score), color: scoreColor(best_score) }}
-          >
-            {bestTimeLabel(best)}
-          </div>
-        </div>
+        {/* Favourite star */}
+        <button
+          onClick={() => onToggleFav(id)}
+          className="shrink-0 text-lg leading-none transition-opacity"
+          style={{ opacity: isFav ? 1 : 0.35 }}
+          title={isFav ? 'Ta bort favorit' : 'Spara som favorit'}
+        >
+          {isFav ? '★' : '☆'}
+        </button>
       </div>
 
       {/* Sub-scores row */}
@@ -101,7 +81,7 @@ function TerraceCard({ terrace }) {
         <ConfidenceChip confidence={scores?.confidence ?? 0.3} />
       </div>
 
-      {/* Score timeline: now / +1h / +2h */}
+      {/* Score timeline: now / +1h / +2h — colour reflects sun score */}
       <div className="flex gap-2">
         {['now', '1h', '2h'].map(key => {
           const s = scores?.[key]?.total_score ?? 0
@@ -109,7 +89,7 @@ function TerraceCard({ terrace }) {
             <div key={key} className="flex-1 text-center">
               <div className="text-[10px] text-slate-500 mb-0.5">{bestTimeLabel(key)}</div>
               <div
-                className="rounded-lg py-1 text-xs font-semibold"
+                className="rounded-lg py-1.5 text-xs font-semibold"
                 style={{ background: scoreBg(s), color: scoreColor(s) }}
               >
                 {s}
@@ -125,11 +105,25 @@ function TerraceCard({ terrace }) {
   )
 }
 
+const FAVS_KEY = 'sol_favourites'
+function loadFavs() { try { return new Set(JSON.parse(localStorage.getItem(FAVS_KEY) || '[]')) } catch { return new Set() } }
+function saveFavs(set) { localStorage.setItem(FAVS_KEY, JSON.stringify([...set])) }
+
 export default function SolView({ coords }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [filter, setFilter] = useState({ type: 'all', minScore: 0 })
+  const [favs, setFavs] = useState(loadFavs)
+
+  const toggleFav = useCallback((id) => {
+    setFavs(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      saveFavs(next)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     if (!coords) return
@@ -229,7 +223,10 @@ export default function SolView({ coords }) {
           <p className="text-slate-500 text-xs px-1">
             {data.length} uteserveringar inom 2 km
           </p>
-          {data.map(t => <TerraceCard key={t.id} terrace={t} />)}
+          {[...data].sort((a, b) => (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0))
+            .map(t => (
+              <TerraceCard key={t.id} terrace={t} isFav={favs.has(t.id)} onToggleFav={toggleFav} />
+            ))}
           <p className="text-white/30 text-xs px-1 pt-1">
             Data från OpenStreetMap · Solberäkning uppdateras löpande
           </p>
