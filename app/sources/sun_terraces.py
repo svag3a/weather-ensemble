@@ -339,15 +339,12 @@ def compute_day_score(
     """
     now = datetime.now(timezone.utc)
 
-    # Guard: if the sun is currently below the horizon, check whether it
-    # already set today (post-sunset) or hasn't risen yet (pre-dawn).
-    # Post-sunset → no remaining daylight today → score = 0.
+    # Guard: if the sun is currently below the horizon return (0, []) immediately.
+    # We never compute "tomorrow's" sun — the day-score is always about
+    # remaining daylight *today*.  Both post-sunset and pre-dawn return 0.
     _, alt_now = solar_position(lat, lon, now)
     if alt_now <= 0:
-        for h in range(1, 7):
-            _, alt_past = solar_position(lat, lon, now - timedelta(hours=h))
-            if alt_past > 0:
-                return 0   # sun was up within the last 6 h → post-sunset
+        return 0, []
 
     # Pre-parse polygon once
     poly = None
