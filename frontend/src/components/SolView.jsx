@@ -468,7 +468,7 @@ function HashtagButton({ terrace, allHashtags, onHashtagsChange }) {
         className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-all select-none
           ${hasHashtags ? 'bg-amber-500/15 text-amber-400' : 'text-slate-600 hover:text-slate-400'}`}
       >
-        <Hash size={14} strokeWidth={hasHashtags ? 2.5 : 1.5}/>
+        <Hash size={14} strokeWidth={2.5}/>
         {hasHashtags && (
           <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 rounded-full bg-amber-500 text-[9px] font-bold text-black flex items-center justify-center px-0.5 leading-none">
             {hashtags.length}
