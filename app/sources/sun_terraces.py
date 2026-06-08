@@ -349,45 +349,57 @@ def compute_day_score(
             if alt_past > 0:
                 return 0   # sun was up within the last 6 h → post-sunset
 
-    total_w = 0.0
-    total_s  = 0.0
+    # Pre-parse polygon once
+    poly = None
+    if polygon_coords_json:
+        try:
+            import json as _json
+            poly = _json.loads(polygon_coords_json)
+        except Exception:
+            poly = None
+
+    def _os(az: float) -> float:
+        if is_rooftop:
+            return 100.0
+        if sun_arc_from is not None and sun_arc_to is not None:
+            return arc_orientation_score(az, sun_arc_from, sun_arc_to)
+        if poly:
+            return polygon_orientation_score(az, poly)
+        os_val = orientation_score(az, orientation)
+        return float(os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60))
+
+    # Collect all daylight samples from now to sunset, every 30 min
+    samples: list = []    # (minutes, os_value)
     sunrise_seen = False
 
-    for step in range(0, 25):          # 0, 30, 60 … 720 min
+    for step in range(0, 25):
         minutes = step * 30
         target  = now + timedelta(minutes=minutes)
         az, alt = solar_position(lat, lon, target)
-
         if alt <= 0:
             if sunrise_seen:
-                break          # sunset reached — stop
-            continue           # sun not up yet — skip
-
+                break
+            continue
         sunrise_seen = True
-        w = math.sin(math.radians(alt))
+        samples.append((minutes, _os(az), math.sin(math.radians(alt))))
 
-        if is_rooftop:
-            os = 100.0
-        elif sun_arc_from is not None and sun_arc_to is not None:
-            os = arc_orientation_score(az, sun_arc_from, sun_arc_to)
-        elif polygon_coords_json:
-            try:
-                import json as _json
-                poly = _json.loads(polygon_coords_json)
-                os = polygon_orientation_score(az, poly)
-            except Exception:
-                os_val = orientation_score(az, orientation)
-                os = float(os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60))
-        else:
-            os_val = orientation_score(az, orientation)
-            os = float(os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60))
+    if not samples:
+        return 0, []
 
-        total_s += os * w
-        total_w += w
+    total_minutes = samples[-1][0] if samples else 1
 
-    if total_w < 1e-9:
-        return 0
-    return min(100, round(total_s / total_w))
+    # Gradient: fraction of daylight window + orientation score (0-100)
+    gradient = [
+        {"frac": round(m / max(total_minutes, 1), 4), "score": int(os)}
+        for m, os, _ in samples
+    ]
+
+    # Day score: altitude-weighted mean
+    total_w = sum(w for _, _, w in samples)
+    total_s = sum(os * w for _, os, w in samples)
+    day_score = 0 if total_w < 1e-9 else min(100, round(total_s / total_w))
+
+    return day_score, gradient
 
 
 # ── Composite score ───────────────────────────────────────────────────────────
@@ -476,14 +488,16 @@ def compute_scores(
         result["confidence"] = 1.0
     else:
         result["confidence"] = orientation_conf if orientation and orientation != "UNKNOWN" else 0.3
-    # Day score: weighted sun exposure from now until sunset
-    result["day_score"] = compute_day_score(
+    # Day score + gradient: weighted sun exposure from now until sunset
+    day_score, gradient = compute_day_score(
         lat, lon, orientation,
         polygon_coords_json=polygon_coords_json,
         sun_arc_from=sun_arc_from,
         sun_arc_to=sun_arc_to,
         is_rooftop=is_rooftop,
     )
+    result["day_score"] = day_score
+    result["gradient"]  = gradient   # [{frac: 0.0, score: 85}, …] from now to sunset
     return result
 
 

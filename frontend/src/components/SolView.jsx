@@ -128,28 +128,32 @@ function SunTimeline({ scores, coords }) {
   const nowH = now.getHours() + now.getMinutes() / 60
   const hoursToSunset = Math.max(0.25, ssLocal - nowH)
 
-  // Use orientation_score (0–100): how directly the sun faces this terrace.
-  // sun_score was (alt/90)×orientation which gives max ~60 at Göteborg latitudes,
-  // making all thresholds look dark. orientation_score uses the full 0–100 range.
-  const s0 = scores?.now?.orientation_score ?? 0
-  const s1 = scores?.['1h']?.orientation_score ?? 0
-  const s2 = scores?.['2h']?.orientation_score ?? 0
-
-  const pct = h => Math.min(100, (h / hoursToSunset) * 100)
-  const p1 = pct(1), p2 = pct(2)
-
-  // Gradient: known scores from now→+2h, then fade to dark
-  const gradient = [
-    `${scoreToColor(s0)} 0%`,
-    `${scoreToColor(s1)} ${p1.toFixed(1)}%`,
-    `${scoreToColor(s2)} ${p2.toFixed(1)}%`,
-    `${scoreToColor(s2)} ${Math.min(p2 + 8, 100).toFixed(1)}%`,
-    `#1e293b 100%`,
-  ].join(', ')
+  // Use gradient from backend — sampled every 30 min from now to sunset.
+  // Falls back to 3-point estimation if not present.
+  const pts = scores?.gradient
+  const gradient = (() => {
+    if (pts && pts.length > 0) {
+      const stops = pts.map(p => `${scoreToColor(p.score)} ${(p.frac * 100).toFixed(1)}%`)
+      return stops.join(', ')
+    }
+    // Legacy fallback
+    const s0 = scores?.now?.orientation_score ?? 0
+    const s1 = scores?.['1h']?.orientation_score ?? 0
+    const s2 = scores?.['2h']?.orientation_score ?? 0
+    const p1 = Math.min(100, (1 / hoursToSunset) * 100)
+    const p2 = Math.min(100, (2 / hoursToSunset) * 100)
+    return [
+      `${scoreToColor(s0)} 0%`,
+      `${scoreToColor(s1)} ${p1.toFixed(1)}%`,
+      `${scoreToColor(s2)} ${p2.toFixed(1)}%`,
+      `#1e293b 100%`,
+    ].join(', ')
+  })()
 
   // Dynamic time markers
   const step = markerStep(hoursToSunset)
   const markers = []
+  const pct = h => Math.min(100, (h / hoursToSunset) * 100)
   for (let h = step; h < hoursToSunset - step * 0.4; h += step) {
     markers.push({ pct: pct(h), label: fmtH(h) })
   }
