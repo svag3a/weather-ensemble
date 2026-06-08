@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import math as _math
 
 from app.database import get_db
-from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace, TerraceReport
+from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace, TerraceReport, Hashtag, TerraceHashtag
 from app.api.auth import get_current_user
 
 router = APIRouter()
@@ -923,6 +923,87 @@ def _build_explanation(scores: dict, orientation: Optional[str], confidence: flo
     return f"{timing} · {conf_str} säkerhet"
 
 
+@router.get("/hashtags")
+def get_hashtags(db: Session = Depends(get_db)):
+    """Return all active hashtags."""
+    rows = db.query(Hashtag).filter(Hashtag.active == True).order_by(Hashtag.name).all()  # noqa: E712
+    return [{"id": h.id, "name": h.name} for h in rows]
+
+
+@router.get("/sun-terraces/{terrace_id}/hashtags")
+def get_terrace_hashtags(terrace_id: int, db: Session = Depends(get_db)):
+    """Return hashtags for a specific venue sorted by count desc."""
+    rows = (
+        db.query(TerraceHashtag, Hashtag)
+        .join(Hashtag, TerraceHashtag.hashtag_id == Hashtag.id)
+        .filter(TerraceHashtag.terrace_id == terrace_id)
+        .order_by(TerraceHashtag.count.desc())
+        .all()
+    )
+    return [{"id": h.id, "name": h.name, "count": th.count} for th, h in rows]
+
+
+@router.post("/sun-terraces/{terrace_id}/hashtags/{hashtag_id}")
+def add_terrace_hashtag(terrace_id: int, hashtag_id: int, db: Session = Depends(get_db)):
+    """Increment hashtag count for a venue (or create with count=1)."""
+    row = (
+        db.query(TerraceHashtag)
+        .filter(TerraceHashtag.terrace_id == terrace_id, TerraceHashtag.hashtag_id == hashtag_id)
+        .first()
+    )
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    if row is None:
+        row = TerraceHashtag(terrace_id=terrace_id, hashtag_id=hashtag_id, count=1, updated_at=now)
+        db.add(row)
+    else:
+        row.count += 1
+        row.updated_at = now
+    db.commit()
+    db.refresh(row)
+    return {"terrace_id": row.terrace_id, "hashtag_id": row.hashtag_id, "count": row.count}
+
+
+@router.delete("/sun-terraces/{terrace_id}/hashtags/{hashtag_id}")
+def remove_terrace_hashtag(terrace_id: int, hashtag_id: int, db: Session = Depends(get_db)):
+    """Decrement hashtag count. Delete row if count reaches 0."""
+    row = (
+        db.query(TerraceHashtag)
+        .filter(TerraceHashtag.terrace_id == terrace_id, TerraceHashtag.hashtag_id == hashtag_id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Hashtag not found for this venue")
+    if row.count <= 1:
+        db.delete(row)
+        db.commit()
+        return {"terrace_id": terrace_id, "hashtag_id": hashtag_id, "count": 0}
+    row.count -= 1
+    row.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+    db.commit()
+    db.refresh(row)
+    return {"terrace_id": row.terrace_id, "hashtag_id": row.hashtag_id, "count": row.count}
+
+
+class HashtagBody(BaseModel):
+    name: str
+
+
+@router.post("/admin/hashtags", status_code=201)
+def create_hashtag(body: HashtagBody, db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
+    """Create a new hashtag (admin only)."""
+    name = body.name.strip().lower()
+    if not name:
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+    existing = db.query(Hashtag).filter(Hashtag.name == name).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Hashtag already exists")
+    h = Hashtag(name=name, active=True, created_at=datetime.now(timezone.utc).replace(tzinfo=None))
+    db.add(h)
+    db.commit()
+    db.refresh(h)
+    return {"id": h.id, "name": h.name, "active": h.active}
+
+
 @router.get("/sun-terraces")
 def get_sun_terraces(
     lat: float = Query(default=57.7089),
@@ -932,21 +1013,43 @@ def get_sun_terraces(
     min_score: int = Query(default=0, ge=0, le=100),
     include_low_confidence: bool = Query(default=True),
     name: str = Query(default=""),
+    tags: str = Query(default=""),
     db: Session = Depends(get_db),
 ):
     """Get sun terraces within radius, scored by current solar conditions.
     When `name` is provided, radius is ignored and all active terraces matching
-    the name are returned (sorted by distance)."""
+    the name are returned (sorted by distance).
+    When `tags` (comma-separated hashtag names) is provided, only venues with
+    any of those tags are returned."""
     from app.sources.sun_terraces import compute_scores
 
     all_terraces = db.query(SunTerrace).filter(SunTerrace.active == True).all()  # noqa: E712
 
+    # Build hashtag lookup: terrace_id -> [{id, name, count}]
+    all_th = (
+        db.query(TerraceHashtag, Hashtag)
+        .join(Hashtag, TerraceHashtag.hashtag_id == Hashtag.id)
+        .all()
+    )
+    terrace_hashtags: dict = {}
+    for th, h in all_th:
+        terrace_hashtags.setdefault(th.terrace_id, []).append({"id": h.id, "name": h.name, "count": th.count})
+    for tid in terrace_hashtags:
+        terrace_hashtags[tid].sort(key=lambda x: -x["count"])
+
+    # Tag filter: terrace must have at least one matching tag
+    tag_names: set = set()
+    if tags.strip():
+        tag_names = {t.strip().lower() for t in tags.split(",") if t.strip()}
+
     if name.strip():
-        # Name search: ignore radius, match anywhere in name or address
+        # Name search: ignore radius, match anywhere in name, address, or hashtag
         q = name.strip().lower()
         nearby = [
             t for t in all_terraces
-            if q in (t.name or "").lower() or q in (t.address or "").lower()
+            if q in (t.name or "").lower()
+            or q in (t.address or "").lower()
+            or any(q in ht["name"] for ht in terrace_hashtags.get(t.id, []))
         ]
     else:
         nearby = [
@@ -958,6 +1061,13 @@ def get_sun_terraces(
     if type and type != "all":
         type_set = {t.strip() for t in type.split(",")}
         nearby = [t for t in nearby if t.amenity_type in type_set]
+
+    # Filter by hashtag tags
+    if tag_names:
+        nearby = [
+            t for t in nearby
+            if any(ht["name"] in tag_names for ht in terrace_hashtags.get(t.id, []))
+        ]
 
     # Get latest ensemble forecast hours for next 3h
     now = datetime.now(timezone.utc)
@@ -1039,6 +1149,7 @@ def get_sun_terraces(
             "best_score": best_score,
             "day_score": scores.get("day_score", 0),
             "explanation": _build_explanation(scores, t.street_orientation, scores["confidence"]),
+            "hashtags": terrace_hashtags.get(t.id, []),
         })
 
     # Sort: day_score desc (rest-of-day sun exposure), then distance asc on tie

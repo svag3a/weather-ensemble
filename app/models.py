@@ -166,3 +166,21 @@ class TerraceReport(Base):
     user_lon: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     feedback: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON: {issues:[...], comment:""}
     status:   Mapped[str] = mapped_column(String, default="pending")         # pending/in_progress/resolved/dismissed
+
+
+class Hashtag(Base):
+    __tablename__ = "hashtags"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, unique=True, index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class TerraceHashtag(Base):
+    __tablename__ = "terrace_hashtags"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    terrace_id: Mapped[int] = mapped_column(Integer, index=True)
+    hashtag_id: Mapped[int] = mapped_column(Integer, index=True)
+    count: Mapped[int] = mapped_column(Integer, default=1)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    __table_args__ = (UniqueConstraint("terrace_id", "hashtag_id", name="uq_terrace_hashtag"),)

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, fixTerraceAddresses, triggerGeocodeTerraces, fetchGeocodeStatus,
          triggerEnrichOsm, fetchEnrichOsmStatus,
-         triggerEnrichAi, fetchEnrichAiStatus } from '../api'
+         triggerEnrichAi, fetchEnrichAiStatus,
+         fetchHashtags, createHashtag } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -756,6 +757,60 @@ function GeocodeWidget() {
   )
 }
 
+// ── Hashtag admin section ─────────────────────────────────────────────────────
+function HashtagAdminSection() {
+  const [hashtags, setHashtags] = useState([])
+  const [newName, setNewName]   = useState('')
+  const [saving, setSaving]     = useState(false)
+  const [error, setError]       = useState(null)
+
+  useEffect(() => {
+    fetchHashtags().then(setHashtags).catch(() => {})
+  }, [])
+
+  async function handleAdd(e) {
+    e.preventDefault()
+    const name = newName.trim()
+    if (!name) return
+    setSaving(true); setError(null)
+    try {
+      const created = await createHashtag(name)
+      setHashtags(prev => [...prev, created].sort((a, b) => a.name.localeCompare(b.name, 'sv')))
+      setNewName('')
+    } catch (err) {
+      setError('Kunde inte skapa — finns redan eller fel uppstod')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 space-y-3">
+      <p className="text-slate-300 text-sm font-medium">Hashtags</p>
+      <form onSubmit={handleAdd} className="flex gap-2">
+        <input
+          value={newName} onChange={e => setNewName(e.target.value)}
+          placeholder="Ny hashtag…"
+          className="flex-1 bg-slate-700 text-slate-200 text-xs rounded-lg px-3 py-1.5 border border-slate-600 placeholder-slate-500 focus:outline-none focus:border-blue-500"
+        />
+        <button type="submit" disabled={saving || !newName.trim()}
+          className="px-3 py-1.5 text-xs rounded-lg bg-blue-600 text-white disabled:opacity-40 hover:bg-blue-500 transition-colors">
+          Lägg till
+        </button>
+      </form>
+      {error && <p className="text-red-400 text-xs">{error}</p>}
+      <div className="flex flex-wrap gap-1.5">
+        {hashtags.map(h => (
+          <span key={h.id} className="px-2.5 py-1 rounded-full text-xs bg-slate-700 text-slate-300 border border-slate-600">
+            #{h.name}
+          </span>
+        ))}
+        {hashtags.length === 0 && <span className="text-slate-600 text-xs">Inga hashtags ännu</span>}
+      </div>
+    </div>
+  )
+}
+
 export default function SunTerraceAdmin({ data, onOverride, onReload }) {
   const [editingId, setEditingId]     = useState(null)
   const [showAdd, setShowAdd]         = useState(false)
@@ -806,6 +861,11 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
         <JobWidget label="Orientering OSM" triggerFn={triggerEnrichOsm} statusFn={fetchEnrichOsmStatus} color="emerald"/>
         <JobWidget label="AI-berikning" triggerFn={triggerEnrichAi} statusFn={fetchEnrichAiStatus} color="blue"/>
         <GeocodeWidget />
+      </div>
+
+      <HashtagAdminSection />
+
+      <div className="flex items-center gap-4 flex-wrap">
         <button onClick={() => setShowAdd(v => !v)}
           className={`ml-auto text-xs px-3 py-2 rounded-lg border transition-colors ${showAdd ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600'}`}>
           {showAdd ? '✕ Avbryt' : '+ Lägg till ställe'}

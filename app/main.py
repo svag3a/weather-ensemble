@@ -59,6 +59,43 @@ async def lifespan(app: FastAPI):
             )""",
             "ALTER TABLE terrace_reports ADD COLUMN feedback TEXT",
             "ALTER TABLE terrace_reports ADD COLUMN status TEXT DEFAULT 'pending'",
+            """CREATE TABLE IF NOT EXISTS hashtags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                active INTEGER DEFAULT 1,
+                created_at DATETIME NOT NULL
+            )""",
+            """CREATE TABLE IF NOT EXISTS terrace_hashtags (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                terrace_id INTEGER NOT NULL,
+                hashtag_id INTEGER NOT NULL,
+                count INTEGER DEFAULT 1,
+                updated_at DATETIME NOT NULL,
+                UNIQUE (terrace_id, hashtag_id)
+            )""",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('öl', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('vin', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('cocktails', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('kaffe', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('fika', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('pizza', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('burgare', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('kebab', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('sushi', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('italienskt', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('brunch', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('lunch', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('middag', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('afterwork', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('utsikt', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('hamnutsikt', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('förmiddagssol', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('eftermiddagssol', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('kvällssol', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('hund', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('vegetariskt', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('vegan', 1, datetime('now'))",
+            "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('livemusik', 1, datetime('now'))",
         ]:
             try:
                 conn.execute(text(stmt))

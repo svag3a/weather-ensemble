@@ -87,10 +87,39 @@ export async function deleteCityImage(id) {
   if (!res.ok) throw new Error(await res.text())
 }
 
-export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', minScore = 0, name = '' } = {}) {
+export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', minScore = 0, name = '', tags = '' } = {}) {
   const params = new URLSearchParams({ lat, lon, radius, type, min_score: minScore })
   if (name) params.set('name', name)
+  if (tags) params.set('tags', tags)
   const res = await fetch(`${BASE}/sun-terraces?${params}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function fetchHashtags() {
+  const res = await fetch(`${BASE}/hashtags`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function addHashtag(terraceId, hashtagId) {
+  const res = await fetch(`${BASE}/sun-terraces/${terraceId}/hashtags/${hashtagId}`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function removeHashtag(terraceId, hashtagId) {
+  const res = await fetch(`${BASE}/sun-terraces/${terraceId}/hashtags/${hashtagId}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function createHashtag(name) {
+  const res = await fetch(`${BASE}/admin/hashtags`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  })
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }

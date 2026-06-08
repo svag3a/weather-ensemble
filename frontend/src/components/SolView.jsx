@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchSunTerraces, reportTerrace, createTerrace } from '../api'
+import { fetchSunTerraces, fetchHashtags, addHashtag, removeHashtag, reportTerrace, createTerrace } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
-import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRight, Spline } from 'lucide-react'
+import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRight, Spline, Hash } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -330,8 +330,165 @@ function ReportButton({ active, onReport, terraceName }) {
   )
 }
 
+// ── Hashtag localStorage ──────────────────────────────────────────────────────
+const HASHTAGS_KEY = 'sol_hashtags'
+function loadUserHashtags() {
+  try { return JSON.parse(localStorage.getItem(HASHTAGS_KEY) || '{}') } catch { return {} }
+}
+function saveUserHashtags(obj) { localStorage.setItem(HASHTAGS_KEY, JSON.stringify(obj)) }
+
+// ── Hashtag popup ─────────────────────────────────────────────────────────────
+function HashtagPopup({ terrace, allHashtags, onClose, onHashtagsChange }) {
+  const terraceId = terrace.id
+  const [localHashtags, setLocalHashtags] = useState(terrace.hashtags || [])
+  const userAdded = loadUserHashtags()[terraceId] || []
+
+  const existingIds = new Set(localHashtags.map(h => h.id))
+  const available = allHashtags.filter(h => !existingIds.has(h.id))
+
+  async function handleAdd(hashtagId) {
+    try {
+      await addHashtag(terraceId, hashtagId)
+      // Track in localStorage
+      const ua = loadUserHashtags()
+      ua[terraceId] = [...(ua[terraceId] || []), hashtagId]
+      saveUserHashtags(ua)
+      // Update local state
+      const tag = allHashtags.find(h => h.id === hashtagId)
+      if (tag) {
+        const updated = [...localHashtags, { id: tag.id, name: tag.name, count: 1 }]
+          .sort((a, b) => b.count - a.count)
+        setLocalHashtags(updated)
+        onHashtagsChange(terraceId, updated)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  async function handleRemove(hashtagId) {
+    const ua = loadUserHashtags()
+    const userAddedThis = (ua[terraceId] || []).includes(hashtagId)
+    if (!userAddedThis) return  // Can only remove own additions
+    try {
+      await removeHashtag(terraceId, hashtagId)
+      // Update localStorage
+      ua[terraceId] = (ua[terraceId] || []).filter(id => id !== hashtagId)
+      saveUserHashtags(ua)
+      // Update local state
+      const updated = localHashtags
+        .map(h => h.id === hashtagId ? { ...h, count: h.count - 1 } : h)
+        .filter(h => h.count > 0)
+        .sort((a, b) => b.count - a.count)
+      setLocalHashtags(updated)
+      onHashtagsChange(terraceId, updated)
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const currentUserAdded = loadUserHashtags()[terraceId] || []
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end"
+         style={{ background: 'rgba(0,0,0,0.6)' }}
+         onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-full bg-slate-800 rounded-t-2xl flex flex-col"
+           style={{ maxHeight: '85vh' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-4 pb-2 flex-shrink-0">
+          <div>
+            <p className="text-white font-semibold text-sm">Taggar</p>
+            <p className="text-slate-400 text-xs mt-0.5 truncate max-w-[260px]">{terrace.name}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-xl leading-none pl-4">✕</button>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-5 pb-5 space-y-4">
+          {localHashtags.length > 0 && (
+            <div>
+              <p className="text-slate-500 text-xs mb-2 font-medium">Valda</p>
+              <div className="flex flex-wrap gap-2">
+                {localHashtags.map(h => {
+                  const canRemove = currentUserAdded.includes(h.id)
+                  return (
+                    <button key={h.id}
+                      onClick={() => canRemove && handleRemove(h.id)}
+                      className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+                        bg-amber-500/20 text-amber-300 border border-amber-500/40
+                        ${canRemove ? 'active:bg-amber-500/30 cursor-pointer' : 'cursor-default opacity-80'}`}>
+                      <Hash size={10}/>
+                      <span>{h.name}</span>
+                      <span className="ml-0.5 text-amber-400/70">{h.count}</span>
+                      {canRemove && <span className="ml-0.5 text-amber-400/50 text-[10px]">✕</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {available.length > 0 && (
+            <div>
+              <p className="text-slate-500 text-xs mb-2 font-medium">Lägg till</p>
+              <div className="flex flex-wrap gap-2">
+                {available.map(h => (
+                  <button key={h.id}
+                    onClick={() => handleAdd(h.id)}
+                    className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium transition-colors
+                      bg-black/20 text-slate-400 border border-slate-700 active:bg-white/10 hover:border-slate-500">
+                    <Hash size={10}/>
+                    <span>{h.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {localHashtags.length === 0 && available.length === 0 && (
+            <p className="text-slate-500 text-sm text-center py-4">Inga taggar tillgängliga</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Hashtag button ────────────────────────────────────────────────────────────
+function HashtagButton({ terrace, allHashtags, onHashtagsChange }) {
+  const [showPopup, setShowPopup] = useState(false)
+  const hashtags = terrace.hashtags || []
+  const hasHashtags = hashtags.length > 0
+
+  return (
+    <>
+      <button
+        onClick={() => setShowPopup(true)}
+        className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-all select-none
+          ${hasHashtags ? 'bg-amber-500/15 text-amber-400' : 'text-slate-600 hover:text-slate-400'}`}
+      >
+        <Hash size={14} strokeWidth={hasHashtags ? 2.5 : 1.5}/>
+        {hasHashtags && (
+          <span className="absolute -top-1 -right-1 min-w-[14px] h-3.5 rounded-full bg-amber-500 text-[9px] font-bold text-black flex items-center justify-center px-0.5 leading-none">
+            {hashtags.length}
+          </span>
+        )}
+      </button>
+      {showPopup && (
+        <HashtagPopup
+          terrace={terrace}
+          allHashtags={allHashtags}
+          onClose={() => setShowPopup(false)}
+          onHashtagsChange={onHashtagsChange}
+        />
+      )}
+    </>
+  )
+}
+
 // ── Terrace card ──────────────────────────────────────────────────────────────
-function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) {
+function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords, allHashtags, onHashtagsChange }) {
   const { id, name, address, amenity_type, street_orientation, scores, outdoor_type } = terrace
   const best = scores?.best_time ?? 'now'
   const altitude = scores?.[best]?.sun_altitude
@@ -353,7 +510,7 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) 
           {address && <div className="text-slate-400 text-xs mt-0.5 truncate">{address}</div>}
           <div className="text-slate-500 text-xs mt-0.5">{amenityLabel(amenity_type)}</div>
         </div>
-        {/* Star + report button */}
+        {/* Star + report + hashtag buttons */}
         <div className="flex flex-col items-center gap-1.5 shrink-0">
           <button onClick={() => onToggleFav(id)}
             className="text-lg leading-none transition-opacity"
@@ -364,6 +521,11 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) 
             active={userVote === -1}
             onReport={fb => onVote(id, fb)}
             terraceName={name}
+          />
+          <HashtagButton
+            terrace={terrace}
+            allHashtags={allHashtags}
+            onHashtagsChange={onHashtagsChange}
           />
         </div>
       </div>
@@ -487,6 +649,8 @@ export default function SolView({ coords }) {
   const [mode, setMode]           = useState('sol')
   const [search, setSearch]       = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [allHashtags, setAllHashtags] = useState([])
+  const [tagFilter, setTagFilter] = useState(new Set())
   const debounceRef = useRef(null)
   const radiusRef   = useRef(null)
 
@@ -524,6 +688,27 @@ export default function SolView({ coords }) {
     })
   }
 
+  function toggleTagFilter(tagName) {
+    setTagFilter(prev => {
+      const next = new Set(prev)
+      next.has(tagName) ? next.delete(tagName) : next.add(tagName)
+      return next
+    })
+  }
+
+  // Fetch all hashtags once on mount
+  useEffect(() => {
+    fetchHashtags().then(setAllHashtags).catch(() => {})
+  }, [])
+
+  // Update hashtags for a specific terrace in local data (after add/remove)
+  const handleHashtagsChange = useCallback((terraceId, updatedHashtags) => {
+    setData(prev => prev
+      ? prev.map(t => t.id === terraceId ? { ...t, hashtags: updatedHashtags } : t)
+      : prev
+    )
+  }, [])
+
   // Debounce search
   useEffect(() => {
     clearTimeout(debounceRef.current)
@@ -542,6 +727,8 @@ export default function SolView({ coords }) {
     ? 'all'
     : [...selectedTypes].join(',')
 
+  const tagsParam = tagFilter.size > 0 ? [...tagFilter].join(',') : ''
+
   useEffect(() => {
     if (!coords && !debouncedSearch) return
     setLoading(true)
@@ -552,11 +739,12 @@ export default function SolView({ coords }) {
       radius: debouncedRadius,
       type:   typeParam,
       name:   debouncedSearch,
+      tags:   tagsParam,
     })
       .then(setData)
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [coords, typeParam, debouncedRadius, debouncedSearch])
+  }, [coords, typeParam, debouncedRadius, debouncedSearch, tagsParam])
 
   const sortedData = data ? [...data].sort((a, b) => {
     const favDiff = (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0)
@@ -614,6 +802,23 @@ export default function SolView({ coords }) {
         ))}
       </div>
 
+      {/* Tag filter bar */}
+      {allHashtags.length > 0 && (
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          <Hash size={13} className="text-slate-600 shrink-0"/>
+          {allHashtags.map(h => (
+            <button key={h.id} onClick={() => toggleTagFilter(h.name)}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                tagFilter.has(h.name)
+                  ? 'bg-amber-500/20 text-amber-300 ring-1 ring-amber-500/40'
+                  : 'bg-black/20 text-slate-500'
+              }`}>
+              {h.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Distance slider */}
       <div className="flex items-center gap-3 px-0.5">
         <span className="text-slate-500 text-xs shrink-0">Avstånd</span>
@@ -663,7 +868,9 @@ export default function SolView({ coords }) {
             <TerraceCard key={t.id} terrace={t}
               isFav={favs.has(t.id)} onToggleFav={toggleFav}
               userVote={votes[t.id] ?? 0} onVote={(id, fb) => handleVote(id, fb)}
-              coords={coords}/>
+              coords={coords}
+              allHashtags={allHashtags}
+              onHashtagsChange={handleHashtagsChange}/>
           ))}
           <p className="text-white/30 text-xs px-1 pt-1">
             Data från OpenStreetMap · Solberäkning uppdateras löpande
