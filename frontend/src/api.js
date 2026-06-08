@@ -105,11 +105,16 @@ export async function createTerrace(fields) {
   return res.json()
 }
 
-export async function voteTerrrace(id, vote, userLat, userLon) {
+export async function voteTerrrace(id, vote, userLat, userLon, feedback = null) {
   const res = await fetch(`${BASE}/sun-terraces/${id}/vote`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ vote, user_lat: userLat ?? null, user_lon: userLon ?? null }),
+    body: JSON.stringify({
+      vote,
+      user_lat: userLat ?? null,
+      user_lon: userLon ?? null,
+      feedback: feedback ? JSON.stringify(feedback) : null,
+    }),
   })
   if (!res.ok) throw new Error(await res.text())
   return res.json()

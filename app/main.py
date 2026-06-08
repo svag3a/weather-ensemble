@@ -52,8 +52,10 @@ async def lifespan(app: FastAPI):
                 vote INTEGER NOT NULL,
                 voted_at DATETIME NOT NULL,
                 user_lat REAL,
-                user_lon REAL
+                user_lon REAL,
+                feedback TEXT
             )""",
+            "ALTER TABLE terrace_votes ADD COLUMN feedback TEXT",
         ]:
             try:
                 conn.execute(text(stmt))

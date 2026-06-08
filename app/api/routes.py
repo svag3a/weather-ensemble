@@ -1173,6 +1173,7 @@ class TerraceVoteBody(BaseModel):
     vote: int           # +1 or -1
     user_lat: Optional[float] = None
     user_lon: Optional[float] = None
+    feedback: Optional[str] = None   # JSON string: {"issues": [...], "comment": "..."}
 
 
 @router.post("/sun-terraces/{terrace_id}/vote", status_code=201)
@@ -1193,6 +1194,7 @@ def vote_terrace(
         voted_at=datetime.now(timezone.utc).replace(tzinfo=None),
         user_lat=body.user_lat,
         user_lon=body.user_lon,
+        feedback=body.feedback,
     )
     db.add(row)
     db.commit()

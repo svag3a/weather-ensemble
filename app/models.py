@@ -165,3 +165,4 @@ class TerraceVote(Base):
     voted_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     user_lat: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     user_lon: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    feedback: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON: {issues:[...], comment:""}

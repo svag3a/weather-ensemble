@@ -190,15 +190,97 @@ function SunTimeline({ scores, coords }) {
   )
 }
 
-// ── Vote button ───────────────────────────────────────────────────────────────
-function VoteButton({ dir, active, onClick }) {
-  const [burst, setBurst] = useState(false)
+// ── Feedback dialog (thumbs-down) ────────────────────────────────────────────
 
-  function handleClick() {
-    setBurst(true)
-    setTimeout(() => setBurst(false), 600)
-    onClick()
+const ISSUES = [
+  { id: 'no_outdoor',    label: 'Har ingen uteplats' },
+  { id: 'has_outdoor',   label: 'Har uteplats (felaktigt utan)' },
+  { id: 'wrong_sun',     label: 'Felaktigt solläge' },
+  { id: 'wrong_forecast',label: 'Felaktig solprognos' },
+  { id: 'wrong_name',    label: 'Felaktigt namn' },
+  { id: 'wrong_address', label: 'Fel adress' },
+  { id: 'wrong_location',label: 'Fel position på kartan' },
+  { id: 'wrong_type',    label: 'Fel typ (café/bar/restaurang)' },
+  { id: 'closed',        label: 'Stängt / finns inte längre' },
+]
+
+function FeedbackDialog({ venueName, onSubmit, onDismiss }) {
+  const [selected, setSelected] = useState(new Set())
+  const [comment,  setComment]  = useState('')
+
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   }
+
+  function handleSubmit() {
+    onSubmit({ issues: [...selected], comment: comment.trim() })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center"
+         style={{ background: 'rgba(0,0,0,0.5)' }}
+         onClick={e => { if (e.target === e.currentTarget) onDismiss() }}>
+      <div className="w-full max-w-lg bg-slate-800 rounded-t-2xl p-5 space-y-4"
+           style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+        <div className="flex items-center justify-between">
+          <p className="text-white font-semibold text-sm">Vad stämmer inte?</p>
+          <button onClick={onDismiss} className="text-slate-500 hover:text-slate-300 text-lg leading-none">✕</button>
+        </div>
+        <p className="text-slate-400 text-xs -mt-2">{venueName}</p>
+
+        <div className="space-y-1">
+          {ISSUES.map(issue => (
+            <label key={issue.id}
+              className="flex items-center gap-3 py-2 px-3 rounded-xl active:bg-white/5 cursor-pointer">
+              <div className={`w-5 h-5 rounded-md border flex items-center justify-center flex-shrink-0 transition-colors ${
+                selected.has(issue.id)
+                  ? 'bg-red-500 border-red-500'
+                  : 'border-slate-600 bg-transparent'
+              }`}>
+                {selected.has(issue.id) && (
+                  <span className="text-white text-xs font-bold leading-none">✓</span>
+                )}
+              </div>
+              <input type="checkbox" className="sr-only"
+                checked={selected.has(issue.id)}
+                onChange={() => toggle(issue.id)}/>
+              <span className="text-slate-300 text-sm">{issue.label}</span>
+            </label>
+          ))}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-slate-500 text-xs">Frivillig kommentar</label>
+          <textarea
+            value={comment} onChange={e => setComment(e.target.value)}
+            rows={2} placeholder="Övrig information..."
+            className="w-full bg-black/30 text-white text-sm rounded-xl px-3 py-2 border border-white/10 placeholder-slate-600 focus:outline-none focus:border-white/30 resize-none"
+          />
+        </div>
+
+        <div className="flex gap-2 pt-1">
+          <button onClick={handleSubmit}
+            className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors active:scale-95">
+            Skicka feedback
+          </button>
+          <button onClick={onDismiss}
+            className="px-5 py-2.5 rounded-xl text-sm bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors">
+            Hoppa över
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Vote button ───────────────────────────────────────────────────────────────
+function VoteButton({ dir, active, onVote, terraceName, coords }) {
+  const [burst, setBurst] = useState(false)
+  const [showDialog, setShowDialog] = useState(false)
 
   const isUp = dir === 1
   const Icon = isUp ? ThumbsUp : ThumbsDown
@@ -206,19 +288,50 @@ function VoteButton({ dir, active, onClick }) {
   const activeBg    = isUp ? 'bg-green-400/15' : 'bg-red-400/15'
   const ringColor   = isUp ? 'border-green-400' : 'border-red-400'
 
+  function handleClick() {
+    setBurst(true)
+    setTimeout(() => setBurst(false), 600)
+    if (!isUp) {
+      // Thumbs-down: open feedback dialog after animation
+      setTimeout(() => setShowDialog(true), 650)
+    } else {
+      // Thumbs-up: submit immediately
+      onVote(null)
+    }
+  }
+
+  function handleFeedback(feedback) {
+    setShowDialog(false)
+    onVote(feedback)
+  }
+
+  function handleDismiss() {
+    setShowDialog(false)
+    onVote(null)   // still record the -1 vote, just no feedback
+  }
+
   return (
-    <button
-      onClick={handleClick}
-      className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-all select-none
-        ${active ? `${activeBg} ${activeColor}` : 'text-slate-600 hover:text-slate-400'}
-        ${burst ? 'scale-125' : active ? 'scale-110' : 'scale-100'}`}
-      style={{ transition: burst ? 'transform 0.1s ease-out' : 'transform 0.3s ease' }}
-    >
-      <Icon size={14} strokeWidth={active ? 2.5 : 1.5}/>
-      {burst && (
-        <span className={`absolute inset-0 rounded-lg border-2 ${ringColor} animate-ping opacity-60`}/>
+    <>
+      <button
+        onClick={handleClick}
+        className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-all select-none
+          ${active ? `${activeBg} ${activeColor}` : 'text-slate-600 hover:text-slate-400'}
+          ${burst ? 'scale-125' : active ? 'scale-110' : 'scale-100'}`}
+        style={{ transition: burst ? 'transform 0.1s ease-out' : 'transform 0.3s ease' }}
+      >
+        <Icon size={14} strokeWidth={active ? 2.5 : 1.5}/>
+        {burst && (
+          <span className={`absolute inset-0 rounded-lg border-2 ${ringColor} animate-ping opacity-60`}/>
+        )}
+      </button>
+      {showDialog && (
+        <FeedbackDialog
+          venueName={terraceName}
+          onSubmit={handleFeedback}
+          onDismiss={handleDismiss}
+        />
       )}
-    </button>
+    </>
   )
 }
 
@@ -252,8 +365,12 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) 
             style={{ opacity: isFav ? 1 : 0.3 }}>
             {isFav ? '★' : '☆'}
           </button>
-          <VoteButton dir={1}  active={userVote === 1}  onClick={() => onVote(id, 1)}  />
-          <VoteButton dir={-1} active={userVote === -1} onClick={() => onVote(id, -1)} />
+          <VoteButton dir={1}  active={userVote === 1}
+            onVote={fb => onVote(id, 1, fb)}
+            terraceName={name} coords={coords}/>
+          <VoteButton dir={-1} active={userVote === -1}
+            onVote={fb => onVote(id, -1, fb)}
+            terraceName={name} coords={coords}/>
         </div>
       </div>
       <div className="flex items-center gap-3 text-xs text-slate-500">
@@ -388,17 +505,15 @@ export default function SolView({ coords }) {
     })
   }, [])
 
-  const handleVote = useCallback((id, dir) => {
+  const handleVote = useCallback((id, dir, feedback = null) => {
     setVotes(prev => {
-      // Toggle: clicking same direction again removes the vote
       const next = { ...prev, [id]: prev[id] === dir ? 0 : dir }
       saveVotes(next)
       return next
     })
-    // Fire-and-forget to backend (include user location if available)
     const lat = coords?.lat ?? null
     const lon = coords?.lon ?? null
-    voteTerrrace(id, dir, lat, lon).catch(() => {})
+    voteTerrrace(id, dir, lat, lon, feedback).catch(() => {})
   }, [coords])
 
   function toggleType(t) {
