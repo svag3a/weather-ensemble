@@ -146,12 +146,12 @@ def _build_segment_index(ways: list[dict]) -> dict:
     return index
 
 
-def _orientation_from_index(
+def _bearing_from_index(
     lat: float, lon: float,
     index: dict,
     radius_cells: int = 2,
-) -> Optional[str]:
-    """Find nearest road segment via grid index and return orientation."""
+) -> Optional[float]:
+    """Find nearest road segment via grid index and return exact bearing in degrees."""
     cos_lat = math.cos(math.radians(lat))
     base_r = int(lat / GRID_CELL)
     base_c = int(lon / GRID_CELL)
@@ -159,18 +159,16 @@ def _orientation_from_index(
     best_d2 = float("inf")
     best_near_lat = best_near_lon = None
 
-    # Search expanding rings until we find a hit (up to radius_cells)
     for radius in range(0, radius_cells + 1):
         candidates = set()
         for dr in range(-radius, radius + 1):
             for dc in range(-radius, radius + 1):
-                if abs(dr) == radius or abs(dc) == radius:  # only the border ring
+                if abs(dr) == radius or abs(dc) == radius:
                     key = (base_r + dr, base_c + dc)
                     candidates.update(index.get(key, []))
 
         for a_lat, a_lon, b_lat, b_lon in candidates:
-            # Project venue onto segment in cos-corrected space
-            px, py = 0.0, 0.0  # venue at origin
+            px, py = 0.0, 0.0
             ax = (a_lon - lon) * cos_lat
             ay = a_lat - lat
             bx = (b_lon - lon) * cos_lat
@@ -183,13 +181,12 @@ def _orientation_from_index(
                 best_near_lon = lon + nx / cos_lat
 
         if best_near_lat is not None:
-            break  # found something in this ring
+            break
 
     if best_near_lat is None:
         return None
 
-    bearing = compute_bearing(lat, lon, best_near_lat, best_near_lon)
-    return bearing_to_dir(bearing)
+    return compute_bearing(lat, lon, best_near_lat, best_near_lon)
 
 
 async def run_osm_orientation_job(get_db_func) -> None:
@@ -231,21 +228,26 @@ async def run_osm_orientation_job(get_db_func) -> None:
         index = _build_segment_index(ways)
         logger.info("Road index built: %d cells", len(index))
 
-        # ── Step 3: assign orientation to each terrace ───────────────────────
+        # ── Step 3: assign arc to each terrace from exact road bearing ──────────
         COMMIT_EVERY = 100
+        now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
         for i, t in enumerate(terraces):
-            ori = _orientation_from_index(t.lat, t.lon, index)
+            bearing = _bearing_from_index(t.lat, t.lon, index)
             _osm_state["done"] += 1
-            if ori:
-                t.street_orientation = ori
+            if bearing is not None:
+                # Store exact arc (±90° around the bearing)
+                t.sun_arc_from = (bearing - 90 + 360) % 360
+                t.sun_arc_to   = (bearing + 90) % 360
+                # Also keep street_orientation for display / fallback
+                t.street_orientation = bearing_to_dir(bearing)
                 t.orientation_confidence = 0.55
-                t.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
+                t.updated_at = now_dt
                 _osm_state["updated"] += 1
             else:
                 _osm_state["skipped"] += 1
             if (i + 1) % COMMIT_EVERY == 0:
                 db.commit()
-                await asyncio.sleep(0)   # yield to event loop
+                await asyncio.sleep(0)
 
         db.commit()
         logger.info("OSM orientation done: %d updated", _osm_state["updated"])
@@ -373,6 +375,14 @@ async def run_ai_enrichment_job(get_db_func) -> None:
                             t.street_orientation = ori
                             t.orientation_confidence = 0.45  # AI-estimated
                             changed = True
+                        # Always set arc from AI direction if not yet set
+                        if t.sun_arc_from is None:
+                            from app.sources.sun_terraces import ORIENTATION_AZIMUTHS
+                            center = ORIENTATION_AZIMUTHS.get(ori)
+                            if center is not None:
+                                t.sun_arc_from = (center - 90 + 360) % 360
+                                t.sun_arc_to   = (center + 90) % 360
+                                changed = True
                     if changed:
                         t.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
                         _ai_state["updated"] += 1
