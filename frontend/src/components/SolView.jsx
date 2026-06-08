@@ -444,8 +444,8 @@ export default function SolView({ coords }) {
     const favDiff = (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0)
     if (favDiff !== 0) return favDiff
     return mode === 'skugga'
-      ? (a.best_score ?? 0) - (b.best_score ?? 0)
-      : (b.best_score ?? 0) - (a.best_score ?? 0)
+      ? (a.day_score ?? 0) - (b.day_score ?? 0)
+      : (b.day_score ?? 0) - (a.day_score ?? 0)
   }) : []
 
   return (

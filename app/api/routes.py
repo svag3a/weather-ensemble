@@ -1037,11 +1037,12 @@ def get_sun_terraces(
             "scores": scores,
             "now_score": now_score,
             "best_score": best_score,
+            "day_score": scores.get("day_score", 0),
             "explanation": _build_explanation(scores, t.street_orientation, scores["confidence"]),
         })
 
-    # Sort: best_score desc, then distance asc (closer wins on tie)
-    results.sort(key=lambda x: (-x["best_score"], x["distance_km"]))
+    # Sort: day_score desc (rest-of-day sun exposure), then distance asc on tie
+    results.sort(key=lambda x: (-x["day_score"], x["distance_km"]))
     return results
 
 
