@@ -204,7 +204,7 @@ const ISSUES = [
   { id: 'closed',        label: 'Stängt / finns inte längre' },
 ]
 
-function FeedbackDialog({ venueName, onSubmit, onDismiss }) {
+function FeedbackDialog({ venueName, onSubmit, onDismiss, onClose }) {
   const [selected, setSelected] = useState(new Set())
   const [comment,  setComment]  = useState('')
 
@@ -223,7 +223,7 @@ function FeedbackDialog({ venueName, onSubmit, onDismiss }) {
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end"
          style={{ background: 'rgba(0,0,0,0.6)' }}
-         onClick={e => { if (e.target === e.currentTarget) onDismiss() }}>
+         onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className="w-full bg-slate-800 rounded-t-2xl flex flex-col"
            style={{ maxHeight: '85vh' }}>
         {/* Header — always visible */}
@@ -232,7 +232,7 @@ function FeedbackDialog({ venueName, onSubmit, onDismiss }) {
             <p className="text-white font-semibold text-sm">Vad stämmer inte?</p>
             <p className="text-slate-400 text-xs mt-0.5 truncate max-w-[260px]">{venueName}</p>
           </div>
-          <button onClick={onDismiss} className="text-slate-500 hover:text-slate-300 text-xl leading-none pl-4">✕</button>
+          <button onClick={onClose} className="text-slate-500 hover:text-slate-300 text-xl leading-none pl-4">✕</button>
         </div>
 
         {/* Scrollable content */}
@@ -292,12 +292,16 @@ function ReportButton({ active, onReport, terraceName }) {
 
   function handleFeedback(feedback) {
     setShowDialog(false)
-    onReport(feedback)
+    onReport(feedback)        // submit with details → icon lights up
   }
 
   function handleDismiss() {
     setShowDialog(false)
-    onReport(null)
+    onReport(null)            // "Hoppa över": submit minimal report → icon lights up
+  }
+
+  function handleClose() {
+    setShowDialog(false)      // ✕: close without reporting → icon stays dark
   }
 
   return (
@@ -319,6 +323,7 @@ function ReportButton({ active, onReport, terraceName }) {
           venueName={terraceName}
           onSubmit={handleFeedback}
           onDismiss={handleDismiss}
+          onClose={handleClose}
         />
       )}
     </>
