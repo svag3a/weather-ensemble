@@ -171,7 +171,11 @@ function SunTimeline({ scores, coords }) {
       </div>
       {/* Labels */}
       <div className="relative h-3.5">
-        <span className="absolute left-0 text-[9px] text-slate-500 leading-none">Nu</span>
+        <span className="absolute left-0 leading-none" style={{ top: -1 }}>
+          {scores?.gradient_is_upcoming
+            ? <Sun size={10} className="text-slate-500"/>
+            : <span className="text-[9px] text-slate-500">Nu</span>}
+        </span>
         {markers.map((m, i) => (
           <span key={i} className="absolute text-[9px] text-slate-500 leading-none"
             style={{ left: `${m.pct}%`, transform: 'translateX(-50%)' }}>

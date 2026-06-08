@@ -339,13 +339,6 @@ def compute_day_score(
     """
     now = datetime.now(timezone.utc)
 
-    # Guard: if the sun is currently below the horizon return (0, []) immediately.
-    # We never compute "tomorrow's" sun — the day-score is always about
-    # remaining daylight *today*.  Both post-sunset and pre-dawn return 0.
-    _, alt_now = solar_position(lat, lon, now)
-    if alt_now <= 0:
-        return 0, []
-
     # Pre-parse polygon once
     poly = None
     if polygon_coords_json:
@@ -365,29 +358,35 @@ def compute_day_score(
         os_val = orientation_score(az, orientation)
         return float(os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60))
 
-    # Collect all daylight samples from now to sunset, every 30 min
-    samples: list = []    # (minutes, os_value)
+    # Scan up to 50 steps (25 h) to cover nighttime → next sunrise → next sunset.
+    # During daytime the loop starts accumulating immediately.
+    # During nighttime it skips until the next sunrise, then runs to sunset.
+    samples: list = []     # (minutes_from_now, os_value, sin_altitude_weight)
     sunrise_seen = False
 
-    for step in range(0, 25):
+    for step in range(0, 50):
         minutes = step * 30
         target  = now + timedelta(minutes=minutes)
         az, alt = solar_position(lat, lon, target)
         if alt <= 0:
             if sunrise_seen:
-                break
-            continue
+                break      # sunset reached — stop
+            continue       # nighttime before sunrise — skip
         sunrise_seen = True
         samples.append((minutes, _os(az), math.sin(math.radians(alt))))
 
     if not samples:
-        return 0, []
+        return 0, [], False
 
-    total_minutes = samples[-1][0] if samples else 1
+    # is_upcoming: first sample is not "now" (sun was below horizon when called)
+    is_upcoming = samples[0][0] > 0
 
-    # Gradient: fraction of daylight window + orientation score (0-100)
+    # Gradient: frac is 0→1 over the *daylight window* (sunrise to sunset),
+    # independent of how far in the future that window is.
+    window_start    = samples[0][0]
+    window_duration = max(samples[-1][0] - window_start, 1)
     gradient = [
-        {"frac": round(m / max(total_minutes, 1), 4), "score": int(os)}
+        {"frac": round((m - window_start) / window_duration, 4), "score": int(os)}
         for m, os, _ in samples
     ]
 
@@ -396,7 +395,7 @@ def compute_day_score(
     total_s = sum(os * w for _, os, w in samples)
     day_score = 0 if total_w < 1e-9 else min(100, round(total_s / total_w))
 
-    return day_score, gradient
+    return day_score, gradient, is_upcoming
 
 
 # ── Composite score ───────────────────────────────────────────────────────────
@@ -486,15 +485,16 @@ def compute_scores(
     else:
         result["confidence"] = orientation_conf if orientation and orientation != "UNKNOWN" else 0.3
     # Day score + gradient: weighted sun exposure from now until sunset
-    day_score, gradient = compute_day_score(
+    day_score, gradient, gradient_is_upcoming = compute_day_score(
         lat, lon, orientation,
         polygon_coords_json=polygon_coords_json,
         sun_arc_from=sun_arc_from,
         sun_arc_to=sun_arc_to,
         is_rooftop=is_rooftop,
     )
-    result["day_score"] = day_score
-    result["gradient"]  = gradient   # [{frac: 0.0, score: 85}, …] from now to sunset
+    result["day_score"]            = day_score
+    result["gradient"]             = gradient
+    result["gradient_is_upcoming"] = gradient_is_upcoming
     return result
 
 
