@@ -120,6 +120,22 @@ export async function voteTerrrace(id, vote, userLat, userLon, feedback = null) 
   return res.json()
 }
 
+export async function fetchVotesAdmin(statusFilter = 'all') {
+  const res = await fetch(`${BASE}/votes/admin?status_filter=${statusFilter}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function updateVoteStatus(id, status) {
+  const res = await fetch(`${BASE}/votes/${id}/status`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function autoArcTerraces() {
   const res = await fetch(`${BASE}/sun-terraces/auto-arc`, { method: 'POST' })
   if (!res.ok) throw new Error(await res.text())

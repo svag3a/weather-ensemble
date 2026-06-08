@@ -9,6 +9,7 @@ import ImageLibrary from './components/ImageLibrary'
 import EnsembleOptimizer from './components/EnsembleOptimizer'
 import EnsembleTrend from './components/EnsembleTrend'
 import SunTerraceAdmin from './components/SunTerraceAdmin'
+import FeedbackAdmin from './components/FeedbackAdmin'
 
 function useData(fetcher, deps = []) {
   const [data, setData] = useState(null)
@@ -111,7 +112,7 @@ export default function App() {
 
         {/* Tab bar */}
         <div className="flex gap-1 mb-6 border-b border-slate-700">
-          {[['status', 'Status'], ['statistik', 'Statistik'], ['karta', 'Karta'], ['sol', 'Sol']].map(([id, label]) => (
+          {[['status', 'Status'], ['statistik', 'Statistik'], ['karta', 'Karta'], ['sol', 'Sol'], ['feedback', 'Feedback']].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -151,6 +152,12 @@ export default function App() {
               onUpdate={async (id, fields) => { await updateCityImage(id, fields); cityImages.reload() }}
               onDelete={async (id) => { await deleteCityImage(id); cityImages.reload() }}
             />
+          </div>
+        )}
+
+        {activeTab === 'feedback' && (
+          <div className="space-y-6">
+            <FeedbackAdmin />
           </div>
         )}
 

@@ -56,6 +56,7 @@ async def lifespan(app: FastAPI):
                 feedback TEXT
             )""",
             "ALTER TABLE terrace_votes ADD COLUMN feedback TEXT",
+            "ALTER TABLE terrace_votes ADD COLUMN status TEXT DEFAULT 'pending'",
         ]:
             try:
                 conn.execute(text(stmt))

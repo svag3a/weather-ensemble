@@ -166,3 +166,4 @@ class TerraceVote(Base):
     user_lat: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     user_lon: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     feedback: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON: {issues:[...], comment:""}
+    status:   Mapped[str] = mapped_column(String, default="pending")         # pending/in_progress/resolved/dismissed

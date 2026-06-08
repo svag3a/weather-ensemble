@@ -1244,3 +1244,66 @@ def create_terrace(body: CreateTerraceBody, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(t)
     return {"id": t.id, "name": t.name, "source_id": t.source_id}
+
+
+# ── Feedback admin ────────────────────────────────────────────────────────────
+
+@router.get("/votes/admin")
+def get_votes_admin(
+    status_filter: str = Query(default="all"),
+    db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Return all thumbs-down votes that have feedback, for admin review."""
+    import json as _json
+    q = db.query(TerraceVote).filter(
+        TerraceVote.vote == -1,
+        TerraceVote.feedback.isnot(None),
+    )
+    if status_filter != "all":
+        q = q.filter(TerraceVote.status == status_filter)
+    rows = q.order_by(TerraceVote.voted_at.desc()).all()
+
+    result = []
+    for v in rows:
+        terrace = db.query(SunTerrace).filter(SunTerrace.id == v.terrace_id).first()
+        fb = {}
+        try:
+            fb = _json.loads(v.feedback) if v.feedback else {}
+        except Exception:
+            pass
+        result.append({
+            "id": v.id,
+            "terrace_id": v.terrace_id,
+            "terrace_name": terrace.name if terrace else f"#{v.terrace_id}",
+            "terrace_address": terrace.address if terrace else None,
+            "voted_at": v.voted_at.isoformat() if v.voted_at else None,
+            "issues": fb.get("issues", []),
+            "comment": fb.get("comment", ""),
+            "status": v.status or "pending",
+            "user_lat": v.user_lat,
+            "user_lon": v.user_lon,
+        })
+    return result
+
+
+class VoteStatusBody(BaseModel):
+    status: str   # pending / in_progress / resolved / dismissed
+
+
+@router.patch("/votes/{vote_id}/status", status_code=200)
+def update_vote_status(
+    vote_id: int,
+    body: VoteStatusBody,
+    db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    valid = {"pending", "in_progress", "resolved", "dismissed"}
+    if body.status not in valid:
+        raise HTTPException(status_code=400, detail=f"status must be one of {valid}")
+    v = db.query(TerraceVote).filter(TerraceVote.id == vote_id).first()
+    if v is None:
+        raise HTTPException(status_code=404, detail="Vote not found")
+    v.status = body.status
+    db.commit()
+    return {"id": vote_id, "status": body.status}
