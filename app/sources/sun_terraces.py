@@ -316,6 +316,69 @@ def weather_score(fc: dict) -> dict:
     }
 
 
+# ── Day score ────────────────────────────────────────────────────────────────
+
+def compute_day_score(
+    lat: float,
+    lon: float,
+    orientation: Optional[str],
+    polygon_coords_json: Optional[str] = None,
+    sun_arc_from: Optional[float] = None,
+    sun_arc_to: Optional[float] = None,
+    is_rooftop: bool = False,
+) -> int:
+    """Weighted-average orientation score from now until sunset today.
+
+    Weight = sin(solar_altitude) so high-sun hours count more.
+    Samples every 30 min up to 12 h ahead; stops at first sunset.
+    Result is 0–100.  A rooftop always scores 100 (sky-facing).
+
+    Normalisation: a terrace with a 360° arc (rooftop) achieves the
+    theoretical maximum of 100 for any day, so no additional scaling
+    is needed — the formula is already in a 0–100 range.
+    """
+    now = datetime.now(timezone.utc)
+    total_w = 0.0
+    total_s  = 0.0
+    sunrise_seen = False
+
+    for step in range(0, 25):          # 0, 30, 60 … 720 min
+        minutes = step * 30
+        target  = now + timedelta(minutes=minutes)
+        az, alt = solar_position(lat, lon, target)
+
+        if alt <= 0:
+            if sunrise_seen:
+                break          # sunset reached — stop
+            continue           # sun not up yet — skip
+
+        sunrise_seen = True
+        w = math.sin(math.radians(alt))
+
+        if is_rooftop:
+            os = 100.0
+        elif sun_arc_from is not None and sun_arc_to is not None:
+            os = arc_orientation_score(az, sun_arc_from, sun_arc_to)
+        elif polygon_coords_json:
+            try:
+                import json as _json
+                poly = _json.loads(polygon_coords_json)
+                os = polygon_orientation_score(az, poly)
+            except Exception:
+                os_val = orientation_score(az, orientation)
+                os = float(os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60))
+        else:
+            os_val = orientation_score(az, orientation)
+            os = float(os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60))
+
+        total_s += os * w
+        total_w += w
+
+    if total_w < 1e-9:
+        return 0
+    return min(100, round(total_s / total_w))
+
+
 # ── Composite score ───────────────────────────────────────────────────────────
 
 def compute_scores(
@@ -402,6 +465,14 @@ def compute_scores(
         result["confidence"] = 1.0
     else:
         result["confidence"] = orientation_conf if orientation and orientation != "UNKNOWN" else 0.3
+    # Day score: weighted sun exposure from now until sunset
+    result["day_score"] = compute_day_score(
+        lat, lon, orientation,
+        polygon_coords_json=polygon_coords_json,
+        sun_arc_from=sun_arc_from,
+        sun_arc_to=sun_arc_to,
+        is_rooftop=is_rooftop,
+    )
     return result
 
 

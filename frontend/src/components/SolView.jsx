@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchSunTerraces, voteTerrrace, createTerrace } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
-import { Moon, Sun, Parasol, ThumbsUp, ThumbsDown, Cloud, CloudRain } from 'lucide-react'
+import { Moon, Sun, Parasol, ThumbsUp, ThumbsDown, Cloud, CloudRain, TriangleRight, Spline } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -29,12 +29,42 @@ function SunDots({ score }) {
 function ArcChip({ arcFrom, arcTo, orientation }) {
   if (arcFrom != null && arcTo != null) {
     const span = Math.round((arcTo - arcFrom + 360) % 360 || 360)
-    return <span>{Math.round(arcFrom)}°–{Math.round(arcTo)}° ({span}°)</span>
+    return (
+      <span className="flex items-center gap-0.5">
+        <Spline size={10}/>
+        <span>{Math.round(arcFrom)}°–{Math.round(arcTo)}° ({span}°)</span>
+      </span>
+    )
   }
   if (orientation && orientation !== 'UNKNOWN') {
-    return <span>{orientation}</span>
+    return (
+      <span className="flex items-center gap-0.5">
+        <Spline size={10}/>
+        <span>{orientation}</span>
+      </span>
+    )
   }
   return null
+}
+
+// Day score badge — colored 0-100 number
+function dayScoreColor(s) {
+  if (s >= 80) return '#fde047'
+  if (s >= 60) return '#f59e0b'
+  if (s >= 40) return '#ea580c'
+  if (s >= 20) return '#7c2d12'
+  return '#374151'
+}
+
+function DayScoreBadge({ score }) {
+  if (score == null) return null
+  const color = dayScoreColor(score)
+  return (
+    <div className="flex flex-col items-center justify-center w-9 shrink-0">
+      <span style={{ color, fontSize: 18, fontWeight: 700, lineHeight: 1 }}>{score}</span>
+      <span className="text-slate-600" style={{ fontSize: 8 }}>/ 100</span>
+    </div>
+  )
 }
 
 // Small weather indicator shown only when conditions are noteworthy
@@ -190,10 +220,13 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) 
   const best = scores?.best_time ?? 'now'
   const altitude = scores?.[best]?.sun_altitude
   const isRooftop = outdoor_type === 'rooftop'
+  const dayScore = scores?.day_score ?? null
 
   return (
     <div className={`${GLASS} rounded-2xl p-4 space-y-3`}>
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2">
+        {/* Day score badge */}
+        <DayScoreBadge score={dayScore}/>
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-1.5 flex-wrap">
             <span className="text-white font-medium leading-tight truncate">{name}</span>
@@ -216,7 +249,12 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) 
         </div>
       </div>
       <div className="flex items-center gap-3 text-xs text-slate-500">
-        {altitude != null && altitude > 0 && <span>Sol {Math.round(altitude)}°</span>}
+        {altitude != null && altitude > 0 && (
+          <span className="flex items-center gap-0.5">
+            <TriangleRight size={10}/>
+            <span>{Math.round(altitude)}°</span>
+          </span>
+        )}
         <ArcChip arcFrom={terrace.sun_arc_from} arcTo={terrace.sun_arc_to} orientation={street_orientation}/>
         <WeatherChip weatherScore={scores?.now?.weather_score} />
       </div>
