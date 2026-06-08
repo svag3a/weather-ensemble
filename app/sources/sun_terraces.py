@@ -338,6 +338,17 @@ def compute_day_score(
     is needed — the formula is already in a 0–100 range.
     """
     now = datetime.now(timezone.utc)
+
+    # Guard: if the sun is currently below the horizon, check whether it
+    # already set today (post-sunset) or hasn't risen yet (pre-dawn).
+    # Post-sunset → no remaining daylight today → score = 0.
+    _, alt_now = solar_position(lat, lon, now)
+    if alt_now <= 0:
+        for h in range(1, 7):
+            _, alt_past = solar_position(lat, lon, now - timedelta(hours=h))
+            if alt_past > 0:
+                return 0   # sun was up within the last 6 h → post-sunset
+
     total_w = 0.0
     total_s  = 0.0
     sunrise_seen = False
