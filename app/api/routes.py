@@ -961,7 +961,7 @@ def get_sun_terraces(
 
     # Get latest ensemble forecast hours for next 3h
     now = datetime.now(timezone.utc)
-    cutoff = now + timedelta(hours=3)
+    cutoff = now + timedelta(hours=18)   # extend to cover full remaining day
     latest_run = (
         db.query(EnsembleForecast.computed_at)
         .order_by(EnsembleForecast.computed_at.desc())

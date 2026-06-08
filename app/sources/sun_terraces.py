@@ -326,8 +326,9 @@ def compute_day_score(
     sun_arc_from: Optional[float] = None,
     sun_arc_to: Optional[float] = None,
     is_rooftop: bool = False,
+    forecast_hours: Optional[list] = None,
 ) -> int:
-    """Weighted-average orientation score from now until sunset today.
+    """Weighted-average sun+weather score from now until the next daylight period.
 
     Weight = sin(solar_altitude) so high-sun hours count more.
     Samples every 30 min up to 12 h ahead; stops at first sunset.
@@ -348,15 +349,30 @@ def compute_day_score(
         except Exception:
             poly = None
 
-    def _os(az: float) -> float:
+    def _os(az: float, target_ts: float) -> float:
+        """Orientation score, optionally blended with weather for this time step."""
+        # Pure geometric orientation score
         if is_rooftop:
-            return 100.0
-        if sun_arc_from is not None and sun_arc_to is not None:
-            return arc_orientation_score(az, sun_arc_from, sun_arc_to)
-        if poly:
-            return polygon_orientation_score(az, poly)
-        os_val = orientation_score(az, orientation)
-        return float(os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60))
+            geo = 100.0
+        elif sun_arc_from is not None and sun_arc_to is not None:
+            geo = arc_orientation_score(az, sun_arc_from, sun_arc_to)
+        elif poly:
+            geo = polygon_orientation_score(az, poly)
+        else:
+            os_val = orientation_score(az, orientation)
+            geo = float(os_val if orientation and orientation != "UNKNOWN" else min(os_val, 60))
+
+        if not forecast_hours:
+            return geo
+
+        # Blend with weather: same weights as per-hour total_score
+        fc = min(forecast_hours, key=lambda f: abs(f.get("valid_for_ts", 0) - target_ts))
+        ws = weather_score(fc)
+        combined = 0.55 * geo + 0.30 * ws["cloud"] + 0.10 * ws["temp"] + 0.05 * ws["wind"]
+        # Rain kills the score
+        if ws["precip"] < 40:
+            combined = combined * ws["precip"] / 40
+        return max(0.0, min(100.0, combined))
 
     # Scan up to 50 steps (25 h) to cover nighttime → next sunrise → next sunset.
     # During daytime the loop starts accumulating immediately.
@@ -373,7 +389,7 @@ def compute_day_score(
                 break      # sunset reached — stop
             continue       # nighttime before sunrise — skip
         sunrise_seen = True
-        samples.append((minutes, _os(az), math.sin(math.radians(alt))))
+        samples.append((minutes, _os(az, target.timestamp()), math.sin(math.radians(alt))))
 
     if not samples:
         return 0, [], False
@@ -491,6 +507,7 @@ def compute_scores(
         sun_arc_from=sun_arc_from,
         sun_arc_to=sun_arc_to,
         is_rooftop=is_rooftop,
+        forecast_hours=forecast_hours,
     )
     result["day_score"]            = day_score
     result["gradient"]             = gradient
