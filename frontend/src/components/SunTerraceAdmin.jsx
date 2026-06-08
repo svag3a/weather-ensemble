@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { overrideTerrace, createTerrace, deriveArcFromPolygon, fixTerraceAddresses, triggerGeocodeTerraces, fetchGeocodeStatus,
+import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, fixTerraceAddresses, triggerGeocodeTerraces, fetchGeocodeStatus,
          triggerEnrichOsm, fetchEnrichOsmStatus,
          triggerEnrichAi, fetchEnrichAiStatus } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
@@ -623,6 +623,40 @@ function AddTerracePanel({ onSaved, onCancel }) {
   )
 }
 
+// ── Auto-arc button ───────────────────────────────────────────────────────────
+
+function AutoArcButton() {
+  const [state, setState] = useState(null)
+  const [running, setRunning] = useState(false)
+
+  async function run() {
+    setRunning(true)
+    try {
+      setState(await autoArcTerraces())
+    } catch (e) {
+      setState({ error: e.message })
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  return (
+    <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-slate-400 text-xs">Auto-solbåge</span>
+        <button onClick={run} disabled={running}
+          className="text-xs bg-amber-700 hover:bg-amber-600 disabled:bg-slate-600 text-white px-2 py-0.5 rounded transition-colors">
+          {running ? 'Kör…' : 'Kör'}
+        </button>
+      </div>
+      {state?.updated != null && (
+        <span className="text-green-400 text-[10px]">✓ {state.updated} bågar satta</span>
+      )}
+      {state?.error && <span className="text-red-400 text-[10px]">{state.error}</span>}
+    </div>
+  )
+}
+
 // ── Fix addresses button ──────────────────────────────────────────────────────
 
 function FixAddressesButton() {
@@ -767,6 +801,7 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
             <div className="text-slate-400 text-xs">{l}</div>
           </div>
         ))}
+        <AutoArcButton />
         <FixAddressesButton />
         <JobWidget label="Orientering OSM" triggerFn={triggerEnrichOsm} statusFn={fetchEnrichOsmStatus} color="emerald"/>
         <JobWidget label="AI-berikning" triggerFn={triggerEnrichAi} statusFn={fetchEnrichAiStatus} color="blue"/>

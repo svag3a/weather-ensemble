@@ -594,6 +594,40 @@ def enrich_ai_status(_user: str = Depends(get_current_user)):
     return get_ai_state()
 
 
+@router.post("/sun-terraces/auto-arc", status_code=200)
+def auto_arc_terraces(
+    db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Derive sun_arc_from/to for all terraces that have a compass orientation
+    but no arc yet.  Each 8-point direction becomes a 180° arc (center ± 90°).
+    This is mathematically equivalent to the old cosine orientation_score model."""
+    from app.sources.sun_terraces import ORIENTATION_AZIMUTHS
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    rows = (
+        db.query(SunTerrace)
+        .filter(
+            SunTerrace.active == True,            # noqa: E712
+            SunTerrace.sun_arc_from == None,      # noqa: E711  — no arc yet
+            SunTerrace.street_orientation != None, # noqa: E711
+            SunTerrace.street_orientation != "UNKNOWN",
+        )
+        .all()
+    )
+    updated = 0
+    for t in rows:
+        center = ORIENTATION_AZIMUTHS.get(t.street_orientation)
+        if center is None:
+            continue
+        t.sun_arc_from = (center - 90 + 360) % 360
+        t.sun_arc_to   = (center + 90) % 360
+        t.updated_at   = now
+        updated += 1
+    if updated:
+        db.commit()
+    return {"updated": updated, "total": len(rows)}
+
+
 @router.post("/sun-terraces/fix-addresses", status_code=200)
 def fix_terrace_addresses(
     db: Session = Depends(get_db),

@@ -115,6 +115,12 @@ export async function voteTerrrace(id, vote, userLat, userLon) {
   return res.json()
 }
 
+export async function autoArcTerraces() {
+  const res = await fetch(`${BASE}/sun-terraces/auto-arc`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fixTerraceAddresses() {
   const res = await fetch(`${BASE}/sun-terraces/fix-addresses`, { method: 'POST' })
   if (!res.ok) throw new Error(await res.text())
