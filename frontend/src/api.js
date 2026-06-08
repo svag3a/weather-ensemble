@@ -105,12 +105,11 @@ export async function createTerrace(fields) {
   return res.json()
 }
 
-export async function voteTerrrace(id, vote, userLat, userLon, feedback = null) {
-  const res = await fetch(`${BASE}/sun-terraces/${id}/vote`, {
+export async function reportTerrace(id, userLat, userLon, feedback = null) {
+  const res = await fetch(`${BASE}/sun-terraces/${id}/report`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      vote,
       user_lat: userLat ?? null,
       user_lon: userLon ?? null,
       feedback: feedback ? JSON.stringify(feedback) : null,
@@ -120,14 +119,14 @@ export async function voteTerrrace(id, vote, userLat, userLon, feedback = null) 
   return res.json()
 }
 
-export async function fetchVotesAdmin(statusFilter = 'all') {
+export async function fetchReportsAdmin(statusFilter = 'all') {
   const res = await fetch(`${BASE}/votes/admin?status_filter=${statusFilter}`)
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
 
-export async function updateVoteStatus(id, status) {
-  const res = await fetch(`${BASE}/votes/${id}/status`, {
+export async function updateReportStatus(id, status) {
+  const res = await fetch(`${BASE}/reports/${id}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),

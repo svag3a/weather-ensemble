@@ -9,7 +9,7 @@ from pydantic import BaseModel
 import math as _math
 
 from app.database import get_db
-from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace, TerraceVote
+from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace, TerraceReport
 from app.api.auth import get_current_user
 
 router = APIRouter()
@@ -1169,36 +1169,32 @@ def derive_arc(
     return {"sun_arc_from": arc_f, "sun_arc_to": arc_t}
 
 
-class TerraceVoteBody(BaseModel):
-    vote: int           # +1 or -1
+class TerraceReportBody(BaseModel):
     user_lat: Optional[float] = None
     user_lon: Optional[float] = None
     feedback: Optional[str] = None   # JSON string: {"issues": [...], "comment": "..."}
 
 
-@router.post("/sun-terraces/{terrace_id}/vote", status_code=201)
-def vote_terrace(
+@router.post("/sun-terraces/{terrace_id}/report", status_code=201)
+def report_terrace(
     terrace_id: int,
-    body: TerraceVoteBody,
+    body: TerraceReportBody,
     db: Session = Depends(get_db),
 ):
-    """Submit a thumbs-up (+1) or thumbs-down (-1) vote for a terrace."""
-    if body.vote not in (1, -1):
-        raise HTTPException(status_code=400, detail="vote must be +1 or -1")
+    """Submit a data-quality report for a terrace."""
     terrace = db.query(SunTerrace).filter(SunTerrace.id == terrace_id).first()
     if terrace is None:
         raise HTTPException(status_code=404, detail="Terrace not found")
-    row = TerraceVote(
+    row = TerraceReport(
         terrace_id=terrace_id,
-        vote=body.vote,
-        voted_at=datetime.now(timezone.utc).replace(tzinfo=None),
+        reported_at=datetime.now(timezone.utc).replace(tzinfo=None),
         user_lat=body.user_lat,
         user_lon=body.user_lon,
         feedback=body.feedback,
     )
     db.add(row)
     db.commit()
-    return {"status": "ok", "terrace_id": terrace_id, "vote": body.vote}
+    return {"status": "ok", "terrace_id": terrace_id}
 
 
 class CreateTerraceBody(BaseModel):
@@ -1254,15 +1250,12 @@ def get_votes_admin(
     db: Session = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    """Return all thumbs-down votes that have feedback, for admin review."""
+    """Return all reports with feedback, for admin review."""
     import json as _json
-    q = db.query(TerraceVote).filter(
-        TerraceVote.vote == -1,
-        TerraceVote.feedback.isnot(None),
-    )
+    q = db.query(TerraceReport).filter(TerraceReport.feedback.isnot(None))
     if status_filter != "all":
-        q = q.filter(TerraceVote.status == status_filter)
-    rows = q.order_by(TerraceVote.voted_at.desc()).all()
+        q = q.filter(TerraceReport.status == status_filter)
+    rows = q.order_by(TerraceReport.reported_at.desc()).all()
 
     result = []
     for v in rows:
@@ -1277,7 +1270,7 @@ def get_votes_admin(
             "terrace_id": v.terrace_id,
             "terrace_name": terrace.name if terrace else f"#{v.terrace_id}",
             "terrace_address": terrace.address if terrace else None,
-            "voted_at": v.voted_at.isoformat() if v.voted_at else None,
+            "reported_at": v.reported_at.isoformat() if v.reported_at else None,
             "issues": fb.get("issues", []),
             "comment": fb.get("comment", ""),
             "status": v.status or "pending",
@@ -1287,23 +1280,23 @@ def get_votes_admin(
     return result
 
 
-class VoteStatusBody(BaseModel):
+class ReportStatusBody(BaseModel):
     status: str   # pending / in_progress / resolved / dismissed
 
 
-@router.patch("/votes/{vote_id}/status", status_code=200)
-def update_vote_status(
-    vote_id: int,
-    body: VoteStatusBody,
+@router.patch("/reports/{report_id}/status", status_code=200)
+def update_report_status(
+    report_id: int,
+    body: ReportStatusBody,
     db: Session = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
     valid = {"pending", "in_progress", "resolved", "dismissed"}
     if body.status not in valid:
         raise HTTPException(status_code=400, detail=f"status must be one of {valid}")
-    v = db.query(TerraceVote).filter(TerraceVote.id == vote_id).first()
+    v = db.query(TerraceReport).filter(TerraceReport.id == report_id).first()
     if v is None:
-        raise HTTPException(status_code=404, detail="Vote not found")
+        raise HTTPException(status_code=404, detail="Report not found")
     v.status = body.status
     db.commit()
-    return {"id": vote_id, "status": body.status}
+    return {"id": report_id, "status": body.status}

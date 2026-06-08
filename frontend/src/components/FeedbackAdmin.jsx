@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { fetchVotesAdmin, updateVoteStatus } from '../api'
+import { fetchReportsAdmin, updateReportStatus } from '../api'
 
 const STATUSES = [
   { value: 'pending',     label: 'Väntar',    color: 'bg-yellow-500/20 text-yellow-400 border-yellow-600' },
@@ -50,7 +50,7 @@ function FeedbackRow({ item, onStatusChange }) {
   async function handleStatus(newStatus) {
     setSaving(true)
     try {
-      await updateVoteStatus(item.id, newStatus)
+      await updateReportStatus(item.id, newStatus)
       onStatusChange(item.id, newStatus)
     } catch (e) {
       alert(e.message)
@@ -59,8 +59,8 @@ function FeedbackRow({ item, onStatusChange }) {
     }
   }
 
-  const date = item.voted_at
-    ? new Date(item.voted_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })
+  const date = item.reported_at
+    ? new Date(item.reported_at).toLocaleString('sv-SE', { dateStyle: 'short', timeStyle: 'short' })
     : '—'
 
   return (
@@ -113,7 +113,7 @@ export default function FeedbackAdmin() {
 
   useEffect(() => {
     setLoading(true)
-    fetchVotesAdmin(filter)
+    fetchReportsAdmin(filter)
       .then(setItems)
       .catch(() => setItems([]))
       .finally(() => setLoading(false))

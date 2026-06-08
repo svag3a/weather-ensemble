@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchSunTerraces, voteTerrrace, createTerrace } from '../api'
+import { fetchSunTerraces, reportTerrace, createTerrace } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
-import { Moon, Sun, Parasol, ThumbsUp, ThumbsDown, Cloud, CloudRain, TriangleRight, Spline } from 'lucide-react'
+import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRight, Spline } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -279,37 +279,25 @@ function FeedbackDialog({ venueName, onSubmit, onDismiss }) {
   )
 }
 
-// ── Vote button ───────────────────────────────────────────────────────────────
-function VoteButton({ dir, active, onVote, terraceName, coords }) {
+// ── Report button ─────────────────────────────────────────────────────────────
+function ReportButton({ active, onReport, terraceName }) {
   const [burst, setBurst] = useState(false)
   const [showDialog, setShowDialog] = useState(false)
-
-  const isUp = dir === 1
-  const Icon = isUp ? ThumbsUp : ThumbsDown
-  const activeColor = isUp ? 'text-green-400' : 'text-red-400'
-  const activeBg    = isUp ? 'bg-green-400/15' : 'bg-red-400/15'
-  const ringColor   = isUp ? 'border-green-400' : 'border-red-400'
 
   function handleClick() {
     setBurst(true)
     setTimeout(() => setBurst(false), 600)
-    if (!isUp) {
-      // Thumbs-down: open feedback dialog after animation
-      setTimeout(() => setShowDialog(true), 650)
-    } else {
-      // Thumbs-up: submit immediately
-      onVote(null)
-    }
+    setTimeout(() => setShowDialog(true), 650)
   }
 
   function handleFeedback(feedback) {
     setShowDialog(false)
-    onVote(feedback)
+    onReport(feedback)
   }
 
   function handleDismiss() {
     setShowDialog(false)
-    onVote(null)   // still record the -1 vote, just no feedback
+    onReport(null)
   }
 
   return (
@@ -317,13 +305,13 @@ function VoteButton({ dir, active, onVote, terraceName, coords }) {
       <button
         onClick={handleClick}
         className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-all select-none
-          ${active ? `${activeBg} ${activeColor}` : 'text-slate-600 hover:text-slate-400'}
+          ${active ? 'bg-orange-400/15 text-orange-400' : 'text-slate-600 hover:text-slate-400'}
           ${burst ? 'scale-125' : active ? 'scale-110' : 'scale-100'}`}
         style={{ transition: burst ? 'transform 0.1s ease-out' : 'transform 0.3s ease' }}
       >
-        <Icon size={14} strokeWidth={active ? 2.5 : 1.5}/>
+        <MessageCircleWarning size={14} strokeWidth={active ? 2.5 : 1.5}/>
         {burst && (
-          <span className={`absolute inset-0 rounded-lg border-2 ${ringColor} animate-ping opacity-60`}/>
+          <span className="absolute inset-0 rounded-lg border-2 border-orange-400 animate-ping opacity-60"/>
         )}
       </button>
       {showDialog && (
@@ -360,19 +348,18 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords }) 
           {address && <div className="text-slate-400 text-xs mt-0.5 truncate">{address}</div>}
           <div className="text-slate-500 text-xs mt-0.5">{amenityLabel(amenity_type)}</div>
         </div>
-        {/* Star + vote buttons stacked */}
-        <div className="flex flex-col items-center gap-1 shrink-0">
+        {/* Star + report button */}
+        <div className="flex flex-col items-center gap-1.5 shrink-0">
           <button onClick={() => onToggleFav(id)}
             className="text-lg leading-none transition-opacity"
             style={{ opacity: isFav ? 1 : 0.3 }}>
             {isFav ? '★' : '☆'}
           </button>
-          <VoteButton dir={1}  active={userVote === 1}
-            onVote={fb => onVote(id, 1, fb)}
-            terraceName={name} coords={coords}/>
-          <VoteButton dir={-1} active={userVote === -1}
-            onVote={fb => onVote(id, -1, fb)}
-            terraceName={name} coords={coords}/>
+          <ReportButton
+            active={userVote === -1}
+            onReport={fb => onVote(id, fb)}
+            terraceName={name}
+          />
         </div>
       </div>
       <div className="flex items-center gap-3 text-xs text-slate-500">
@@ -507,15 +494,16 @@ export default function SolView({ coords }) {
     })
   }, [])
 
-  const handleVote = useCallback((id, dir, feedback = null) => {
+  const handleVote = useCallback((id, feedback = null) => {
     setVotes(prev => {
-      const next = { ...prev, [id]: prev[id] === dir ? 0 : dir }
+      // Toggle: clicking again removes the report indicator
+      const next = { ...prev, [id]: prev[id] === -1 ? 0 : -1 }
       saveVotes(next)
       return next
     })
     const lat = coords?.lat ?? null
     const lon = coords?.lon ?? null
-    voteTerrrace(id, dir, lat, lon, feedback).catch(() => {})
+    reportTerrace(id, lat, lon, feedback).catch(() => {})
   }, [coords])
 
   function toggleType(t) {
@@ -669,7 +657,7 @@ export default function SolView({ coords }) {
           {sortedData.map(t => (
             <TerraceCard key={t.id} terrace={t}
               isFav={favs.has(t.id)} onToggleFav={toggleFav}
-              userVote={votes[t.id] ?? 0} onVote={handleVote}
+              userVote={votes[t.id] ?? 0} onVote={(id, fb) => handleVote(id, fb)}
               coords={coords}/>
           ))}
           <p className="text-white/30 text-xs px-1 pt-1">
