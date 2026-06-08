@@ -209,6 +209,18 @@ export async function fetchGeocodeStatus() {
   return res.json()
 }
 
+export async function triggerAutoTag() {
+  const res = await fetch(`${BASE}/sun-terraces/auto-tag`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function fetchAutoTagStatus() {
+  const res = await fetch(`${BASE}/sun-terraces/auto-tag/status`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchSunTerracesAdmin() {
   const res = await fetch(`${BASE}/sun-terraces/admin`)
   if (!res.ok) throw new Error(await res.text())

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, fixTerraceAddresses, triggerGeocodeTerraces, fetchGeocodeStatus,
          triggerEnrichOsm, fetchEnrichOsmStatus,
          triggerEnrichAi, fetchEnrichAiStatus,
+         triggerAutoTag, fetchAutoTagStatus,
          fetchHashtags, createHashtag } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
@@ -860,6 +861,7 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
         <FixAddressesButton />
         <JobWidget label="Orientering OSM" triggerFn={triggerEnrichOsm} statusFn={fetchEnrichOsmStatus} color="emerald"/>
         <JobWidget label="AI-berikning" triggerFn={triggerEnrichAi} statusFn={fetchEnrichAiStatus} color="blue"/>
+        <JobWidget label="Auto-taggar" triggerFn={triggerAutoTag} statusFn={fetchAutoTagStatus} color="blue"/>
         <GeocodeWidget />
       </div>
 

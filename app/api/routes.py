@@ -1004,6 +1004,26 @@ def create_hashtag(body: HashtagBody, db: Session = Depends(get_db), _user: str 
     return {"id": h.id, "name": h.name, "active": h.active}
 
 
+@router.post("/sun-terraces/auto-tag")
+async def trigger_auto_tag(_user: str = Depends(get_current_user)):
+    """Trigger automatic hashtag tagging job (background)."""
+    import asyncio
+    from app.sources.auto_tag import run_auto_tag_job, get_state
+    from app.database import get_db as _get_db
+    state = get_state()
+    if state["running"]:
+        return {"status": "already_running", **state}
+    asyncio.create_task(run_auto_tag_job(_get_db))
+    return {"status": "started", "message": "Auto-taggning i bakgrunden — poll /sun-terraces/auto-tag/status"}
+
+
+@router.get("/sun-terraces/auto-tag/status")
+def auto_tag_status(_user: str = Depends(get_current_user)):
+    """Poll auto-tag job progress."""
+    from app.sources.auto_tag import get_state
+    return get_state()
+
+
 @router.get("/sun-terraces")
 def get_sun_terraces(
     lat: float = Query(default=57.7089),
