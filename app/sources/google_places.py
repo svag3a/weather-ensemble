@@ -23,39 +23,44 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY", "")
 BASE_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
 
 def _build_grid() -> list[tuple]:
-    """Generate a search grid covering Göteborg.
+    """Generate a two-level search grid covering Göteborg.
 
-    Google Nearby Search returns at most 60 results (3 pages × 20).
-    A 5 km circle in central Göteborg contains hundreds of venues, so
-    most are silently dropped.  We instead use a 1.5 km radius grid so
-    each cell holds ≤ 60 venues, covering the full urban area.
+    Google Nearby Search caps at 60 results per call.  We use two levels:
 
-    Step size = 2.0 km (≈ 0.018° lat, ≈ 0.033° lon at 57.7°N) gives
-    ~33 % overlap between adjacent circles — enough to avoid gaps at
-    the cell edges.
+    Level 1 — full urban area (bbox 57.61–57.82, 11.78–12.10):
+      radius 1 500 m, step 2 000 m → ~130 cells
+
+    Level 2 — dense centre (bbox 57.685–57.725, 11.945–11.995):
+      radius 750 m, step 1 000 m → ~25 extra cells filling the
+      Avenyn/Haga/Järntorget pocket where level 1 still hits the cap.
     """
-    import math as _math
-
-    # Bounding box for the Göteborg urban area
-    lat_min, lat_max = 57.61, 57.82
-    lon_min, lon_max = 11.78, 12.10
-
-    lat_step = 0.018   # ≈ 2.0 km
-    lon_step = 0.033   # ≈ 2.0 km at lat 57.7° (cos-corrected)
-    radius_m = 1500
-
     points = []
-    lat = lat_min
-    while lat <= lat_max + lat_step / 2:
-        lon = lon_min
-        while lon <= lon_max + lon_step / 2:
-            points.append((round(lat, 4), round(lon, 4), radius_m, f"{lat:.3f},{lon:.3f}"))
-            lon += lon_step
-        lat += lat_step
+
+    def _add_layer(lat_min, lat_max, lon_min, lon_max, lat_step, lon_step, radius_m):
+        lat = lat_min
+        while lat <= lat_max + lat_step / 2:
+            lon = lon_min
+            while lon <= lon_max + lon_step / 2:
+                points.append((round(lat, 4), round(lon, 4), radius_m, f"{lat:.3f},{lon:.3f}"))
+                lon += lon_step
+            lat += lat_step
+
+    # Level 1: full urban area
+    _add_layer(57.61, 57.82, 11.78, 12.10,
+               lat_step=0.018,   # ≈ 2.0 km
+               lon_step=0.033,   # ≈ 2.0 km at lat 57.7°
+               radius_m=1500)
+
+    # Level 2: dense centre — finer mesh to beat the 60-result cap
+    _add_layer(57.685, 57.725, 11.945, 11.995,
+               lat_step=0.009,   # ≈ 1.0 km
+               lon_step=0.017,   # ≈ 1.0 km
+               radius_m=750)
+
     return points
 
 
-SEARCH_GRID = _build_grid()   # ~120 cells
+SEARCH_GRID = _build_grid()   # ~155 cells
 
 PLACE_TYPES = ["restaurant", "bar", "cafe"]
 
@@ -98,18 +103,22 @@ def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return R * 2 * math.asin(math.sqrt(a))
 
 
-def _is_duplicate(name: str, lat: float, lon: float, existing: list) -> bool:
-    """True if an existing venue is close enough to be the same physical place."""
+def _find_match(name: str, lat: float, lon: float, existing: list):
+    """Return the first active existing venue that is the same physical place,
+    or None if no match.  Inactive venues are intentionally ignored so that a
+    Google entry can reactivate a venue that disappeared from OSM temporarily."""
     n1 = _normalize(name)
     for ev in existing:
+        if not ev.active:
+            continue          # skip inactive — let Google re-import them
         d = _haversine_m(lat, lon, ev.lat, ev.lon)
         if d < 25:
-            return True          # same coordinates → definitely duplicate
+            return ev         # same coordinates → definitely the same place
         if d < 120:
             n2 = _normalize(ev.name or "")
             if n1 and n2 and (n1 in n2 or n2 in n1):
-                return True      # same name nearby → duplicate
-    return False
+                return ev     # same name nearby → same place
+    return None
 
 
 def _amenity_type(google_types: list) -> str:
@@ -228,21 +237,22 @@ async def run_google_import_job() -> None:
                     (e for e in existing_all if e.source_id == v["source_id"]), None
                 )
                 if existing is not None:
-                    existing.name        = v["name"]
-                    existing.lat         = v["lat"]
-                    existing.lon         = v["lon"]
-                    existing.address     = v["address"]
+                    existing.name         = v["name"]
+                    existing.lat          = v["lat"]
+                    existing.lon          = v["lon"]
+                    existing.address      = v["address"]
                     existing.last_seen_at = now
-                    existing.updated_at  = now
+                    existing.updated_at   = now
                     skipped += 1
                     continue
 
-                # 2. Same physical venue already exists from OSM → skip
-                if _is_duplicate(v["name"], v["lat"], v["lon"], existing_all):
+                # 2. Same physical venue exists and is active → skip (already in app)
+                active_match = _find_match(v["name"], v["lat"], v["lon"], existing_all)
+                if active_match is not None:
                     skipped += 1
                     continue
 
-                # 3. Genuinely new venue
+                # 3. Genuinely new venue (or only exists as inactive → add fresh)
                 new_t = SunTerrace(
                     source="google",
                     source_id=v["source_id"],
