@@ -3,7 +3,8 @@ import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, 
          triggerEnrichOsm, fetchEnrichOsmStatus,
          triggerEnrichAi, fetchEnrichAiStatus,
          triggerAutoTag, fetchAutoTagStatus,
-         fetchHashtags, createHashtag } from '../api'
+         fetchHashtags, createHashtag,
+         triggerOsmRefresh } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -457,8 +458,46 @@ function EditPanel({ terrace, onSave, onCancel }) {
 
 // ── Main admin component ──────────────────────────────────────────────────────
 
+// ── OSM Refresh button ────────────────────────────────────────────────────────
+
+function OsmRefreshButton({ onDone }) {
+  const [state, setState] = useState('idle')  // idle | running | done | error
+  const [msg, setMsg]     = useState('')
+
+  async function handleClick() {
+    setState('running')
+    setMsg('')
+    try {
+      const r = await triggerOsmRefresh()
+      setMsg(r.message || 'Startat')
+      setState('done')
+      // Reload the table after ~5 seconds to show new venues
+      setTimeout(() => { onDone?.(); setState('idle') }, 5000)
+    } catch (e) {
+      setMsg(e.message)
+      setState('error')
+    }
+  }
+
+  return (
+    <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1 min-w-[160px]"
+         title="Hämtar nya och uppdaterade venues från OpenStreetMap via Overpass">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-slate-400 text-xs">Hämta från OSM</span>
+        <button onClick={handleClick} disabled={state === 'running'}
+          className="text-xs bg-orange-700 hover:bg-orange-600 disabled:bg-slate-600 text-white px-2 py-0.5 rounded transition-colors">
+          {state === 'running' ? 'Hämtar…' : 'Hämta'}
+        </button>
+      </div>
+      {state === 'running' && <span className="text-orange-300 text-[10px]">Laddar OSM-data (~60s)…</span>}
+      {state === 'done'    && <span className="text-green-400 text-[10px]">✓ {msg}</span>}
+      {state === 'error'   && <span className="text-red-400 text-[10px]">{msg}</span>}
+    </div>
+  )
+}
+
 // Generic job-widget: trigger + progress bar
-function JobWidget({ label, triggerFn, statusFn, color = 'blue' }) {
+function JobWidget({ label, triggerFn, statusFn, color = 'blue', title }) {
   const [status, setStatus] = useState(null)
   const [triggering, setTriggering] = useState(false)
   const pollRef = useRef(null)
@@ -492,11 +531,13 @@ function JobWidget({ label, triggerFn, statusFn, color = 'blue' }) {
   const pct = status?.total > 0 ? Math.round((status.done / status.total) * 100) : 0
   const btnClass = color === 'emerald'
     ? 'bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-600'
+    : color === 'violet'
+    ? 'bg-violet-700 hover:bg-violet-600 disabled:bg-slate-600'
     : 'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600'
-  const barClass = color === 'emerald' ? 'bg-emerald-500' : 'bg-blue-500'
+  const barClass = color === 'emerald' ? 'bg-emerald-500' : color === 'violet' ? 'bg-violet-500' : 'bg-blue-500'
 
   return (
-    <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1 min-w-[200px]">
+    <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1 min-w-[200px]" title={title}>
       <div className="flex items-center justify-between gap-3">
         <span className="text-slate-400 text-xs">{label}</span>
         <button onClick={start} disabled={triggering || status?.running}
@@ -843,8 +884,8 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
 
   return (
     <div className="space-y-4">
-      {/* Summary */}
-      <div className="flex items-center gap-4 flex-wrap">
+      {/* Summary stats */}
+      <div className="flex items-center gap-3 flex-wrap">
         {[
           [activeCount, 'Aktiva'],
           [inactiveCount, 'Inaktiva'],
@@ -857,12 +898,26 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
             <div className="text-slate-400 text-xs">{l}</div>
           </div>
         ))}
-        <AutoArcButton />
-        <FixAddressesButton />
-        <JobWidget label="Orientering OSM" triggerFn={triggerEnrichOsm} statusFn={fetchEnrichOsmStatus} color="emerald"/>
-        <JobWidget label="AI-berikning" triggerFn={triggerEnrichAi} statusFn={fetchEnrichAiStatus} color="blue"/>
-        <JobWidget label="Auto-taggar" triggerFn={triggerAutoTag} statusFn={fetchAutoTagStatus} color="blue"/>
-        <GeocodeWidget />
+      </div>
+
+      {/* Job buttons — grouped by function */}
+      <div className="space-y-2">
+        <div className="text-slate-500 text-xs uppercase tracking-wider">Data</div>
+        <div className="flex gap-2 flex-wrap items-center">
+          <OsmRefreshButton onDone={onReload} />
+          <GeocodeWidget />
+          <FixAddressesButton />
+        </div>
+        <div className="text-slate-500 text-xs uppercase tracking-wider mt-1">Berikning</div>
+        <div className="flex gap-2 flex-wrap items-center">
+          <JobWidget label="Solbåge OSM" triggerFn={triggerEnrichOsm} statusFn={fetchEnrichOsmStatus} color="emerald"
+            title="Beräknar solbåge från närmaste väg för venues utan båge" />
+          <JobWidget label="Solbåge AI" triggerFn={triggerEnrichAi} statusFn={fetchEnrichAiStatus} color="blue"
+            title="Frågar Claude om solbåge för venues som saknar den" />
+          <AutoArcButton />
+          <JobWidget label="Auto-taggar" triggerFn={triggerAutoTag} statusFn={fetchAutoTagStatus} color="violet"
+            title="Sätter hashtags automatiskt baserat på namn, typ och solbåge" />
+        </div>
       </div>
 
       <HashtagAdminSection />

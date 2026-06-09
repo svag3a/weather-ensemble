@@ -623,6 +623,17 @@ out center;
         if v["source_id"] not in seen:
             seen.add(v["source_id"])
             deduped.append(v)
+
+    # Log breakdown by element type
+    type_counts: dict = {}
+    for v in deduped:
+        t = v["source_id"].split("_")[1]   # "node" / "way" / "relation"
+        type_counts[t] = type_counts.get(t, 0) + 1
+    logger.info(
+        "Overpass returned %d unique venues: %s",
+        len(deduped),
+        ", ".join(f"{t}={c}" for t, c in sorted(type_counts.items())),
+    )
     return deduped
 
 
@@ -637,6 +648,8 @@ async def refresh_terraces(db: Session, client) -> None:
 
     now = datetime.utcnow()
     fetched_ids = set()
+    added = 0
+    updated = 0
     for v in venues:
         fetched_ids.add(v["source_id"])
         existing = (
@@ -662,6 +675,7 @@ async def refresh_terraces(db: Session, client) -> None:
                 created_at=now,
                 updated_at=now,
             ))
+            added += 1
         else:
             # Update mutable fields; preserve manual orientation overrides
             existing.name = v["name"]
@@ -678,13 +692,19 @@ async def refresh_terraces(db: Session, client) -> None:
             if existing.orientation_confidence < 0.7:
                 existing.street_orientation = v["street_orientation"]
                 existing.orientation_confidence = v["orientation_confidence"]
+            updated += 1
 
     # Mark venues no longer in OSM as inactive
     all_terraces = db.query(SunTerrace).filter(SunTerrace.source == "osm").all()
+    deactivated = 0
     for t in all_terraces:
         if t.source_id not in fetched_ids:
             t.active = False
             t.updated_at = now
+            deactivated += 1
 
     db.commit()
-    logger.info("Sun terraces refresh done: %d venues upserted", len(venues))
+    logger.info(
+        "Sun terraces refresh done: %d fetched → +%d new, %d updated, %d deactivated",
+        len(venues), added, updated, deactivated,
+    )
