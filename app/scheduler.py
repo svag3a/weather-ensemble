@@ -185,14 +185,40 @@ async def _pregen_ai_summaries(db: Session) -> None:
             logger.warning("  AI summary pre-generation failed for %s: %s", period, exc)
 
 
+_refresh_state: dict = {
+    "running": False, "added": 0, "updated": 0, "deactivated": 0,
+    "started_at": None, "finished_at": None, "error": None,
+}
+
+
+def get_refresh_state() -> dict:
+    return dict(_refresh_state)
+
+
 async def refresh_sun_terraces_job() -> None:
     """Daily refresh of sun terrace data from Overpass."""
+    global _refresh_state
+    if _refresh_state["running"]:
+        return
+    _refresh_state = {
+        "running": True, "added": 0, "updated": 0, "deactivated": 0,
+        "started_at": datetime.now(timezone.utc).isoformat(),
+        "finished_at": None, "error": None,
+    }
     db: Session = SessionLocal()
     try:
         async with httpx.AsyncClient() as client:
-            await refresh_terraces(db, client)
+            stats = await refresh_terraces(db, client)
+        _refresh_state["added"]       = stats.get("added", 0)
+        _refresh_state["updated"]     = stats.get("updated", 0)
+        _refresh_state["deactivated"] = stats.get("deactivated", 0)
+    except Exception as exc:
+        _refresh_state["error"] = str(exc)
+        logger.error("refresh_sun_terraces_job failed: %s", exc)
     finally:
         db.close()
+        _refresh_state["running"]     = False
+        _refresh_state["finished_at"] = datetime.now(timezone.utc).isoformat()
 
 
 async def nightly_terrace_pipeline() -> None:

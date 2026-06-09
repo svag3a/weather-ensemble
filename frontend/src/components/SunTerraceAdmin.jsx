@@ -4,7 +4,7 @@ import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, 
          triggerEnrichAi, fetchEnrichAiStatus,
          triggerAutoTag, fetchAutoTagStatus,
          fetchHashtags, createHashtag,
-         triggerOsmRefresh } from '../api'
+         triggerOsmRefresh, fetchOsmRefreshStatus } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -461,37 +461,58 @@ function EditPanel({ terrace, onSave, onCancel }) {
 // ── OSM Refresh button ────────────────────────────────────────────────────────
 
 function OsmRefreshButton({ onDone }) {
-  const [state, setState] = useState('idle')  // idle | running | done | error
-  const [msg, setMsg]     = useState('')
+  const [status, setStatus]       = useState(null)
+  const [triggering, setTriggering] = useState(false)
+  const pollRef = useRef(null)
 
-  async function handleClick() {
-    setState('running')
-    setMsg('')
+  async function start() {
+    setTriggering(true)
     try {
-      const r = await triggerOsmRefresh()
-      setMsg(r.message || 'Startat')
-      setState('done')
-      // Reload the table after ~5 seconds to show new venues
-      setTimeout(() => { onDone?.(); setState('idle') }, 5000)
+      const s = await triggerOsmRefresh()
+      setStatus(s)
+      if (s.running) startPolling()
     } catch (e) {
-      setMsg(e.message)
-      setState('error')
+      setStatus({ error: e.message })
+    } finally {
+      setTriggering(false)
     }
   }
 
+  function startPolling() {
+    clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await fetchOsmRefreshStatus()
+        setStatus(s)
+        if (!s.running) {
+          clearInterval(pollRef.current)
+          onDone?.()   // reload the table when done
+        }
+      } catch { clearInterval(pollRef.current) }
+    }, 3000)
+  }
+
+  useEffect(() => () => clearInterval(pollRef.current), [])
+
   return (
-    <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1 min-w-[160px]"
-         title="Hämtar nya och uppdaterade venues från OpenStreetMap via Overpass">
+    <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1 min-w-[180px]"
+         title="Hämtar nya och uppdaterade venues från OpenStreetMap via Overpass (~60s)">
       <div className="flex items-center justify-between gap-3">
         <span className="text-slate-400 text-xs">Hämta från OSM</span>
-        <button onClick={handleClick} disabled={state === 'running'}
+        <button onClick={start} disabled={triggering || status?.running}
           className="text-xs bg-orange-700 hover:bg-orange-600 disabled:bg-slate-600 text-white px-2 py-0.5 rounded transition-colors">
-          {state === 'running' ? 'Hämtar…' : 'Hämta'}
+          {status?.running ? 'Hämtar…' : 'Hämta'}
         </button>
       </div>
-      {state === 'running' && <span className="text-orange-300 text-[10px]">Laddar OSM-data (~60s)…</span>}
-      {state === 'done'    && <span className="text-green-400 text-[10px]">✓ {msg}</span>}
-      {state === 'error'   && <span className="text-red-400 text-[10px]">{msg}</span>}
+      {status?.running && (
+        <span className="text-orange-300 text-[10px]">Laddar OSM-data, vänta ~60s…</span>
+      )}
+      {!status?.running && status?.finished_at && (
+        <span className="text-green-400 text-[10px]">
+          ✓ +{status.added} nya · {status.updated} uppdaterade · {status.deactivated} borttagna
+        </span>
+      )}
+      {status?.error && <span className="text-red-400 text-[10px]">{status.error}</span>}
     </div>
   )
 }

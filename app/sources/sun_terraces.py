@@ -708,3 +708,4 @@ async def refresh_terraces(db: Session, client) -> None:
         "Sun terraces refresh done: %d fetched → +%d new, %d updated, %d deactivated",
         len(venues), added, updated, deactivated,
     )
+    return {"added": added, "updated": updated, "deactivated": deactivated, "total": len(venues)}

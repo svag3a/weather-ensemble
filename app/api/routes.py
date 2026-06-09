@@ -531,9 +531,19 @@ async def trigger_collection(_user: str = Depends(get_current_user)):
 async def refresh_sun_terraces_now():
     """Trigger OSM terrace data refresh in the background."""
     import asyncio
-    from app.scheduler import refresh_sun_terraces_job
+    from app.scheduler import refresh_sun_terraces_job, get_refresh_state
+    state = get_refresh_state()
+    if state["running"]:
+        return {"status": "already_running", **state}
     asyncio.create_task(refresh_sun_terraces_job())
-    return {"status": "started", "message": "Refresh running in background — check /sun-terraces/admin in ~60s"}
+    return {"status": "started", "running": True}
+
+
+@router.get("/sun-terraces/refresh/status")
+def refresh_status():
+    """Poll status of the background OSM refresh job."""
+    from app.scheduler import get_refresh_state
+    return get_refresh_state()
 
 
 @router.post("/sun-terraces/geocode")
