@@ -677,7 +677,9 @@ async def refresh_terraces(db: Session, client) -> None:
             ))
             added += 1
         else:
-            # Update mutable fields; preserve manual orientation overrides
+            # Update mutable fields; preserve manual orientation overrides.
+            # Do NOT touch active — a manually deactivated venue should stay
+            # inactive even if it still exists in OSM.
             existing.name = v["name"]
             existing.lat = v["lat"]
             existing.lon = v["lon"]
@@ -685,7 +687,6 @@ async def refresh_terraces(db: Session, client) -> None:
             existing.address = v["address"]
             existing.website = v["website"]
             existing.outdoor_seating = v["outdoor_seating"]
-            existing.active = True
             existing.last_seen_at = now
             existing.updated_at = now
             # Only update orientation if it was not manually set (confidence > 0.7)
