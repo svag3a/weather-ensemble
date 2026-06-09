@@ -22,18 +22,40 @@ logger = logging.getLogger(__name__)
 GOOGLE_API_KEY = os.getenv("GOOGLE_PLACES_API_KEY", "")
 BASE_URL = "https://maps.googleapis.com/maps/api/place/nearbysearch/json"
 
-# Grid of search circles covering the Göteborg area.
-# Overlapping circles ensure no gaps between cells.
-# Each tuple: (lat, lon, radius_m, label)
-SEARCH_GRID = [
-    (57.705, 11.967, 5000, "Centrum/Linné"),
-    (57.735, 11.920, 4500, "Hisingen"),
-    (57.720, 12.030, 4000, "Örgryte/Härlanda"),
-    (57.675, 11.985, 4000, "Frölunda/Högsbo"),
-    (57.760, 11.960, 4000, "Kärra/Backa"),
-    (57.690, 11.870, 3500, "Askim/Hovås"),
-    (57.650, 12.010, 3500, "Mölndal"),
-]
+def _build_grid() -> list[tuple]:
+    """Generate a search grid covering Göteborg.
+
+    Google Nearby Search returns at most 60 results (3 pages × 20).
+    A 5 km circle in central Göteborg contains hundreds of venues, so
+    most are silently dropped.  We instead use a 1.5 km radius grid so
+    each cell holds ≤ 60 venues, covering the full urban area.
+
+    Step size = 2.0 km (≈ 0.018° lat, ≈ 0.033° lon at 57.7°N) gives
+    ~33 % overlap between adjacent circles — enough to avoid gaps at
+    the cell edges.
+    """
+    import math as _math
+
+    # Bounding box for the Göteborg urban area
+    lat_min, lat_max = 57.61, 57.82
+    lon_min, lon_max = 11.78, 12.10
+
+    lat_step = 0.018   # ≈ 2.0 km
+    lon_step = 0.033   # ≈ 2.0 km at lat 57.7° (cos-corrected)
+    radius_m = 1500
+
+    points = []
+    lat = lat_min
+    while lat <= lat_max + lat_step / 2:
+        lon = lon_min
+        while lon <= lon_max + lon_step / 2:
+            points.append((round(lat, 4), round(lon, 4), radius_m, f"{lat:.3f},{lon:.3f}"))
+            lon += lon_step
+        lat += lat_step
+    return points
+
+
+SEARCH_GRID = _build_grid()   # ~120 cells
 
 PLACE_TYPES = ["restaurant", "bar", "cafe"]
 
