@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, Bike, Footprints, Sailboat, Sun, Droplet, Droplets } from 'lucide-react'
+import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, Bike, Footprints, Sailboat, Sun, Droplet, Droplets } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -1826,7 +1826,7 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
 
 // ── Swipe navigation ──────────────────────────────────────────────────────────
 
-const TAB_ORDER = ['now', 'analysis', 'warnings', 'sources', 'sol']
+const TAB_ORDER = ['now', 'sol', 'analysis', 'warnings', 'sources']
 
 // slideDir: 1 = forward (enter from right), -1 = backward (enter from left)
 const slideVariants = {
@@ -2038,6 +2038,15 @@ export default function MobileApp() {
             <span>Väder</span>
           </button>
           <button
+            onClick={() => changeTab('sol')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
+              activeTab === 'sol' ? 'text-white' : 'text-slate-500'
+            }`}
+          >
+            <Sun size={22} strokeWidth={1.5} />
+            <span>Sol</span>
+          </button>
+          <button
             onClick={() => changeTab('analysis')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
               activeTab === 'analysis' ? 'text-white' : 'text-slate-500'
@@ -2066,17 +2075,8 @@ export default function MobileApp() {
               activeTab === 'sources' ? 'text-white' : 'text-slate-500'
             }`}
           >
-            <Layers size={22} strokeWidth={1.5} />
-            <span>Källor</span>
-          </button>
-          <button
-            onClick={() => changeTab('sol')}
-            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'sol' ? 'text-white' : 'text-slate-500'
-            }`}
-          >
-            <Sun size={22} strokeWidth={1.5} />
-            <span>Sol</span>
+            <ChartSpline size={22} strokeWidth={1.5} />
+            <span>Statistik</span>
           </button>
         </div>
       </div>
