@@ -239,6 +239,18 @@ export async function fetchOsmRefreshStatus() {
   return res.json()
 }
 
+export async function triggerGoogleImport() {
+  const res = await fetch(`${BASE}/sun-terraces/import/google`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function fetchGoogleImportStatus() {
+  const res = await fetch(`${BASE}/sun-terraces/import/google/status`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function overrideTerrace(id, { orientation, orientation_confidence, amenity_type, active, outdoor_type, polygon_coords, name, address, sun_arc_from, sun_arc_to }) {
   const res = await fetch(`${BASE}/sun-terraces/${id}/override`, {
     method: 'POST',

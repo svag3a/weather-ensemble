@@ -4,7 +4,8 @@ import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, 
          triggerEnrichAi, fetchEnrichAiStatus,
          triggerAutoTag, fetchAutoTagStatus,
          fetchHashtags, createHashtag,
-         triggerOsmRefresh, fetchOsmRefreshStatus } from '../api'
+         triggerOsmRefresh, fetchOsmRefreshStatus,
+         triggerGoogleImport, fetchGoogleImportStatus } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -517,6 +518,69 @@ function OsmRefreshButton({ onDone }) {
   )
 }
 
+// ── Google Places import widget ───────────────────────────────────────────────
+
+function GoogleImportWidget({ onDone }) {
+  const [status, setStatus]         = useState(null)
+  const [triggering, setTriggering] = useState(false)
+  const pollRef = useRef(null)
+
+  async function start() {
+    setTriggering(true)
+    try {
+      const s = await triggerGoogleImport()
+      setStatus(s)
+      if (s.running) startPolling()
+    } catch (e) {
+      setStatus({ error: e.message })
+    } finally {
+      setTriggering(false)
+    }
+  }
+
+  function startPolling() {
+    clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await fetchGoogleImportStatus()
+        setStatus(s)
+        if (!s.running) { clearInterval(pollRef.current); onDone?.() }
+      } catch { clearInterval(pollRef.current) }
+    }, 3000)
+  }
+
+  useEffect(() => () => clearInterval(pollRef.current), [])
+
+  const pct = status?.total > 0 ? Math.round((status.done / status.total) * 100) : 0
+
+  return (
+    <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1 min-w-[200px]"
+         title="Importerar venues från Google Places. Dedupliceras mot OSM-data.">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-slate-400 text-xs">Google Places</span>
+        <button onClick={start} disabled={triggering || status?.running}
+          className="text-xs bg-blue-700 hover:bg-blue-600 disabled:bg-slate-600 text-white px-2 py-0.5 rounded transition-colors">
+          {status?.running ? 'Importerar…' : 'Importera'}
+        </button>
+      </div>
+      {status?.running && (
+        <>
+          <div className="w-full bg-slate-600 rounded-full h-1.5">
+            <div className="bg-blue-500 h-1.5 rounded-full transition-all" style={{width:`${pct}%`}}/>
+          </div>
+          <span className="text-slate-400 text-[10px]">{status.done}/{status.total} sökningar</span>
+        </>
+      )}
+      {!status?.running && status?.finished_at && (
+        <span className="text-green-400 text-[10px]">
+          ✓ +{status.added} nya · {status.skipped} dubblett/uppdaterade
+        </span>
+      )}
+      {status?.error && <span className="text-red-400 text-[10px]">{status.error}</span>}
+    </div>
+  )
+}
+
 // Generic job-widget: trigger + progress bar
 function JobWidget({ label, triggerFn, statusFn, color = 'blue', title }) {
   const [status, setStatus] = useState(null)
@@ -926,6 +990,7 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
         <div className="text-slate-500 text-xs uppercase tracking-wider">Data</div>
         <div className="flex gap-2 flex-wrap items-center">
           <OsmRefreshButton onDone={onReload} />
+          <GoogleImportWidget onDone={onReload} />
           <GeocodeWidget />
           <FixAddressesButton />
         </div>

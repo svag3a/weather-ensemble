@@ -546,6 +546,26 @@ def refresh_status():
     return get_refresh_state()
 
 
+@router.post("/sun-terraces/import/google")
+async def import_google(_user: str = Depends(get_current_user)):
+    """Trigger Google Places import job (background)."""
+    import asyncio
+    from app.sources.google_places import run_google_import_job, get_google_state
+    from app.database import get_db as _get_db
+    state = get_google_state()
+    if state["running"]:
+        return {"status": "already_running", **state}
+    asyncio.create_task(run_google_import_job(_get_db))
+    return {"status": "started", "running": True}
+
+
+@router.get("/sun-terraces/import/google/status")
+def import_google_status(_user: str = Depends(get_current_user)):
+    """Poll status of the Google Places import job."""
+    from app.sources.google_places import get_google_state
+    return get_google_state()
+
+
 @router.post("/sun-terraces/geocode")
 async def geocode_sun_terraces(_user: str = Depends(get_current_user)):
     """Trigger reverse geocoding for terraces missing an address (background job)."""
