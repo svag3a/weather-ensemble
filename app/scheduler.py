@@ -195,8 +195,43 @@ async def refresh_sun_terraces_job() -> None:
         db.close()
 
 
+async def nightly_terrace_pipeline() -> None:
+    """Nightly pipeline: OSM import → solar arc from roads → auto-hashtag.
+
+    Runs at 03:00 UTC (05:00 CEST).  Each step is independent; a failure
+    in one step is logged but does not abort the following steps.
+    """
+    from app.sources.enrich_terraces import run_osm_orientation_job
+    from app.sources.auto_tag import run_auto_tag_job
+
+    logger.info("Nightly terrace pipeline started")
+
+    # 1. Refresh venues from OSM (adds new, deactivates removed)
+    try:
+        await refresh_sun_terraces_job()
+        logger.info("Pipeline step 1/3 done: OSM refresh")
+    except Exception as exc:
+        logger.error("Pipeline step 1/3 failed (OSM refresh): %s", exc)
+
+    # 2. Assign solar arcs from nearest road bearing
+    try:
+        await run_osm_orientation_job(SessionLocal)
+        logger.info("Pipeline step 2/3 done: OSM orientation")
+    except Exception as exc:
+        logger.error("Pipeline step 2/3 failed (orientation): %s", exc)
+
+    # 3. Auto-tag hashtags (name/arc/AI)
+    try:
+        await run_auto_tag_job(SessionLocal)
+        logger.info("Pipeline step 3/3 done: auto-tag")
+    except Exception as exc:
+        logger.error("Pipeline step 3/3 failed (auto-tag): %s", exc)
+
+    logger.info("Nightly terrace pipeline finished")
+
+
 def create_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
-    scheduler.add_job(collect_and_update, "cron", minute=5)  # run at :05 each hour
-    scheduler.add_job(refresh_sun_terraces_job, "cron", hour=3, minute=0)  # daily at 03:00 UTC
+    scheduler.add_job(collect_and_update, "cron", minute=5)          # hourly at :05
+    scheduler.add_job(nightly_terrace_pipeline, "cron", hour=3, minute=0)  # daily 03:00 UTC
     return scheduler
