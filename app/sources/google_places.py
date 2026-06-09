@@ -62,7 +62,7 @@ def _build_grid() -> list[tuple]:
 
 SEARCH_GRID = _build_grid()   # ~155 cells
 
-PLACE_TYPES = ["restaurant", "bar", "cafe"]
+PLACE_TYPES = ["restaurant", "bar", "cafe", "night_club"]
 
 # Map Google place types → our amenity_type
 _TYPE_MAP = {

@@ -1127,9 +1127,19 @@ export default function SunTerraceAdmin({ onOverride }) {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${t.active?'bg-green-500/20 text-green-400':'bg-slate-600 text-slate-400'}`}>
-                      {t.active?'Aktiv':'Inaktiv'}
-                    </span>
+                    {t.active ? (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/20 text-green-400">Aktiv</span>
+                    ) : (
+                      <button
+                        onClick={async () => {
+                          await overrideTerrace(t.id, { active: true })
+                          reload()
+                        }}
+                        className="text-xs px-2 py-0.5 rounded-full bg-slate-600 text-slate-400 hover:bg-amber-600/30 hover:text-amber-300 transition-colors"
+                        title="Klicka för att återaktivera">
+                        Inaktiv ↩
+                      </button>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-slate-500 text-xs max-w-[140px] truncate">{t.address||'—'}</td>
                   <td className="px-4 py-3">
