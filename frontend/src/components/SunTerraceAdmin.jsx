@@ -946,6 +946,7 @@ function HashtagAdminSection() {
 export default function SunTerraceAdmin({ onOverride }) {
   const [data, setData]               = useState(null)
   const [loading, setLoading]         = useState(false)
+  const [loadError, setLoadError]     = useState(null)
   const [editingId, setEditingId]     = useState(null)
   const [showAdd, setShowAdd]         = useState(false)
   const [typeFilter, setTypeFilter]   = useState('all')
@@ -955,11 +956,12 @@ export default function SunTerraceAdmin({ onOverride }) {
 
   const reload = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
       const rows = await fetchSunTerracesAdmin()
       setData(rows)
     } catch (e) {
-      console.error('fetchSunTerracesAdmin failed:', e)
+      setLoadError(e.message)
     } finally {
       setLoading(false)
     }
@@ -967,7 +969,9 @@ export default function SunTerraceAdmin({ onOverride }) {
 
   useEffect(() => { reload() }, [reload])
 
-  if (!data) return <div className="text-slate-400 text-sm text-center py-8">Hämtar uteserveringar…</div>
+  if (!data && loading) return <div className="text-slate-400 text-sm text-center py-8">Hämtar uteserveringar…</div>
+  if (!data && loadError) return <div className="text-red-400 text-sm text-center py-8">Fel: {loadError}</div>
+  if (!data) return null
 
   const activeCount   = data.filter(t => t.active).length
   const inactiveCount = data.filter(t => !t.active).length
@@ -1038,6 +1042,8 @@ export default function SunTerraceAdmin({ onOverride }) {
           className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-600 transition-colors">
           {loading ? 'Laddar…' : 'Ladda om'}
         </button>
+        {loadError && <span className="text-red-400 text-xs">{loadError}</span>}
+        {!loading && data && <span className="text-slate-500 text-xs">{data.length} totalt</span>}
       </div>
 
       {showAdd && (
