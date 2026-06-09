@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { fetchEnsemble, fetchSources, fetchWeights, fetchWeightsHistory, fetchStatus, triggerCollect, fetchCityImages, uploadCityImage, updateCityImage, deleteCityImage, fetchEnsembleHealth, fetchEnsembleTrend, fetchSunTerracesAdmin, overrideTerrace } from './api'
+import { fetchEnsemble, fetchSources, fetchWeights, fetchWeightsHistory, fetchStatus, triggerCollect, fetchCityImages, uploadCityImage, updateCityImage, deleteCityImage, fetchEnsembleHealth, fetchEnsembleTrend, overrideTerrace } from './api'
 import EnsembleForecast from './components/EnsembleForecast'
 import SourceComparison from './components/SourceComparison'
 import SourceRanking from './components/SourceRanking'
@@ -39,7 +39,6 @@ export default function App() {
   const cityImages     = useData(fetchCityImages)
   const ensembleHealth = useData(fetchEnsembleHealth)
   const ensembleTrend  = useData(fetchEnsembleTrend)
-  const sunTerraces    = useData(fetchSunTerracesAdmin)
 
   useEffect(() => {
     const refresh = () => {
@@ -164,9 +163,7 @@ export default function App() {
         {activeTab === 'sol' && (
           <div className="space-y-6">
             <SunTerraceAdmin
-              data={sunTerraces.data}
-              onOverride={async (id, fields) => { await overrideTerrace(id, fields); sunTerraces.reload() }}
-              onReload={sunTerraces.reload}
+              onOverride={async (id, fields) => { await overrideTerrace(id, fields) }}
             />
           </div>
         )}

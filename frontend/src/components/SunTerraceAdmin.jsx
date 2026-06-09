@@ -5,7 +5,8 @@ import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, 
          triggerAutoTag, fetchAutoTagStatus,
          fetchHashtags, createHashtag,
          triggerOsmRefresh, fetchOsmRefreshStatus,
-         triggerGoogleImport, fetchGoogleImportStatus } from '../api'
+         triggerGoogleImport, fetchGoogleImportStatus,
+         fetchSunTerracesAdmin } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -942,13 +943,29 @@ function HashtagAdminSection() {
   )
 }
 
-export default function SunTerraceAdmin({ data, onOverride, onReload }) {
+export default function SunTerraceAdmin({ onOverride }) {
+  const [data, setData]               = useState(null)
+  const [loading, setLoading]         = useState(false)
   const [editingId, setEditingId]     = useState(null)
   const [showAdd, setShowAdd]         = useState(false)
   const [typeFilter, setTypeFilter]   = useState('all')
   const [activeFilter, setActiveFilter] = useState('active')
   const [oriFilter, setOriFilter]     = useState('all')
   const [search, setSearch]           = useState('')
+
+  const reload = useCallback(async () => {
+    setLoading(true)
+    try {
+      const rows = await fetchSunTerracesAdmin()
+      setData(rows)
+    } catch (e) {
+      console.error('fetchSunTerracesAdmin failed:', e)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { reload() }, [reload])
 
   if (!data) return <div className="text-slate-400 text-sm text-center py-8">Hämtar uteserveringar…</div>
 
@@ -969,7 +986,7 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
     )
   }
 
-  function handleSaved() { setEditingId(null); onReload?.() }
+  function handleSaved() { setEditingId(null); reload?.() }
 
   return (
     <div className="space-y-4">
@@ -993,8 +1010,8 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
       <div className="space-y-2">
         <div className="text-slate-500 text-xs uppercase tracking-wider">Data</div>
         <div className="flex gap-2 flex-wrap items-center">
-          <OsmRefreshButton onDone={onReload} />
-          <GoogleImportWidget onDone={onReload} />
+          <OsmRefreshButton onDone={reload} />
+          <GoogleImportWidget onDone={reload} />
           <GeocodeWidget />
           <FixAddressesButton />
         </div>
@@ -1017,15 +1034,15 @@ export default function SunTerraceAdmin({ data, onOverride, onReload }) {
           className={`ml-auto text-xs px-3 py-2 rounded-lg border transition-colors ${showAdd ? 'bg-blue-600 border-blue-500 text-white' : 'bg-slate-700 border-slate-600 text-slate-200 hover:bg-slate-600'}`}>
           {showAdd ? '✕ Avbryt' : '+ Lägg till ställe'}
         </button>
-        <button onClick={onReload}
-          className="bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-600 transition-colors">
-          Ladda om
+        <button onClick={reload} disabled={loading}
+          className="bg-slate-700 hover:bg-slate-600 disabled:opacity-50 text-slate-200 text-xs px-3 py-2 rounded-lg border border-slate-600 transition-colors">
+          {loading ? 'Laddar…' : 'Ladda om'}
         </button>
       </div>
 
       {showAdd && (
         <AddTerracePanel
-          onSaved={() => { setShowAdd(false); onReload?.() }}
+          onSaved={() => { setShowAdd(false); reload?.() }}
           onCancel={() => setShowAdd(false)}
         />
       )}
