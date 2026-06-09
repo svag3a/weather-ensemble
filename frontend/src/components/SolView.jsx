@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchSunTerraces, fetchHashtags, addHashtag, removeHashtag, reportTerrace, createTerrace } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
-import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRight, Spline, Hash } from 'lucide-react'
+import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRight, Spline, Hash, Martini, Beer, Coffee, Utensils } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -88,8 +88,12 @@ function ConfidenceChip({ confidence }) {
   return <span className={`text-[10px] font-medium ${color}`}>{label}</span>
 }
 
-function amenityLabel(type) {
-  return { restaurant: 'Restaurang', cafe: 'Café', bar: 'Bar', pub: 'Pub' }[type] ?? type
+const VENUE_ICONS = { bar: Martini, pub: Beer, cafe: Coffee, restaurant: Utensils }
+
+function VenueTypeIcon({ type }) {
+  const Icon = VENUE_ICONS[type]
+  if (!Icon) return null
+  return <Icon size={13} className="text-slate-400 shrink-0" strokeWidth={1.5}/>
 }
 
 function scoreToColor(score) {
@@ -501,21 +505,22 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords, al
         {/* Day score badge */}
         <DayScoreBadge score={dayScore}/>
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline gap-1.5 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-white font-medium leading-tight truncate">{name}</span>
+            <VenueTypeIcon type={amenity_type}/>
             {isRooftop && (
               <span className="text-amber-400 text-[10px] font-medium tracking-wide shrink-0">ROOFTOP</span>
             )}
           </div>
           {address && <div className="text-slate-400 text-xs mt-0.5 truncate">{address}</div>}
-          <div className="text-slate-500 text-xs mt-0.5">{amenityLabel(amenity_type)}</div>
         </div>
         {/* Star + report + hashtag buttons */}
         <div className="flex flex-col items-center gap-1.5 shrink-0">
           <button onClick={() => onToggleFav(id)}
-            className="text-lg leading-none transition-opacity"
-            style={{ opacity: isFav ? 1 : 0.3 }}>
-            {isFav ? '★' : '☆'}
+            className={`text-lg leading-none transition-all ${
+              isFav ? 'text-amber-400' : 'text-slate-600 hover:text-slate-400'
+            }`}>
+            ☆
           </button>
           <ReportButton
             active={userVote === -1}
@@ -530,7 +535,7 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords, al
         </div>
       </div>
       <div className="flex items-center gap-3 text-xs text-slate-500">
-        {altitude != null && altitude > 0 && (
+        {false && altitude != null && altitude > 0 && (
           <span className="flex items-center gap-0.5">
             <TriangleRight size={10}/>
             <span>{Math.round(altitude)}°</span>
