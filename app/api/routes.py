@@ -551,11 +551,10 @@ async def import_google(_user: str = Depends(get_current_user)):
     """Trigger Google Places import job (background)."""
     import asyncio
     from app.sources.google_places import run_google_import_job, get_google_state
-    from app.database import get_db as _get_db
     state = get_google_state()
     if state["running"]:
         return {"status": "already_running", **state}
-    asyncio.create_task(run_google_import_job(_get_db))
+    asyncio.create_task(run_google_import_job())
     return {"status": "started", "running": True}
 
 

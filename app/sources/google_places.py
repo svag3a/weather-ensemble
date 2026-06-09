@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy.orm import Session
 from app.models import SunTerrace
+from app.database import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -157,7 +158,7 @@ async def fetch_nearby(client, lat: float, lon: float, radius: int, place_type: 
 
 # ── Import job ────────────────────────────────────────────────────────────────
 
-async def run_google_import_job(session_factory) -> None:
+async def run_google_import_job() -> None:
     """Fetch all grid cells × types from Google Places and upsert into DB."""
     global _google_state
     if _google_state["running"]:
@@ -192,7 +193,7 @@ async def run_google_import_job(session_factory) -> None:
                 )
 
         # Write to DB
-        db: Session = session_factory()
+        db: Session = SessionLocal()
         try:
             now = datetime.utcnow()
             # Load all existing venues once for dedup
