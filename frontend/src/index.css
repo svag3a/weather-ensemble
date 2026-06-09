@@ -8,6 +8,31 @@ body {
   font-family: system-ui, sans-serif;
 }
 
+/* ── Leaflet popup overrides ─────────────────────────────────────────────── */
+.leaflet-popup-content-wrapper {
+  background: #f8fafc;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  padding: 0;
+  border: none;
+}
+.leaflet-popup-content {
+  margin: 12px 14px;
+}
+.leaflet-popup-tip {
+  background: #f8fafc;
+}
+.leaflet-popup-close-button {
+  color: #64748b !important;
+  font-size: 14px !important;
+  top: 6px !important;
+  right: 8px !important;
+}
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #1e293b !important;
+}
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
 @keyframes rain-fall {
   0%   { transform: translateY(-20px) translateX(0);      opacity: 0; }
   5%   { opacity: 1; }
