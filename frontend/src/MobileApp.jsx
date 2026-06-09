@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, Bike, Footprints, Sailboat, Sun } from 'lucide-react'
+import { Thermometer, CalendarDays, Layers, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, Bike, Footprints, Sailboat, Sun, Droplet, Droplets } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -450,12 +450,30 @@ function windDirArrow(deg) {
   return ['↓','↙','←','↖','↑','↗','→','↘'][Math.round(deg / 45) % 8]
 }
 
+// Returns [count, useDouble] where count=1–3 droplets, useDouble=show Droplets icon
+function rainDropLevel(mm) {
+  if (mm == null || mm < 0.5) return null
+  if (mm < 2.0)  return 1
+  if (mm < 6.0)  return 2
+  return 3
+}
+
+function RainDrops({ mm, size = 12 }) {
+  const level = rainDropLevel(mm)
+  if (!level) return null
+  const color = '#93c5fd'  // blue-300
+  return (
+    <span className="inline-flex items-center gap-px leading-none">
+      {Array.from({ length: level }).map((_, i) => (
+        <Droplet key={i} size={size} className="shrink-0" style={{ color, fill: color }} />
+      ))}
+    </span>
+  )
+}
+
+// Legacy string helper for places that still need a string (getDaySummary drops field)
 function rainDrops(mm) {
-  if (mm == null || mm < 0.5) return null   // 0.5mm min matches rain symbol threshold
-  if (mm < 2.0)  return '💧'
-  if (mm < 5.0)  return '💧💧'
-  if (mm < 10.0) return '💧💧💧'
-  return '💧💧💧💧'
+  return rainDropLevel(mm)  // returns 1-3 or null — callers now use RainDrops component
 }
 
 function groupByDay(forecasts) {
@@ -503,12 +521,10 @@ function getDaySummary(hours) {
   // Pass null for validFor — day summaries always use daytime symbols
   const { symbol } = getWeatherInfo(repTemp, repPrecip, repWind, repCloud, null, 0, repFog, 0)
 
-  const maxPrecipMm = Math.max(...hours.map(h => h.precip_mm ?? 0))
-  const drops = rainDrops(maxPrecipMm)
   const totalPrecipMm = hours.reduce((s, h) => s + (h.precip_mm ?? 0), 0)
   const maxWind = Math.max(...hours.map(h => h.wind_speed ?? 0))
 
-  return { minTemp, maxTemp, symbol, drops, totalPrecipMm, maxWind }
+  return { minTemp, maxTemp, symbol, totalPrecipMm, maxWind }
 }
 
 // ── Warnings ─────────────────────────────────────────────────────────────────
@@ -573,7 +589,7 @@ function SixHourTable({ forecasts }) {
     <div className="mt-4 border-t border-slate-700 pt-4 space-y-1">
       {rows.map((fc, i) => {
         const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
-        const drops = fc.precip_probability >= 20 ? rainDrops(fc.precip_mm) : null
+        const drops = fc.precip_probability >= 20 ? fc.precip_mm : null
         const fl = feelsLike(fc.temperature, fc.wind_speed)
         return (
           <div key={i} className="flex items-center gap-3 py-0.5">
@@ -593,7 +609,7 @@ function SixHourTable({ forecasts }) {
                 ? `${Math.round(fc.wind_speed)} m/s ${windDirArrow(fc.wind_direction)}`
                 : ''}
             </span>
-            <span className="text-xs w-8 text-right">{drops ?? ''}</span>
+            <span className="w-8 flex justify-end"><RainDrops mm={drops} size={10}/></span>
           </div>
         )
       })}
@@ -871,7 +887,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
 function HourRow({ fc }) {
   const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
   // Only show drops when precip_probability ≥ 20 — same threshold as rain symbol
-  const drops = fc.precip_probability >= 20 ? rainDrops(fc.precip_mm) : null
+  const drops = fc.precip_probability >= 20 ? fc.precip_mm : null
   const fl = feelsLike(fc.temperature, fc.wind_speed)
   return (
     <div className="flex items-center gap-3 py-2 border-b border-slate-700/50 last:border-0">
@@ -889,14 +905,14 @@ function HourRow({ fc }) {
           </span>
         : <span className="flex-1" />
       }
-      <span className="text-xs w-12 text-right">{drops ?? <span className="text-slate-700">—</span>}</span>
+      <span className="w-12 flex justify-end items-center">{drops != null ? <RainDrops mm={drops} size={11}/> : <span className="text-slate-700 text-xs">—</span>}</span>
     </div>
   )
 }
 
 function DayRow({ hours, warnings, weekMin, weekMax }) {
   const [open, setOpen] = useState(false)
-  const { minTemp, maxTemp, symbol, drops } = getDaySummary(hours)
+  const { minTemp, maxTemp, symbol, totalPrecipMm } = getDaySummary(hours)
   const label   = dayLabel(hours[0].valid_for)
   const date    = dateLabel(hours[0].valid_for)
   const warning = warningForDay(hours, warnings)
