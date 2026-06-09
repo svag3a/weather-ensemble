@@ -222,7 +222,7 @@ export async function fetchAutoTagStatus() {
 }
 
 export async function fetchSunTerracesAdmin() {
-  const res = await fetch(`${BASE}/sun-terraces/admin`)
+  const res = await fetch(`${BASE}/sun-terraces/admin`, { cache: 'no-store' })
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }

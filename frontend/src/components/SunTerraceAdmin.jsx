@@ -464,7 +464,9 @@ function EditPanel({ terrace, onSave, onCancel }) {
 function OsmRefreshButton({ onDone }) {
   const [status, setStatus]       = useState(null)
   const [triggering, setTriggering] = useState(false)
-  const pollRef = useRef(null)
+  const pollRef   = useRef(null)
+  const onDoneRef = useRef(onDone)
+  useEffect(() => { onDoneRef.current = onDone }, [onDone])
 
   async function start() {
     setTriggering(true)
@@ -487,7 +489,7 @@ function OsmRefreshButton({ onDone }) {
         setStatus(s)
         if (!s.running) {
           clearInterval(pollRef.current)
-          onDone?.()   // reload the table when done
+          onDoneRef.current?.()
         }
       } catch { clearInterval(pollRef.current) }
     }, 3000)
@@ -523,7 +525,9 @@ function OsmRefreshButton({ onDone }) {
 function GoogleImportWidget({ onDone }) {
   const [status, setStatus]         = useState(null)
   const [triggering, setTriggering] = useState(false)
-  const pollRef = useRef(null)
+  const pollRef   = useRef(null)
+  const onDoneRef = useRef(onDone)
+  useEffect(() => { onDoneRef.current = onDone }, [onDone])
 
   async function start() {
     setTriggering(true)
@@ -544,7 +548,7 @@ function GoogleImportWidget({ onDone }) {
       try {
         const s = await fetchGoogleImportStatus()
         setStatus(s)
-        if (!s.running) { clearInterval(pollRef.current); onDone?.() }
+        if (!s.running) { clearInterval(pollRef.current); onDoneRef.current?.() }
       } catch { clearInterval(pollRef.current) }
     }, 3000)
   }
