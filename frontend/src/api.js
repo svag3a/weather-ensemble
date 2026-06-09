@@ -227,6 +227,12 @@ export async function fetchSunTerracesAdmin() {
   return res.json()
 }
 
+export async function fetchSunTerracesStats() {
+  const res = await fetch(`${BASE}/sun-terraces/stats`, { cache: 'no-store' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function triggerOsmRefresh() {
   const res = await fetch(`${BASE}/sun-terraces/refresh`)
   if (!res.ok) throw new Error(await res.text())

@@ -1206,6 +1206,25 @@ def get_sun_terraces(
     return results
 
 
+@router.get("/sun-terraces/stats")
+def get_sun_terraces_stats(db: Session = Depends(get_db)):
+    """Count venues by source and active status."""
+    rows = db.query(SunTerrace).all()
+    by_source: dict = {}
+    for t in rows:
+        key = t.source or "unknown"
+        if key not in by_source:
+            by_source[key] = {"active": 0, "inactive": 0}
+        if t.active:
+            by_source[key]["active"] += 1
+        else:
+            by_source[key]["inactive"] += 1
+    return {
+        "total": len(rows),
+        "by_source": by_source,
+    }
+
+
 @router.get("/sun-terraces/admin")
 def get_sun_terraces_admin(db: Session = Depends(get_db)):
     """Return all terraces (active + inactive) for admin debugging."""

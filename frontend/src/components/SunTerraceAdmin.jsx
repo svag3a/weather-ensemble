@@ -6,7 +6,7 @@ import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, 
          fetchHashtags, createHashtag,
          triggerOsmRefresh, fetchOsmRefreshStatus,
          triggerGoogleImport, fetchGoogleImportStatus,
-         fetchSunTerracesAdmin } from '../api'
+         fetchSunTerracesAdmin, fetchSunTerracesStats } from '../api'
 import { MapContainer, TileLayer, Marker, Polyline, Polygon, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
@@ -945,6 +945,7 @@ function HashtagAdminSection() {
 
 export default function SunTerraceAdmin({ onOverride }) {
   const [data, setData]               = useState(null)
+  const [stats, setStats]             = useState(null)
   const [loading, setLoading]         = useState(false)
   const [loadError, setLoadError]     = useState(null)
   const [editingId, setEditingId]     = useState(null)
@@ -958,8 +959,9 @@ export default function SunTerraceAdmin({ onOverride }) {
     setLoading(true)
     setLoadError(null)
     try {
-      const rows = await fetchSunTerracesAdmin()
+      const [rows, s] = await Promise.all([fetchSunTerracesAdmin(), fetchSunTerracesStats()])
       setData(rows)
+      setStats(s)
     } catch (e) {
       setLoadError(e.message)
     } finally {
@@ -1043,7 +1045,13 @@ export default function SunTerraceAdmin({ onOverride }) {
           {loading ? 'Laddar…' : 'Ladda om'}
         </button>
         {loadError && <span className="text-red-400 text-xs">{loadError}</span>}
-        {!loading && data && <span className="text-slate-500 text-xs">{data.length} totalt</span>}
+        {!loading && stats && (
+          <span className="text-slate-500 text-xs">
+            {Object.entries(stats.by_source).map(([src, counts]) =>
+              `${src}: ${counts.active}a/${counts.inactive}i`
+            ).join(' · ')}
+          </span>
+        )}
       </div>
 
       {showAdd && (
