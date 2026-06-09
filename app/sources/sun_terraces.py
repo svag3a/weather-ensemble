@@ -518,16 +518,22 @@ def compute_scores(
 # ── Overpass fetching ─────────────────────────────────────────────────────────
 
 async def fetch_from_overpass(client) -> list[dict]:
-    """Query Overpass for restaurants/cafes/bars/pubs in Göteborg bounding box."""
+    """Query Overpass for restaurants/cafes/bars/pubs/biergardens in Göteborg.
+
+    Fetches nodes, ways AND relations so venues mapped as building polygons
+    are included.  Uses `out center` to get centroid coordinates for ways/relations.
+    """
     query = """
-[out:json][timeout:60];
+[out:json][timeout:90];
 (
-  node["amenity"~"^(restaurant|cafe|bar|pub)$"]["outdoor_seating"="yes"]
+  node["amenity"~"^(restaurant|cafe|bar|pub|biergarten)$"]
     (57.60,11.70,57.85,12.10);
-  node["amenity"~"^(restaurant|cafe|bar|pub)$"]
+  way["amenity"~"^(restaurant|cafe|bar|pub|biergarten)$"]
+    (57.60,11.70,57.85,12.10);
+  relation["amenity"~"^(restaurant|cafe|bar|pub|biergarten)$"]
     (57.60,11.70,57.85,12.10);
 );
-out body;
+out center;
 """
     import urllib.parse
     encoded = urllib.parse.urlencode({"data": query})
@@ -564,7 +570,24 @@ out body;
         name = tags.get("name")
         if not name:
             continue
+
+        # Coordinates: nodes have lat/lon directly; ways/relations get centroid via `out center`
+        el_type = el.get("type", "node")
+        if el_type == "node":
+            lat = el.get("lat")
+            lon = el.get("lon")
+        else:
+            center = el.get("center", {})
+            lat = center.get("lat")
+            lon = center.get("lon")
+        if lat is None or lon is None:
+            continue
+
         amenity = tags.get("amenity", "restaurant")
+        # Map biergarten → pub for amenity_type consistency
+        if amenity == "biergarten":
+            amenity = "pub"
+
         street = (tags.get("addr:street") or tags.get("contact:street") or "")
         housenr = (tags.get("addr:housenumber") or tags.get("addr:streetnumber") or "")
         full = tags.get("addr:full") or ""
@@ -582,10 +605,10 @@ out body;
         )
         ori_conf = 0.8 if orientation != "UNKNOWN" else 0.3
         venues.append({
-            "source_id": f"osm_node_{el['id']}",
+            "source_id": f"osm_{el_type}_{el['id']}",
             "name": name,
-            "lat": el["lat"],
-            "lon": el["lon"],
+            "lat": lat,
+            "lon": lon,
             "amenity_type": amenity,
             "address": address,
             "website": tags.get("website") or tags.get("contact:website"),
