@@ -1056,7 +1056,7 @@ def auto_tag_status(_user: str = Depends(get_current_user)):
 @router.post("/sun-terraces/area-tag")
 async def trigger_area_tag(_user: str = Depends(get_current_user)):
     """Trigger area/neighborhood tagging via Nominatim reverse geocoding (background)."""
-    import asyncio
+    from app.database import get_db as _get_db
     from app.sources.area_tag import run_area_tag_job, get_state
     state = get_state()
     if state["running"]:
