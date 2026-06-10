@@ -87,6 +87,16 @@ export async function deleteCityImage(id) {
   if (!res.ok) throw new Error(await res.text())
 }
 
+export async function askPlanner({ q, lat, lon, radius = 5.0 } = {}) {
+  const res = await fetch(`${BASE}/planner/ask`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ q, lat, lon, radius }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchPlanner({ lat, lon, radius = 5.0, date, fromHour, toHour, type = 'all', tags = '' } = {}) {
   const params = new URLSearchParams({ lat, lon, radius, from_hour: fromHour, to_hour: toHour, type })
   if (date) params.set('date', date)

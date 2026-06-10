@@ -1359,6 +1359,217 @@ def get_planner(
     return results
 
 
+class PlannerAskRequest(BaseModel):
+    q: str
+    lat: float = 57.7089
+    lon: float = 11.9746
+    radius: float = 5.0
+
+
+@router.post("/planner/ask")
+async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
+    """Natural language planner: parse query with Haiku, score terraces, return results."""
+    import anthropic as _anthropic
+    import os
+    import json as _json
+    from zoneinfo import ZoneInfo
+    from app.sources.sun_terraces import (
+        solar_position, arc_orientation_score, orientation_score,
+        weather_score, polygon_orientation_score,
+    )
+
+    tz = ZoneInfo("Europe/Stockholm")
+    today = datetime.now(tz).date()
+    weekdays = ['måndag', 'tisdag', 'onsdag', 'torsdag', 'fredag', 'lördag', 'söndag']
+
+    # ── Step 1: extract structured params from query ──────────────────────────
+    client = _anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+    system_prompt = (
+        f"Du tolkar utevistelsefrågor för gbgsol.se — en app om sol på uteserveringar i Göteborg.\n"
+        f"Idag: {today.isoformat()} ({weekdays[today.weekday()]}).\n\n"
+        "Svara ENBART med giltig JSON, inga kommentarer eller markdown:\n"
+        '{"query_type":"specific"|"best_in_window","date":"YYYY-MM-DD"|null,"from_hour":0-23,"to_hour":0-23,'
+        '"type":"all"|"restaurant"|"cafe"|"bar"|"pub","tags":[]}\n\n'
+        "query_type \"specific\": frågan anger specifikt datum/tid.\n"
+        "query_type \"best_in_window\": öppen fråga (\"när är bäst\", \"vilken dag\", \"bäst i veckan\").\n"
+        "date null = idag. Lös relativa datum mot idag.\n"
+        "from_hour/to_hour saknas: gissa — öl/afterwork=16-20, kväll/middag=18-22, lunch=11-14, fika=14-17.\n"
+        "type: restaurant=mat, bar/pub=dryck, cafe=fika, all=blandat/oklart.\n"
+        "tags välj bland: öl vin cocktails kaffe fika pizza burgare kebab sushi italienskt brunch "
+        "lunch middag afterwork utsikt hamnutsikt livemusik hund vegetariskt vegan"
+    )
+    msg = await client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=200,
+        system=system_prompt,
+        messages=[{"role": "user", "content": body.q}],
+    )
+    raw = msg.content[0].text.strip()
+    if raw.startswith("```"):
+        raw = "\n".join(raw.split("\n")[1:]).rstrip("`").strip()
+    params = _json.loads(raw)
+
+    query_type = params.get("query_type", "specific")
+    from_hour  = int(params.get("from_hour", 16))
+    to_hour    = max(from_hour, int(params.get("to_hour", 20)))
+    venue_type = params.get("type", "all") or "all"
+    tags_list  = params.get("tags") or []
+    date_str   = params.get("date")
+
+    dates_to_check = (
+        [(today + timedelta(days=i)).isoformat() for i in range(7)]
+        if query_type == "best_in_window"
+        else [date_str or today.isoformat()]
+    )
+
+    # ── Load terraces + hashtags ──────────────────────────────────────────────
+    all_terraces = db.query(SunTerrace).filter(SunTerrace.active == True).all()  # noqa: E712
+    all_th = (
+        db.query(TerraceHashtag, Hashtag)
+        .join(Hashtag, TerraceHashtag.hashtag_id == Hashtag.id)
+        .all()
+    )
+    terrace_hashtags: dict = {}
+    for th, h_obj in all_th:
+        terrace_hashtags.setdefault(th.terrace_id, []).append(
+            {"id": h_obj.id, "name": h_obj.name, "count": th.count}
+        )
+
+    nearby = [t for t in all_terraces if _haversine_km(body.lat, body.lon, t.lat, t.lon) <= body.radius]
+    nearby = [t for t in nearby if (t.outdoor_type or "unknown") != "none"]
+    if venue_type != "all":
+        vset = {s.strip() for s in venue_type.split(",")}
+        nearby = [t for t in nearby if t.amenity_type in vset]
+    if tags_list:
+        tag_set = {s.lower() for s in tags_list}
+        nearby = [t for t in nearby if any(ht["name"] in tag_set for ht in terrace_hashtags.get(t.id, []))]
+
+    # ── Fetch ensemble forecasts for entire window ────────────────────────────
+    all_utc = []
+    for d in dates_to_check:
+        ld = datetime.strptime(d, "%Y-%m-%d").date()
+        for h in range(from_hour, to_hour + 1):
+            all_utc.append(datetime(ld.year, ld.month, ld.day, h, 30, tzinfo=tz).astimezone(timezone.utc))
+
+    win_min = (min(all_utc) - timedelta(hours=1)).replace(tzinfo=None) if all_utc else datetime.now(timezone.utc)
+    win_max = (max(all_utc) + timedelta(hours=1)).replace(tzinfo=None) if all_utc else datetime.now(timezone.utc)
+
+    latest_run = (
+        db.query(EnsembleForecast.computed_at)
+        .order_by(EnsembleForecast.computed_at.desc())
+        .first()
+    )
+    forecast_rows: list = []
+    if latest_run:
+        rows = (
+            db.query(EnsembleForecast)
+            .filter(
+                EnsembleForecast.computed_at == latest_run[0],
+                EnsembleForecast.valid_for >= win_min,
+                EnsembleForecast.valid_for <= win_max,
+            )
+            .order_by(EnsembleForecast.valid_for)
+            .all()
+        )
+        forecast_rows = [
+            {
+                "temperature": r.temperature,
+                "precip_probability": r.precip_probability,
+                "wind_speed": r.wind_speed,
+                "cloud_cover": r.cloud_cover,
+                "valid_for_ts": r.valid_for.replace(tzinfo=timezone.utc).timestamp(),
+            }
+            for r in rows
+        ]
+
+    # ── Scoring helpers ───────────────────────────────────────────────────────
+    def _score_hour(t, utc_dt):
+        az, alt = solar_position(t.lat, t.lon, utc_dt)
+        if alt <= 0:
+            return 0
+        if (t.outdoor_type or "") == "rooftop":
+            geo = 100.0
+        elif t.sun_arc_from is not None and t.sun_arc_to is not None:
+            geo = float(arc_orientation_score(az, t.sun_arc_from, t.sun_arc_to))
+        elif t.polygon_coords:
+            try:
+                poly = _json.loads(t.polygon_coords)
+                geo = float(polygon_orientation_score(az, poly))
+            except Exception:
+                geo = float(orientation_score(az, t.street_orientation))
+        else:
+            ov = orientation_score(az, t.street_orientation)
+            geo = float(ov if t.street_orientation and t.street_orientation != "UNKNOWN" else min(ov, 60))
+        if forecast_rows:
+            fc = min(forecast_rows, key=lambda f: abs(f["valid_for_ts"] - utc_dt.timestamp()))
+            ws = weather_score(fc)
+            combined = 0.55 * geo + 0.30 * ws["cloud"] + 0.10 * ws["temp"] + 0.05 * ws["wind"]
+            if ws["precip"] < 40:
+                combined = combined * ws["precip"] / 40
+            geo = max(0.0, min(100.0, combined))
+        return int(round(geo))
+
+    def _score_date(date_iso):
+        ld = datetime.strptime(date_iso, "%Y-%m-%d").date()
+        hour_utc = [
+            (h, datetime(ld.year, ld.month, ld.day, h, 30, tzinfo=tz).astimezone(timezone.utc))
+            for h in range(from_hour, to_hour + 1)
+        ]
+        out = []
+        for t in nearby:
+            hs = {h: _score_hour(t, utc_dt) for h, utc_dt in hour_utc}
+            avg = round(sum(hs.values()) / len(hs)) if hs else 0
+            out.append({
+                "id": t.id, "name": t.name, "lat": t.lat, "lon": t.lon,
+                "amenity_type": t.amenity_type, "address": t.address,
+                "outdoor_type": t.outdoor_type or "unknown",
+                "distance_km": round(_haversine_km(body.lat, body.lon, t.lat, t.lon), 2),
+                "hour_scores": hs, "avg_score": avg,
+                "hashtags": terrace_hashtags.get(t.id, []),
+            })
+        out.sort(key=lambda x: -x["avg_score"])
+        return out
+
+    # ── Build response ────────────────────────────────────────────────────────
+    if query_type == "best_in_window":
+        day_data = [(d, _score_date(d)) for d in dates_to_check]
+        day_data.sort(key=lambda x: -(x[1][0]["avg_score"] if x[1] else 0))
+        best_date, best_results = day_data[0]
+
+        bd = datetime.strptime(best_date, "%Y-%m-%d").date()
+        if bd == today:
+            date_label = "idag"
+        elif bd == today + timedelta(days=1):
+            date_label = "imorgon"
+        else:
+            date_label = f"på {weekdays[bd.weekday()]} {bd.day}/{bd.month}"
+
+        top3 = ", ".join(f"{t['name']} ({t['avg_score']}p)" for t in best_results[:3])
+        recommendation = f"Bäst {date_label}, kl {from_hour:02d}–{to_hour:02d}. {top3}."
+
+        return {
+            "query_type": "best_in_window",
+            "interpreted": {**params, "from_hour": from_hour, "to_hour": to_hour},
+            "best_date": best_date,
+            "recommendation": recommendation,
+            "results": best_results,
+            "alt_days": [
+                {
+                    "date": d,
+                    "label": weekdays[datetime.strptime(d, "%Y-%m-%d").date().weekday()],
+                    "top_score": r[0]["avg_score"] if r else 0,
+                }
+                for d, r in day_data[1:4]
+            ],
+        }
+    else:
+        return {
+            "query_type": "specific",
+            "interpreted": {**params, "from_hour": from_hour, "to_hour": to_hour},
+            "results": _score_date(dates_to_check[0]),
+        }
+
+
 @router.get("/sun-terraces/stats")
 def get_sun_terraces_stats(db: Session = Depends(get_db)):
     """Count venues by source and active status."""
