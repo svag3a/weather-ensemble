@@ -1400,8 +1400,8 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
         "properties": {
             "query_type": {"type": "string", "enum": ["specific", "best_in_window"]},
             "date":       {"type": ["string", "null"]},
-            "from_hour":  {"type": "integer", "minimum": 0, "maximum": 23},
-            "to_hour":    {"type": "integer", "minimum": 0, "maximum": 23},
+            "from_hour":  {"type": "integer"},
+            "to_hour":    {"type": "integer"},
             "type":       {"type": "string", "enum": ["all", "restaurant", "cafe", "bar", "pub"]},
             "tags":       {"type": "array", "items": {"type": "string"}},
         },
