@@ -1408,14 +1408,18 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
         "required": ["query_type", "from_hour", "to_hour", "type", "tags"],
         "additionalProperties": False,
     }
-    msg = await client.messages.create(
-        model="claude-haiku-4-5",
-        max_tokens=200,
-        system=system_prompt,
-        messages=[{"role": "user", "content": body.q}],
-        output_config={"format": {"type": "json_schema", "schema": _schema}},
-    )
-    params = _json.loads(msg.content[0].text)
+    try:
+        msg = await client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=200,
+            system=system_prompt,
+            messages=[{"role": "user", "content": body.q}],
+            output_config={"format": {"type": "json_schema", "schema": _schema}},
+        )
+        params = _json.loads(msg.content[0].text)
+    except Exception as _exc:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=400, detail=f"Claude error: {_exc}")
 
     query_type = params.get("query_type", "specific")
     from_hour  = int(params.get("from_hour", 16))
