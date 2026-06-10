@@ -1413,7 +1413,7 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
         max_tokens=200,
         system=system_prompt,
         messages=[{"role": "user", "content": body.q}],
-        output_config={"format": {"type": "json_schema", "json_schema": {"name": "planner_params", "schema": _schema}}},
+        output_config={"format": {"type": "json_schema", "schema": _schema}},
     )
     params = _json.loads(msg.content[0].text)
 
