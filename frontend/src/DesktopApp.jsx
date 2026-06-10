@@ -141,10 +141,10 @@ function TerraceCard({ terrace, selected, onClick }) {
 // ── PlannerAskView ────────────────────────────────────────────────────────────
 
 function cellColor(score) {
-  if (score >= 70) return '#f59e0b'
-  if (score >= 45) return '#fb923c'
-  if (score >= 20) return '#334155'
-  return '#1e293b'
+  if (score >= 70) return '#fde047'   // yellow-300  — soligt
+  if (score >= 45) return '#f97316'   // orange-500  — halvsoligt
+  if (score >= 20) return '#475569'   // slate-600   — lite sol
+  return '#1e293b'                    // slate-800   — skugga
 }
 
 const EXAMPLES = [
@@ -180,7 +180,7 @@ function SunTimeline({ results, hours, selectedId, onSelect }) {
         </button>
       ))}
       <div className="flex items-center gap-3 mt-4 px-1">
-        {[['#f59e0b', 'Soligt'], ['#fb923c', 'Halvsoligt'], ['#334155', 'Lite sol']].map(([c, l]) => (
+        {[['#fde047', 'Soligt'], ['#f97316', 'Halvsoligt'], ['#475569', 'Lite sol']].map(([c, l]) => (
           <div key={l} className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-sm shrink-0" style={{ background: c }} />
             <span className="text-[10px] text-slate-500">{l}</span>
