@@ -1206,6 +1206,159 @@ def get_sun_terraces(
     return results
 
 
+@router.get("/planner")
+def get_planner(
+    lat: float = 57.7089,
+    lon: float = 11.9746,
+    radius: float = 5.0,
+    date: Optional[str] = Query(None),   # YYYY-MM-DD in Europe/Stockholm local time
+    from_hour: int = Query(16, ge=0, le=23),
+    to_hour: int = Query(20, ge=0, le=23),
+    type: str = "all",
+    tags: str = "",
+    db: Session = Depends(get_db),
+):
+    """Return terraces with per-hour sun scores for a planned time window."""
+    from app.sources.sun_terraces import (
+        solar_position, arc_orientation_score, orientation_score,
+        weather_score, polygon_orientation_score,
+    )
+    import json as _json
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("Europe/Stockholm")
+
+    if date:
+        local_date = datetime.strptime(date, "%Y-%m-%d").date()
+    else:
+        local_date = datetime.now(tz).date()
+
+    # Build target timestamps at HH:30 for each hour in window (mid-hour solar position)
+    if from_hour > to_hour:
+        to_hour = from_hour
+    hours = list(range(from_hour, to_hour + 1))
+    hour_utc: list[tuple[int, datetime]] = []
+    for h in hours:
+        local_dt = datetime(local_date.year, local_date.month, local_date.day, h, 30, tzinfo=tz)
+        hour_utc.append((h, local_dt.astimezone(timezone.utc)))
+
+    # Get terraces
+    all_terraces = db.query(SunTerrace).filter(SunTerrace.active == True).all()  # noqa: E712
+
+    all_th = (
+        db.query(TerraceHashtag, Hashtag)
+        .join(Hashtag, TerraceHashtag.hashtag_id == Hashtag.id)
+        .all()
+    )
+    terrace_hashtags: dict = {}
+    for th, h_obj in all_th:
+        terrace_hashtags.setdefault(th.terrace_id, []).append(
+            {"id": h_obj.id, "name": h_obj.name, "count": th.count}
+        )
+
+    # Filter: radius, type, tags, outdoor_type
+    nearby = [t for t in all_terraces if _haversine_km(lat, lon, t.lat, t.lon) <= radius]
+    nearby = [t for t in nearby if (t.outdoor_type or "unknown") != "none"]
+
+    if type and type != "all":
+        type_set = {s.strip() for s in type.split(",")}
+        nearby = [t for t in nearby if t.amenity_type in type_set]
+
+    if tags.strip():
+        tag_names = {s.strip().lower() for s in tags.split(",") if s.strip()}
+        nearby = [
+            t for t in nearby
+            if any(ht["name"] in tag_names for ht in terrace_hashtags.get(t.id, []))
+        ]
+
+    # Fetch ensemble forecasts covering the window
+    if hour_utc:
+        win_min = min(ts for _, ts in hour_utc) - timedelta(hours=1)
+        win_max = max(ts for _, ts in hour_utc) + timedelta(hours=1)
+    else:
+        win_min = win_max = datetime.now(timezone.utc)
+
+    latest_run = (
+        db.query(EnsembleForecast.computed_at)
+        .order_by(EnsembleForecast.computed_at.desc())
+        .first()
+    )
+    forecast_rows: list = []
+    if latest_run:
+        rows = (
+            db.query(EnsembleForecast)
+            .filter(
+                EnsembleForecast.computed_at == latest_run[0],
+                EnsembleForecast.valid_for >= win_min.replace(tzinfo=None),
+                EnsembleForecast.valid_for <= win_max.replace(tzinfo=None),
+            )
+            .order_by(EnsembleForecast.valid_for)
+            .all()
+        )
+        forecast_rows = [
+            {
+                "temperature": r.temperature,
+                "precip_probability": r.precip_probability,
+                "wind_speed": r.wind_speed,
+                "cloud_cover": r.cloud_cover,
+                "valid_for_ts": r.valid_for.replace(tzinfo=timezone.utc).timestamp(),
+            }
+            for r in rows
+        ]
+
+    def _hour_score(t: SunTerrace, utc_dt: datetime) -> int:
+        az, alt = solar_position(t.lat, t.lon, utc_dt)
+        if alt <= 0:
+            return 0
+
+        is_rooftop = (t.outdoor_type or "") == "rooftop"
+        if is_rooftop:
+            geo = 100.0
+        elif t.sun_arc_from is not None and t.sun_arc_to is not None:
+            geo = float(arc_orientation_score(az, t.sun_arc_from, t.sun_arc_to))
+        elif t.polygon_coords:
+            try:
+                poly = _json.loads(t.polygon_coords)
+                geo = float(polygon_orientation_score(az, poly))
+            except Exception:
+                geo = float(orientation_score(az, t.street_orientation))
+        else:
+            ov = orientation_score(az, t.street_orientation)
+            geo = float(ov if t.street_orientation and t.street_orientation != "UNKNOWN" else min(ov, 60))
+
+        if forecast_rows:
+            fc = min(forecast_rows, key=lambda f: abs(f["valid_for_ts"] - utc_dt.timestamp()))
+            ws = weather_score(fc)
+            combined = 0.55 * geo + 0.30 * ws["cloud"] + 0.10 * ws["temp"] + 0.05 * ws["wind"]
+            if ws["precip"] < 40:
+                combined = combined * ws["precip"] / 40
+            geo = max(0.0, min(100.0, combined))
+
+        return int(round(geo))
+
+    results = []
+    for t in nearby:
+        hour_scores = {h: _hour_score(t, utc_dt) for h, utc_dt in hour_utc}
+        avg_score = round(sum(hour_scores.values()) / len(hour_scores)) if hour_scores else 0
+        results.append({
+            "id": t.id,
+            "name": t.name,
+            "lat": t.lat,
+            "lon": t.lon,
+            "amenity_type": t.amenity_type,
+            "address": t.address,
+            "website": t.website,
+            "outdoor_type": t.outdoor_type or "unknown",
+            "distance_km": round(_haversine_km(lat, lon, t.lat, t.lon), 2),
+            "hour_scores": hour_scores,
+            "avg_score": avg_score,
+            "hashtags": terrace_hashtags.get(t.id, []),
+        })
+
+    results.sort(key=lambda x: -x["avg_score"])
+    return results
+
+
 @router.get("/sun-terraces/stats")
 def get_sun_terraces_stats(db: Session = Depends(get_db)):
     """Count venues by source and active status."""

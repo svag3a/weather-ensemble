@@ -87,6 +87,15 @@ export async function deleteCityImage(id) {
   if (!res.ok) throw new Error(await res.text())
 }
 
+export async function fetchPlanner({ lat, lon, radius = 5.0, date, fromHour, toHour, type = 'all', tags = '' } = {}) {
+  const params = new URLSearchParams({ lat, lon, radius, from_hour: fromHour, to_hour: toHour, type })
+  if (date) params.set('date', date)
+  if (tags) params.set('tags', tags)
+  const res = await fetch(`${BASE}/planner?${params}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', minScore = 0, name = '', tags = '' } = {}) {
   const params = new URLSearchParams({ lat, lon, radius, type, min_score: minScore })
   if (name) params.set('name', name)
