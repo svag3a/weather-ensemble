@@ -1395,30 +1395,25 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
         "tags välj bland: öl vin cocktails kaffe fika pizza burgare kebab sushi italienskt brunch "
         "lunch middag afterwork utsikt hamnutsikt livemusik hund vegetariskt vegan"
     )
+    _schema = {
+        "type": "object",
+        "properties": {
+            "query_type": {"type": "string", "enum": ["specific", "best_in_window"]},
+            "date":       {"type": ["string", "null"]},
+            "from_hour":  {"type": "integer", "minimum": 0, "maximum": 23},
+            "to_hour":    {"type": "integer", "minimum": 0, "maximum": 23},
+            "type":       {"type": "string", "enum": ["all", "restaurant", "cafe", "bar", "pub"]},
+            "tags":       {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["query_type", "from_hour", "to_hour", "type", "tags"],
+        "additionalProperties": False,
+    }
     msg = await client.messages.create(
         model="claude-haiku-4-5",
         max_tokens=200,
         system=system_prompt,
         messages=[{"role": "user", "content": body.q}],
-        output_config={
-            "type": "json_schema",
-            "json_schema": {
-                "name": "planner_params",
-                "schema": {
-                    "type": "object",
-                    "properties": {
-                        "query_type": {"type": "string", "enum": ["specific", "best_in_window"]},
-                        "date":       {"type": ["string", "null"]},
-                        "from_hour":  {"type": "integer", "minimum": 0, "maximum": 23},
-                        "to_hour":    {"type": "integer", "minimum": 0, "maximum": 23},
-                        "type":       {"type": "string", "enum": ["all", "restaurant", "cafe", "bar", "pub"]},
-                        "tags":       {"type": "array", "items": {"type": "string"}},
-                    },
-                    "required": ["query_type", "from_hour", "to_hour", "type", "tags"],
-                    "additionalProperties": False,
-                },
-            },
-        },
+        output_config={"format": {"type": "json_schema", "json_schema": {"name": "planner_params", "schema": _schema}}},
     )
     params = _json.loads(msg.content[0].text)
 
