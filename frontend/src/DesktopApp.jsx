@@ -206,8 +206,8 @@ function PlannerAskView({ coords, selectedId, onSelectTerrace, onResultsChange }
       const r = await askPlanner({ q: text, lat: coords.lat, lon: coords.lon })
       setResult(r)
       onResultsChange(r.results)
-    } catch {
-      setError('Kunde inte tolka frågan — försök igen')
+    } catch (e) {
+      setError(`Fel: ${e?.message || e}`)
     } finally {
       setLoading(false)
     }
