@@ -241,7 +241,8 @@ function PlannerAskView({ coords, selectedId, onSelectTerrace, onResultsChange }
     const time = `kl ${String(intp.from_hour).padStart(2,'0')}–${String(intp.to_hour).padStart(2,'0')}`
     const type = intp.type && intp.type !== 'all' ? ` · ${intp.type}` : ''
     const tags = intp.tags?.length ? ' · ' + intp.tags.map(t => '#' + t).join(' ') : ''
-    return date + ', ' + time + type + tags
+    const area = intp.area_label ? ` · ${intp.area_label}` : ''
+    return date + ', ' + time + type + tags + area
   }
 
   return (

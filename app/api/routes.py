@@ -1404,8 +1404,9 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
             "to_hour":    {"type": "integer"},
             "type":       {"type": "string", "enum": ["all", "restaurant", "cafe", "bar", "pub"]},
             "tags":       {"type": "array", "items": {"type": "string"}},
+            "area":       {"type": ["string", "null"]},
         },
-        "required": ["query_type", "from_hour", "to_hour", "type", "tags"],
+        "required": ["query_type", "from_hour", "to_hour", "type", "tags", "area"],
         "additionalProperties": False,
     }
     try:
@@ -1427,6 +1428,28 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
     venue_type = params.get("type", "all") or "all"
     tags_list  = params.get("tags") or []
     date_str   = params.get("date")
+    area       = params.get("area")
+
+    # ── Geocode area if provided ──────────────────────────────────────────────
+    search_lat, search_lon, search_radius = body.lat, body.lon, body.radius
+    area_label = None
+    if area:
+        import httpx as _httpx
+        try:
+            async with _httpx.AsyncClient(timeout=5.0) as hc:
+                resp = await hc.get(
+                    "https://nominatim.openstreetmap.org/search",
+                    params={"q": area, "format": "json", "limit": 1},
+                    headers={"User-Agent": "gbgsol/1.0"},
+                )
+            hits = resp.json()
+            if hits:
+                search_lat = float(hits[0]["lat"])
+                search_lon = float(hits[0]["lon"])
+                search_radius = 2.0
+                area_label = hits[0].get("display_name", area).split(",")[0]
+        except Exception:
+            pass
 
     dates_to_check = (
         [(today + timedelta(days=i)).isoformat() for i in range(7)]
@@ -1447,7 +1470,7 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
             {"id": h_obj.id, "name": h_obj.name, "count": th.count}
         )
 
-    nearby = [t for t in all_terraces if _haversine_km(body.lat, body.lon, t.lat, t.lon) <= body.radius]
+    nearby = [t for t in all_terraces if _haversine_km(search_lat, search_lon, t.lat, t.lon) <= search_radius]
     nearby = [t for t in nearby if (t.outdoor_type or "unknown") != "none"]
     if venue_type != "all":
         vset = {s.strip() for s in venue_type.split(",")}
@@ -1535,7 +1558,7 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
                 "id": t.id, "name": t.name, "lat": t.lat, "lon": t.lon,
                 "amenity_type": t.amenity_type, "address": t.address,
                 "outdoor_type": t.outdoor_type or "unknown",
-                "distance_km": round(_haversine_km(body.lat, body.lon, t.lat, t.lon), 2),
+                "distance_km": round(_haversine_km(search_lat, search_lon, t.lat, t.lon), 2),
                 "hour_scores": hs, "avg_score": avg,
                 "hashtags": terrace_hashtags.get(t.id, []),
             })
@@ -1561,7 +1584,7 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
 
         return {
             "query_type": "best_in_window",
-            "interpreted": {**params, "from_hour": from_hour, "to_hour": to_hour},
+            "interpreted": {**params, "from_hour": from_hour, "to_hour": to_hour, "area_label": area_label},
             "best_date": best_date,
             "recommendation": recommendation,
             "results": best_results,
@@ -1577,7 +1600,7 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
     else:
         return {
             "query_type": "specific",
-            "interpreted": {**params, "from_hour": from_hour, "to_hour": to_hour},
+            "interpreted": {**params, "from_hour": from_hour, "to_hour": to_hour, "area_label": area_label},
             "results": _score_date(dates_to_check[0]),
         }
 
