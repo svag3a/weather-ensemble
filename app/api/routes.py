@@ -1053,6 +1053,25 @@ def auto_tag_status(_user: str = Depends(get_current_user)):
     return get_state()
 
 
+@router.post("/sun-terraces/area-tag")
+async def trigger_area_tag(_user: str = Depends(get_current_user)):
+    """Trigger area/neighborhood tagging via Nominatim reverse geocoding (background)."""
+    import asyncio
+    from app.sources.area_tag import run_area_tag_job, get_state
+    state = get_state()
+    if state["running"]:
+        return {"status": "already_running", **state}
+    asyncio.create_task(run_area_tag_job(_get_db))
+    return {"status": "started", "message": "Stadsdelstagning i bakgrunden — poll /sun-terraces/area-tag/status"}
+
+
+@router.get("/sun-terraces/area-tag/status")
+def area_tag_status(_user: str = Depends(get_current_user)):
+    """Poll area-tag job progress."""
+    from app.sources.area_tag import get_state
+    return get_state()
+
+
 @router.get("/sun-terraces")
 def get_sun_terraces(
     lat: float = Query(default=57.7089),
@@ -1430,26 +1449,33 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
     date_str   = params.get("date")
     area       = params.get("area")
 
-    # ── Geocode area if provided ──────────────────────────────────────────────
+    # ── Resolve area: hashtag match first, Nominatim geocode as fallback ────────
     search_lat, search_lon, search_radius = body.lat, body.lon, body.radius
     area_label = None
+    area_hashtag_id: int | None = None
     if area:
-        import httpx as _httpx
-        try:
-            async with _httpx.AsyncClient(timeout=5.0) as hc:
-                resp = await hc.get(
-                    "https://nominatim.openstreetmap.org/search",
-                    params={"q": area, "format": "json", "limit": 1},
-                    headers={"User-Agent": "gbgsol/1.0"},
-                )
-            hits = resp.json()
-            if hits:
-                search_lat = float(hits[0]["lat"])
-                search_lon = float(hits[0]["lon"])
-                search_radius = 2.0
-                area_label = hits[0].get("display_name", area).split(",")[0]
-        except Exception:
-            pass
+        area_norm = area.strip().lower()
+        ht_row = db.query(Hashtag).filter(Hashtag.name == area_norm).first()
+        if ht_row:
+            area_hashtag_id = ht_row.id
+            area_label = ht_row.name
+        else:
+            import httpx as _httpx
+            try:
+                async with _httpx.AsyncClient(timeout=5.0) as hc:
+                    resp = await hc.get(
+                        "https://nominatim.openstreetmap.org/search",
+                        params={"q": area, "format": "json", "limit": 1},
+                        headers={"User-Agent": "gbgsol/1.0"},
+                    )
+                hits = resp.json()
+                if hits:
+                    search_lat = float(hits[0]["lat"])
+                    search_lon = float(hits[0]["lon"])
+                    search_radius = 2.0
+                    area_label = hits[0].get("display_name", area).split(",")[0]
+            except Exception:
+                pass
 
     dates_to_check = (
         [(today + timedelta(days=i)).isoformat() for i in range(7)]
@@ -1470,7 +1496,12 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
             {"id": h_obj.id, "name": h_obj.name, "count": th.count}
         )
 
-    nearby = [t for t in all_terraces if _haversine_km(search_lat, search_lon, t.lat, t.lon) <= search_radius]
+    if area_hashtag_id:
+        # Area resolved to a hashtag — filter by tag, ignore geo radius
+        tagged_ids = {th.terrace_id for th, _ in all_th if th.hashtag_id == area_hashtag_id}
+        nearby = [t for t in all_terraces if t.id in tagged_ids]
+    else:
+        nearby = [t for t in all_terraces if _haversine_km(search_lat, search_lon, t.lat, t.lon) <= search_radius]
     nearby = [t for t in nearby if (t.outdoor_type or "unknown") != "none"]
     if venue_type != "all":
         vset = {s.strip() for s in venue_type.split(",")}

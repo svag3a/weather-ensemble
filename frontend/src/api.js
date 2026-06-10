@@ -240,6 +240,18 @@ export async function fetchAutoTagStatus() {
   return res.json()
 }
 
+export async function triggerAreaTag() {
+  const res = await fetch(`${BASE}/sun-terraces/area-tag`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function fetchAreaTagStatus() {
+  const res = await fetch(`${BASE}/sun-terraces/area-tag/status`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchSunTerracesAdmin() {
   const res = await fetch(`${BASE}/sun-terraces/admin`, { cache: 'no-store' })
   if (!res.ok) throw new Error(await res.text())

@@ -3,6 +3,7 @@ import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, 
          triggerEnrichOsm, fetchEnrichOsmStatus,
          triggerEnrichAi, fetchEnrichAiStatus,
          triggerAutoTag, fetchAutoTagStatus,
+         triggerAreaTag, fetchAreaTagStatus,
          fetchHashtags, createHashtag,
          triggerOsmRefresh, fetchOsmRefreshStatus,
          triggerGoogleImport, fetchGoogleImportStatus,
@@ -1030,6 +1031,8 @@ export default function SunTerraceAdmin({ onOverride }) {
           <AutoArcButton />
           <JobWidget label="Auto-taggar" triggerFn={triggerAutoTag} statusFn={fetchAutoTagStatus} color="violet"
             title="Sätter hashtags automatiskt baserat på namn, typ och solbåge" />
+          <JobWidget label="Stadsdels-taggar" triggerFn={triggerAreaTag} statusFn={fetchAreaTagStatus} color="pink"
+            title="Reverse-geocodar varje venue via Nominatim och sätter stadsdel som hashtag (~1 req/s)" />
         </div>
       </div>
 
