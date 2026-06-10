@@ -1385,16 +1385,13 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
     # ── Step 1: extract structured params from query ──────────────────────────
     client = _anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
     system_prompt = (
-        f"Du tolkar utevistelsefrågor för gbgsol.se — en app om sol på uteserveringar i Göteborg.\n"
-        f"Idag: {today.isoformat()} ({weekdays[today.weekday()]}).\n\n"
-        "Svara ENBART med giltig JSON, inga kommentarer eller markdown:\n"
-        '{"query_type":"specific"|"best_in_window","date":"YYYY-MM-DD"|null,"from_hour":0-23,"to_hour":0-23,'
-        '"type":"all"|"restaurant"|"cafe"|"bar"|"pub","tags":[]}\n\n'
-        "query_type \"specific\": frågan anger specifikt datum/tid.\n"
-        "query_type \"best_in_window\": öppen fråga (\"när är bäst\", \"vilken dag\", \"bäst i veckan\").\n"
-        "date null = idag. Lös relativa datum mot idag.\n"
-        "from_hour/to_hour saknas: gissa — öl/afterwork=16-20, kväll/middag=18-22, lunch=11-14, fika=14-17.\n"
-        "type: restaurant=mat, bar/pub=dryck, cafe=fika, all=blandat/oklart.\n"
+        f"Du tolkar utevistelsefrågor för gbgsol.se — en app om sol på uteserveringar i Göteborg. "
+        f"Idag: {today.isoformat()} ({weekdays[today.weekday()]}).\n"
+        "query_type 'specific': frågan anger specifikt datum/tid. "
+        "'best_in_window': öppen fråga ('när är bäst', 'vilken dag', 'bäst i veckan').\n"
+        "date: null=idag, annars absolut datum löst mot idag.\n"
+        "from_hour/to_hour om ej angivna: öl/afterwork=16-20, kväll/middag=18-22, lunch=11-14, fika=14-17.\n"
+        "type: restaurant=mat, bar/pub=dryck, cafe=fika, all=blandat.\n"
         "tags välj bland: öl vin cocktails kaffe fika pizza burgare kebab sushi italienskt brunch "
         "lunch middag afterwork utsikt hamnutsikt livemusik hund vegetariskt vegan"
     )
@@ -1403,11 +1400,27 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
         max_tokens=200,
         system=system_prompt,
         messages=[{"role": "user", "content": body.q}],
+        output_config={
+            "type": "json_schema",
+            "json_schema": {
+                "name": "planner_params",
+                "schema": {
+                    "type": "object",
+                    "properties": {
+                        "query_type": {"type": "string", "enum": ["specific", "best_in_window"]},
+                        "date":       {"type": ["string", "null"]},
+                        "from_hour":  {"type": "integer", "minimum": 0, "maximum": 23},
+                        "to_hour":    {"type": "integer", "minimum": 0, "maximum": 23},
+                        "type":       {"type": "string", "enum": ["all", "restaurant", "cafe", "bar", "pub"]},
+                        "tags":       {"type": "array", "items": {"type": "string"}},
+                    },
+                    "required": ["query_type", "from_hour", "to_hour", "type", "tags"],
+                    "additionalProperties": False,
+                },
+            },
+        },
     )
-    raw = msg.content[0].text.strip()
-    if raw.startswith("```"):
-        raw = "\n".join(raw.split("\n")[1:]).rstrip("`").strip()
-    params = _json.loads(raw)
+    params = _json.loads(msg.content[0].text)
 
     query_type = params.get("query_type", "specific")
     from_hour  = int(params.get("from_hour", 16))
