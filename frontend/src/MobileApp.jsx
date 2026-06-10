@@ -835,7 +835,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
             inset: 0,
             width: '100%',
             height: '100%',
-            objectFit: 'contain',
+            objectFit: 'cover',
             objectPosition: 'center bottom',
             pointerEvents: 'none',
             zIndex: 2,
