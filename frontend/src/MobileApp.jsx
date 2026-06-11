@@ -821,12 +821,6 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
           <span className="text-6xl leading-none" style={{ display: 'block', lineHeight: 1 }}><WeatherSymbol symbol={symbol} /></span>
           <span className={`${cSecondary} text-sm text-center leading-tight max-w-[72px]`} style={{ marginTop: -6 }}>{label}</span>
         </div>
-        {/* Center: precip + wind gauge + pressure trend */}
-        <div className="flex flex-col items-center gap-1">
-          <PrecipChance prob={fc.precip_probability} skyTheme={skyTheme} />
-          <BeaufortGauge windSpeed={fc.wind_speed} windDirection={fc.wind_direction} skyTheme={skyTheme} />
-          <PressureTrend forecasts={allForecasts} />
-        </div>
         {/* Right: temperature + feels like */}
         <div className="text-right">
           <div className={`text-7xl font-thin ${cPrimary} leading-none`}>
