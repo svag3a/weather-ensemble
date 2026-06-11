@@ -72,6 +72,12 @@ export async function uploadCityImage(formData) {
   return res.json()
 }
 
+export async function replaceCityImage(id, formData) {
+  const res = await fetch(`${BASE}/city-images/${id}/replace`, { method: 'POST', body: formData })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function updateCityImage(id, { label, lat, lon }) {
   const res = await fetch(`${BASE}/city-images/${id}`, {
     method: 'PUT',

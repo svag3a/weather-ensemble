@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, lazy, Suspense } from 'react'
+import { replaceCityImage } from '../api'
 const ImageMap = lazy(() => import('./ImageMap'))
 
 // Find the nearest preset label for a given coordinate
@@ -567,12 +568,8 @@ function MotifRow({ img, onDelete, onUpload }) {
       setProgress('Laddar upp…')
       const fd = new FormData()
       fd.append('file', resized)
-      fd.append('label', img.label)
-      fd.append('lat', String(img.lat))
-      fd.append('lon', String(img.lon))
-      fd.append('time_slot', 'day')
-      fd.append('image_type', 'motif')
-      await onUpload(fd)
+      await replaceCityImage(img.id, fd)
+      onUpload()  // trigger reload in parent
       setOpen(false)
     } catch (err) {
       setError(err.message)

@@ -147,7 +147,7 @@ export default function App() {
           <div className="space-y-6">
             <ImageLibrary
               data={cityImages.data}
-              onUpload={async (fd) => { await uploadCityImage(fd); cityImages.reload() }}
+              onUpload={async (fd) => { if (fd) await uploadCityImage(fd); cityImages.reload() }}
               onUpdate={async (id, fields) => { await updateCityImage(id, fields); cityImages.reload() }}
               onDelete={async (id) => { await deleteCityImage(id); cityImages.reload() }}
             />

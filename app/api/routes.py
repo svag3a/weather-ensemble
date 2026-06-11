@@ -796,6 +796,34 @@ def update_city_image(
     return _img_out(row)
 
 
+@router.post("/city-images/{image_id}/replace", response_model=CityImageOut)
+async def replace_city_image(
+    image_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    row = db.query(CityImage).filter(CityImage.id == image_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Image not found")
+    # Save new file
+    ext = _Path(file.filename).suffix if file.filename else ""
+    new_filename = f"{_uuid.uuid4()}{ext}"
+    dest = IMAGE_DIR / new_filename
+    IMAGE_DIR.mkdir(parents=True, exist_ok=True)
+    content = await file.read()
+    dest.write_bytes(content)
+    # Delete old file
+    old_path = IMAGE_DIR / row.filename
+    if old_path.exists():
+        old_path.unlink()
+    # Update DB row in place
+    row.filename = new_filename
+    db.commit()
+    db.refresh(row)
+    return _img_out(row)
+
+
 @router.delete("/city-images/{image_id}", status_code=204)
 def delete_city_image(image_id: int, db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
     row = db.query(CityImage).filter(CityImage.id == image_id).first()
