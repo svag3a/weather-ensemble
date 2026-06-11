@@ -713,6 +713,18 @@ function getBeaufort(ms) {
   return BEAUFORT_SCALE.find(b => ms <= b.max) ?? BEAUFORT_SCALE[12]
 }
 
+function PrecipChance({ prob, skyTheme }) {
+  if (prob == null) return null
+  const p = Math.round(prob)
+  const color = p >= 60 ? '#60a5fa' : p >= 30 ? '#93c5fd' : skyTheme === 'light' ? '#94a3b8' : '#475569'
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      <span style={{ fontSize: 18, lineHeight: 1 }}>💧</span>
+      <span className="text-xs font-medium" style={{ color }}>{p}%</span>
+    </div>
+  )
+}
+
 function BeaufortGauge({ windSpeed, windDirection, skyTheme }) {
   const bf = getBeaufort(windSpeed)
   if (!bf) return null
@@ -809,8 +821,9 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
           <span className="text-6xl leading-none" style={{ display: 'block', lineHeight: 1 }}><WeatherSymbol symbol={symbol} /></span>
           <span className={`${cSecondary} text-sm text-center leading-tight max-w-[72px]`} style={{ marginTop: -6 }}>{label}</span>
         </div>
-        {/* Center: wind gauge + pressure trend */}
+        {/* Center: precip + wind gauge + pressure trend */}
         <div className="flex flex-col items-center gap-1">
+          <PrecipChance prob={fc.precip_probability} skyTheme={skyTheme} />
           <BeaufortGauge windSpeed={fc.wind_speed} windDirection={fc.wind_direction} skyTheme={skyTheme} />
           <PressureTrend forecasts={allForecasts} />
         </div>
