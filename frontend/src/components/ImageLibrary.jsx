@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 const ImageMap = lazy(() => import('./ImageMap'))
 
 // Find the nearest preset label for a given coordinate
@@ -549,8 +549,39 @@ function MotifSection({ data, onUpload, onDelete }) {
 }
 
 function MotifRow({ img, onDelete, onUpload }) {
-  const [open, setOpen]               = useState(false)
+  const [open, setOpen]         = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [progress, setProgress] = useState(null)
+  const [error, setError]       = useState(null)
+  const fileRef                 = useRef(null)
+
+  async function handleReplace(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    setError(null)
+    setProgress('Komprimerar…')
+    try {
+      const resized = await resizeToWebP(file)
+      setProgress('Laddar upp…')
+      const fd = new FormData()
+      fd.append('file', resized)
+      fd.append('label', img.label)
+      fd.append('lat', String(img.lat))
+      fd.append('lon', String(img.lon))
+      fd.append('time_slot', 'day')
+      fd.append('image_type', 'motif')
+      await onUpload(fd)
+      setOpen(false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setUploading(false)
+      setProgress(null)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
 
   return (
     <div className="border-b border-slate-700/50 last:border-0">
@@ -569,7 +600,7 @@ function MotifRow({ img, onDelete, onUpload }) {
         <span className={`text-slate-500 text-xs ml-2 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
       </button>
 
-      {/* Expanded — edit / replace / delete */}
+      {/* Expanded — preview / replace / delete */}
       {open && (
         <div className="px-4 pb-4 border-t border-slate-700/40 bg-slate-700/10 space-y-3">
           {/* Preview + metadata */}
@@ -582,16 +613,17 @@ function MotifRow({ img, onDelete, onUpload }) {
             </div>
           </div>
 
-          {/* Replace motif */}
-          <div>
-            <p className="text-slate-400 text-xs mb-2">Ersätt motivbild</p>
-            <MotifUploadForm
-              defaultLabel={img.label}
-              defaultLat={String(img.lat)}
-              defaultLon={String(img.lon)}
-              onUpload={async (fd) => { await onUpload(fd); setOpen(false) }}
-              onClose={() => setOpen(false)}
-            />
+          {/* Replace — single file button */}
+          <div className="flex items-center gap-3">
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleReplace} />
+            <button
+              onClick={() => fileRef.current?.click()}
+              disabled={uploading}
+              className="bg-slate-600 hover:bg-slate-500 disabled:opacity-50 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            >
+              {progress ?? 'Ersätt motivbild…'}
+            </button>
+            {error && <span className="text-red-400 text-xs">{error}</span>}
           </div>
 
           {/* Delete */}
