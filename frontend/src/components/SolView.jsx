@@ -15,7 +15,7 @@ function UVChip({ uv }) {
                ['#22c55e', 'Låg']
   return (
     <div className="flex flex-col items-center gap-0.5 shrink-0">
-      <span style={{ fontSize: 18, lineHeight: 1 }}>🔆</span>
+      <Sun size={20} strokeWidth={2} style={{ color }} />
       <span className="text-xs font-bold leading-none" style={{ color }}>UV {val}</span>
       <span className="text-[10px] leading-none" style={{ color, opacity: 0.8 }}>{label}</span>
     </div>
@@ -479,15 +479,14 @@ function HashtagPopup({ terrace, allHashtags, onClose, onHashtagsChange }) {
 // ── Hashtag button ────────────────────────────────────────────────────────────
 function HashtagButton({ terrace, allHashtags, onHashtagsChange }) {
   const [showPopup, setShowPopup] = useState(false)
-  const hashtags = terrace.hashtags || []
-  const hasHashtags = hashtags.length > 0
+  const userAdded = (loadUserHashtags()[terrace.id] || []).length > 0
 
   return (
     <>
       <button
         onClick={() => setShowPopup(true)}
         className={`relative flex items-center justify-center w-7 h-7 rounded-lg transition-all select-none
-          ${hasHashtags ? 'bg-amber-500/15 text-amber-400' : 'text-slate-600 hover:text-slate-400'}`}
+          ${userAdded ? 'bg-amber-500/15 text-amber-400' : 'text-slate-600 hover:text-slate-400'}`}
       >
         <Hash size={14} strokeWidth={2.5}/>
       </button>
