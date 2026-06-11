@@ -667,7 +667,12 @@ export default function ImageLibrary({ data, onUpload, onUpdate, onDelete }) {
     setShowMotifForm(true)
   }
 
-  const handlePinClick = (loc) => {
+  const handlePinClick = async (loc) => {
+    if (loc.fromDrag) {
+      const img = loc.slots['day']
+      if (img) await onUpdate(img.id, { label: img.label, lat: loc.lat, lon: loc.lon, time_slot: img.time_slot ?? 'day' })
+      return
+    }
     setSelectedMotif(loc)
     setPendingPos({ lat: loc.lat, lon: loc.lon })
     setShowMotifForm(true)
