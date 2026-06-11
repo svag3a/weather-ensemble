@@ -1,9 +1,26 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { fetchSunTerraces, fetchHashtags, addHashtag, removeHashtag, reportTerrace, createTerrace } from '../api'
+import { fetchSunTerraces, fetchHashtags, addHashtag, removeHashtag, reportTerrace, createTerrace, fetchUV } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
 import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRight, Spline, Hash, Martini, Beer, Coffee, Utensils } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
+
+function UVChip({ uv }) {
+  const val = Math.round(uv)
+  const [color, label] =
+    val >= 11 ? ['#a855f7', 'Extrem'] :
+    val >= 8  ? ['#ef4444', 'Mycket hög'] :
+    val >= 6  ? ['#f97316', 'Hög'] :
+    val >= 3  ? ['#eab308', 'Måttlig'] :
+               ['#22c55e', 'Låg']
+  return (
+    <div className="flex flex-col items-center gap-0.5 shrink-0">
+      <span style={{ fontSize: 18, lineHeight: 1 }}>🔆</span>
+      <span className="text-xs font-bold leading-none" style={{ color }}>UV {val}</span>
+      <span className="text-[10px] leading-none" style={{ color, opacity: 0.8 }}>{label}</span>
+    </div>
+  )
+}
 
 const ALL_TYPES = ['cafe', 'bar', 'pub', 'restaurant']
 const TYPE_LABELS = { cafe: 'Café', bar: 'Bar', pub: 'Pub', restaurant: 'Restaurang' }
@@ -651,6 +668,7 @@ export default function SolView({ coords }) {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [allHashtags, setAllHashtags] = useState([])
   const [tagFilter, setTagFilter] = useState(new Set())
+  const [uvIndex, setUvIndex]     = useState(null)
   const debounceRef = useRef(null)
   const radiusRef   = useRef(null)
 
@@ -700,6 +718,12 @@ export default function SolView({ coords }) {
   useEffect(() => {
     fetchHashtags().then(setAllHashtags).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    fetchUV({ lat: coords?.lat, lon: coords?.lon })
+      .then(d => setUvIndex(d.current))
+      .catch(() => {})
+  }, [coords?.lat, coords?.lon])
 
   // Update hashtags for a specific terrace in local data (after add/remove)
   const handleHashtagsChange = useCallback((terraceId, updatedHashtags) => {
@@ -757,11 +781,14 @@ export default function SolView({ coords }) {
   return (
     <div className="space-y-3">
       {/* Header */}
-      <div className="px-1">
-        <h1 className="text-white font-semibold text-lg">Solsökaren</h1>
-        <p className="text-slate-400 text-xs mt-0.5">
-          {mode === 'sol' ? 'Uteserveringar med bäst solläge just nu' : 'Uteserveringar i skugga just nu'}
-        </p>
+      <div className="px-1 flex items-start justify-between">
+        <div>
+          <h1 className="text-white font-semibold text-lg">Solsökaren</h1>
+          <p className="text-slate-400 text-xs mt-0.5">
+            {mode === 'sol' ? 'Uteserveringar med bäst solläge just nu' : 'Uteserveringar i skugga just nu'}
+          </p>
+        </div>
+        {uvIndex != null && <UVChip uv={uvIndex} />}
       </div>
 
       {/* Search */}

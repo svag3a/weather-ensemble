@@ -1949,3 +1949,30 @@ def update_report_status(
     v.status = body.status
     db.commit()
     return {"id": report_id, "status": body.status}
+
+
+@router.get("/uv")
+async def get_uv(lat: float = Query(default=57.7089), lon: float = Query(default=11.9746)):
+    """Fetch hourly UV index for today from Open-Meteo."""
+    import httpx as _httpx
+    from datetime import date as _date
+    url = (
+        f"https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}"
+        f"&hourly=uv_index&forecast_days=2&timeformat=iso8601&timezone=auto"
+    )
+    async with _httpx.AsyncClient(timeout=8.0) as hc:
+        resp = await hc.get(url)
+        resp.raise_for_status()
+    data = resp.json()
+    today = _date.today().isoformat()
+    hours = [
+        {"hour": int(t[11:13]), "uv": round(v, 1)}
+        for t, v in zip(data["hourly"]["time"], data["hourly"]["uv_index"])
+        if t.startswith(today) and v is not None
+    ]
+    current_hour = datetime.now().hour
+    current = next((h["uv"] for h in hours if h["hour"] == current_hour), None)
+    if current is None and hours:
+        current = min(hours, key=lambda h: abs(h["hour"] - current_hour))["uv"]
+    return {"current": current, "hours": hours}

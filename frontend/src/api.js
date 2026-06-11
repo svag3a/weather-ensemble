@@ -1,5 +1,14 @@
 const BASE = '/api/v1'
 
+export async function fetchUV({ lat, lon } = {}) {
+  const params = new URLSearchParams()
+  if (lat != null) params.set('lat', lat)
+  if (lon != null) params.set('lon', lon)
+  const res = await fetch(`${BASE}/uv?${params}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchEnsemble(hoursAhead = 48) {
   const res = await fetch(`${BASE}/forecast?hours_ahead=${hoursAhead}`)
   if (!res.ok) throw new Error(await res.text())
