@@ -4,6 +4,7 @@ import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, 
          triggerEnrichAi, fetchEnrichAiStatus,
          triggerAutoTag, fetchAutoTagStatus,
          triggerAreaTag, fetchAreaTagStatus,
+         deleteHashtag,
          fetchHashtags, createHashtag,
          triggerOsmRefresh, fetchOsmRefreshStatus,
          triggerGoogleImport, fetchGoogleImportStatus,
@@ -896,6 +897,7 @@ function HashtagAdminSection() {
   const [newName, setNewName]   = useState('')
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState(null)
+  const [confirmId, setConfirmId] = useState(null)
 
   useEffect(() => {
     fetchHashtags().then(setHashtags).catch(() => {})
@@ -917,6 +919,16 @@ function HashtagAdminSection() {
     }
   }
 
+  async function handleDelete(id) {
+    try {
+      await deleteHashtag(id)
+      setHashtags(prev => prev.filter(h => h.id !== id))
+      setConfirmId(null)
+    } catch {
+      setError('Kunde inte ta bort hashtag')
+    }
+  }
+
   return (
     <div className="bg-slate-800 rounded-xl border border-slate-700 p-4 space-y-3">
       <p className="text-slate-300 text-sm font-medium">Hashtags</p>
@@ -934,8 +946,16 @@ function HashtagAdminSection() {
       {error && <p className="text-red-400 text-xs">{error}</p>}
       <div className="flex flex-wrap gap-1.5">
         {hashtags.map(h => (
-          <span key={h.id} className="px-2.5 py-1 rounded-full text-xs bg-slate-700 text-slate-300 border border-slate-600">
+          <span key={h.id} className="flex items-center gap-1 pl-2.5 pr-1 py-1 rounded-full text-xs bg-slate-700 text-slate-300 border border-slate-600">
             #{h.name}
+            {confirmId === h.id ? (
+              <>
+                <button onClick={() => handleDelete(h.id)} className="text-red-400 hover:text-red-300 font-medium ml-1">ja</button>
+                <button onClick={() => setConfirmId(null)} className="text-slate-500 hover:text-slate-300">nej</button>
+              </>
+            ) : (
+              <button onClick={() => setConfirmId(h.id)} className="text-slate-600 hover:text-red-400 transition-colors ml-0.5 leading-none">×</button>
+            )}
           </span>
         ))}
         {hashtags.length === 0 && <span className="text-slate-600 text-xs">Inga hashtags ännu</span>}

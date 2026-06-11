@@ -149,6 +149,11 @@ export async function createHashtag(name) {
   return res.json()
 }
 
+export async function deleteHashtag(id) {
+  const res = await fetch(`${BASE}/admin/hashtags/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await res.text())
+}
+
 export async function createTerrace(fields) {
   const res = await fetch(`${BASE}/sun-terraces/create`, {
     method: 'POST',

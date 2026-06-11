@@ -1061,6 +1061,17 @@ def create_hashtag(body: HashtagBody, db: Session = Depends(get_db), _user: str 
     return {"id": h.id, "name": h.name, "active": h.active}
 
 
+@router.delete("/admin/hashtags/{hashtag_id}", status_code=204)
+def delete_hashtag(hashtag_id: int, db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
+    """Delete a hashtag and all its venue associations."""
+    h = db.query(Hashtag).filter(Hashtag.id == hashtag_id).first()
+    if h is None:
+        raise HTTPException(status_code=404, detail="Hashtag not found")
+    db.query(TerraceHashtag).filter(TerraceHashtag.hashtag_id == hashtag_id).delete()
+    db.delete(h)
+    db.commit()
+
+
 @router.post("/sun-terraces/auto-tag")
 async def trigger_auto_tag(_user: str = Depends(get_current_user)):
     """Trigger automatic hashtag tagging job (background)."""
