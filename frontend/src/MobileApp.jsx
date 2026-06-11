@@ -803,15 +803,18 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
       <WeatherParticles precip={fc.precip_probability ?? 0} temperature={fc.temperature ?? 10} />
       {/* Content wrapper (z-3) ensures text is above clouds and rain */}
       <div style={{ position: 'relative', zIndex: 3 }}>
-      <div className="flex items-start justify-between">
-        {/* Left column: symbol + label + Beaufort gauge */}
+      <div className="flex items-center justify-between">
+        {/* Left: symbol + label */}
         <div className="flex flex-col gap-1 items-center">
           <span className="text-6xl leading-none" style={{ display: 'block', lineHeight: 1 }}><WeatherSymbol symbol={symbol} /></span>
           <span className={`${cSecondary} text-sm text-center leading-tight max-w-[72px]`} style={{ marginTop: -6 }}>{label}</span>
+        </div>
+        {/* Center: wind gauge + pressure trend */}
+        <div className="flex flex-col items-center gap-1">
           <BeaufortGauge windSpeed={fc.wind_speed} windDirection={fc.wind_direction} skyTheme={skyTheme} />
           <PressureTrend forecasts={allForecasts} />
         </div>
-        {/* Right column: temperature + feels like */}
+        {/* Right: temperature + feels like */}
         <div className="text-right">
           <div className={`text-7xl font-thin ${cPrimary} leading-none`}>
             {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
