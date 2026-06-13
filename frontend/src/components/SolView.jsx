@@ -28,7 +28,7 @@ const TYPE_LABELS = { cafe: 'Café', bar: 'Bar', pub: 'Pub', restaurant: 'Restau
 // ── Sun dots ──────────────────────────────────────────────────────────────────
 function SunDots({ score }) {
   const filled = score >= 70 ? 4 : score >= 45 ? 3 : score >= 20 ? 2 : score > 0 ? 1 : 0
-  const color  = score >= 70 ? '#f59e0b' : score >= 45 ? '#fb923c' : score >= 20 ? '#94a3b8' : '#374151'
+  const color  = score >= 70 ? '#fde047' : score >= 45 ? '#eab308' : score >= 20 ? '#334155' : '#1e293b'
   return (
     <span className="flex gap-0.5">
       {[0,1,2,3].map(i => (
@@ -66,11 +66,11 @@ function ArcChip({ arcFrom, arcTo, orientation }) {
 
 // Day score badge — colored 0-100 number
 function dayScoreColor(s) {
-  if (s >= 80) return '#fde047'
-  if (s >= 60) return '#f59e0b'
-  if (s >= 40) return '#ea580c'
-  if (s >= 20) return '#7c2d12'
-  return '#374151'
+  if (s >= 75) return '#fde047'
+  if (s >= 50) return '#eab308'
+  if (s >= 25) return '#ca8a04'
+  if (s > 0)   return '#334155'
+  return '#1e293b'
 }
 
 function DayScoreBadge({ score }) {
@@ -114,10 +114,10 @@ function VenueTypeIcon({ type }) {
 }
 
 function scoreToColor(score) {
-  if (score <= 0)  return '#0f172a'   // ingen sol — nästan svart
-  if (score < 25)  return '#7c2d12'   // svag sol — mörk brun-orange
-  if (score < 50)  return '#ea580c'   // måttlig sol — orange
-  if (score < 75)  return '#f59e0b'   // bra sol — amber
+  if (score <= 0)  return '#1e293b'   // ingen sol — mörk slate
+  if (score < 25)  return '#334155'   // svag sol — slate-blå
+  if (score < 50)  return '#ca8a04'   // måttlig sol — mörk guld
+  if (score < 75)  return '#eab308'   // bra sol — gul-guld
   return '#fde047'                    // full sol — gul
 }
 
