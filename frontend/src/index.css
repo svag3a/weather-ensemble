@@ -46,6 +46,7 @@ body {
   );
   outline: none;
   cursor: pointer;
+  touch-action: none;
 }
 .sol-slider::-webkit-slider-runnable-track {
   -webkit-appearance: none;
