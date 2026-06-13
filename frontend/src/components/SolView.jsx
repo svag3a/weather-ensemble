@@ -647,9 +647,19 @@ function loadVotes() { try { return JSON.parse(localStorage.getItem(VOTES_KEY) |
 function saveVotes(obj) { localStorage.setItem(VOTES_KEY, JSON.stringify(obj)) }
 
 // ── Favourites ────────────────────────────────────────────────────────────────
-const FAVS_KEY = 'sol_favourites'
-function loadFavs() { try { return new Set(JSON.parse(localStorage.getItem(FAVS_KEY) || '[]')) } catch { return new Set() } }
-function saveFavs(set) { localStorage.setItem(FAVS_KEY, JSON.stringify([...set])) }
+const FAVS_KEY      = 'sol_favourites'
+const FAV_DATA_KEY  = 'sol_favourites_data'
+function loadFavs()     { try { return new Set(JSON.parse(localStorage.getItem(FAVS_KEY) || '[]')) } catch { return new Set() } }
+function saveFavs(set)  { localStorage.setItem(FAVS_KEY, JSON.stringify([...set])) }
+function loadFavData()  { try { return JSON.parse(localStorage.getItem(FAV_DATA_KEY) || '{}') } catch { return {} } }
+function saveFavData(id, terrace) {
+  const d = loadFavData(); d[id] = { id, name: terrace.name, amenity_type: terrace.amenity_type }
+  localStorage.setItem(FAV_DATA_KEY, JSON.stringify(d))
+}
+function removeFavData(id) {
+  const d = loadFavData(); delete d[id]
+  localStorage.setItem(FAV_DATA_KEY, JSON.stringify(d))
+}
 
 // ── Main view ─────────────────────────────────────────────────────────────────
 export default function SolView({ coords }) {
@@ -673,10 +683,11 @@ export default function SolView({ coords }) {
   const debounceRef = useRef(null)
   const radiusRef   = useRef(null)
 
-  const toggleFav = useCallback((id) => {
+  const toggleFav = useCallback((id, terrace) => {
     setFavs(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) { next.delete(id); removeFavData(id) }
+      else              { next.add(id);    saveFavData(id, terrace) }
       saveFavs(next)
       return next
     })
@@ -903,7 +914,7 @@ export default function SolView({ coords }) {
           </p>
           {sortedData.map(t => (
             <TerraceCard key={t.id} terrace={t}
-              isFav={favs.has(t.id)} onToggleFav={toggleFav}
+              isFav={favs.has(t.id)} onToggleFav={(id) => toggleFav(id, t)}
               userVote={votes[t.id] ?? 0} onVote={(id, fb) => handleVote(id, fb)}
               coords={coords}
               allHashtags={allHashtags}

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils } from 'lucide-react'
+import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -1839,7 +1839,7 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
 
 // ── Swipe navigation ──────────────────────────────────────────────────────────
 
-const TAB_ORDER = ['now', 'sol', 'analysis', 'warnings', 'sources']
+const TAB_ORDER = ['now', 'sol', 'analysis', 'sources', 'profile']
 
 // slideDir: 1 = forward (enter from right), -1 = backward (enter from left)
 const slideVariants = {
@@ -1868,6 +1868,101 @@ function useSwipeNav(activeTab, setActiveTab) {
   }, [activeTab, setActiveTab])
 
   return { onTouchStart, onTouchEnd }
+}
+
+// ── Profile view ─────────────────────────────────────────────────────────────
+
+const FAVS_KEY_P     = 'sol_favourites'
+const FAV_DATA_KEY_P = 'sol_favourites_data'
+const UV_PREF_KEY    = 'sol_uv_threshold'
+const VENUE_ICONS_P  = { cafe: Coffee, bar: Martini, pub: Beer, restaurant: Utensils }
+
+function loadFavsP()    { try { return new Set(JSON.parse(localStorage.getItem(FAVS_KEY_P) || '[]')) } catch { return new Set() } }
+function loadFavDataP() { try { return JSON.parse(localStorage.getItem(FAV_DATA_KEY_P) || '{}') } catch { return {} } }
+
+function ProfileView({ onNavigateToSol }) {
+  const [favs]         = useState(loadFavsP)
+  const [favData]      = useState(loadFavDataP)
+  const [uvThreshold, setUvThreshold] = useState(
+    () => { try { return parseInt(localStorage.getItem(UV_PREF_KEY) || '6') } catch { return 6 } }
+  )
+
+  const favorites = [...favs].map(id => favData[id]).filter(Boolean)
+
+  function handleUv(v) {
+    setUvThreshold(v)
+    localStorage.setItem(UV_PREF_KEY, String(v))
+  }
+
+  const UV_LEVELS = [
+    { v: 3,  label: 'Låg',       color: 'text-green-400'  },
+    { v: 6,  label: 'Måttlig',   color: 'text-yellow-400' },
+    { v: 8,  label: 'Hög',       color: 'text-orange-400' },
+    { v: 11, label: 'Mycket hög', color: 'text-red-400'   },
+  ]
+  const uvLabel = UV_LEVELS.slice().reverse().find(l => uvThreshold >= l.v) ?? UV_LEVELS[0]
+
+  return (
+    <div className="px-4 pt-10 pb-8 space-y-3 max-w-lg mx-auto">
+
+      {/* Favourites */}
+      <div className={`${GLASS} rounded-2xl overflow-hidden`}>
+        <div className="px-5 pt-4 pb-3 border-b border-slate-700 flex items-center gap-2">
+          <Star size={13} className="text-amber-400 shrink-0" />
+          <span className="text-white text-sm font-medium">Favoritställen</span>
+          {favorites.length > 0 && (
+            <span className="text-slate-500 text-xs ml-auto">{favorites.length}</span>
+          )}
+        </div>
+        {favorites.length === 0 ? (
+          <div className="px-5 py-6 text-center space-y-2">
+            <p className="text-slate-400 text-xs">Inga favoriter än.</p>
+            <button
+              onClick={onNavigateToSol}
+              className="text-amber-400 text-xs touch-manipulation"
+            >
+              Gå till sol-vyn och stjärnmärk ställen →
+            </button>
+          </div>
+        ) : (
+          <>
+            {favorites.map(v => {
+              const Icon = VENUE_ICONS_P[v.amenity_type]
+              return (
+                <div key={v.id} className="flex items-center gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
+                  {Icon && <Icon size={13} className="text-slate-400 shrink-0" strokeWidth={1.5} />}
+                  <span className="text-white text-xs flex-1">{v.name}</span>
+                </div>
+              )
+            })}
+            <button
+              onClick={onNavigateToSol}
+              className="w-full px-5 py-3 text-amber-400 text-xs text-right border-t border-slate-700/50 touch-manipulation"
+            >
+              Visa i sol-vyn →
+            </button>
+          </>
+        )}
+      </div>
+
+      {/* UV threshold */}
+      <div className={`${GLASS} rounded-2xl px-5 py-4 space-y-3`}>
+        <div className="flex items-center gap-2">
+          <Sun size={13} className="text-yellow-400 shrink-0" />
+          <span className="text-white text-sm font-medium">UV-varning</span>
+          <span className={`text-xs ml-auto ${uvLabel.color}`}>UV {uvThreshold}+ · {uvLabel.label}</span>
+        </div>
+        <input
+          type="range" min="3" max="11" step="1" value={uvThreshold}
+          onChange={e => handleUv(parseInt(e.target.value))}
+          className="sol-slider w-full"
+          style={{'--fill': `${(uvThreshold - 3) / 8 * 100}%`}}
+        />
+        <p className="text-slate-500 text-xs">Varna mig i sol-vyn när UV-index överstiger detta värde.</p>
+      </div>
+
+    </div>
+  )
 }
 
 // ── Sol just nu card ──────────────────────────────────────────────────────────
@@ -2034,6 +2129,18 @@ export default function MobileApp() {
                     return <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} skyGradient={sky.gradient} skyTheme={getSkyTheme(sky.gradient)} />
                   })()}
 
+                  {warnings.some(w => WARNING_TRIANGLE_COLOR[w.level_code]) && (
+                    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl"
+                      style={{ background: 'rgba(251,146,60,0.10)', border: '1px solid rgba(251,146,60,0.20)' }}>
+                      <TriangleAlert size={13} className="text-orange-400 shrink-0" />
+                      <span className="text-orange-300 text-xs flex-1 leading-snug">
+                        {warnings.filter(w => WARNING_TRIANGLE_COLOR[w.level_code]).length === 1
+                          ? warnings.find(w => WARNING_TRIANGLE_COLOR[w.level_code]).event
+                          : `${warnings.filter(w => WARNING_TRIANGLE_COLOR[w.level_code]).length} aktiva SMHI-varningar`}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Prognossäkerhet + sammanfattning — under "just nu"-kortet */}
                   {(() => {
                     const conf = summariseConfidence(future)
@@ -2077,16 +2184,16 @@ export default function MobileApp() {
                 <AnalysView prefetchedToday={summaryToday} prefetchedTomorrow={summaryTomorrow} />
               )}
 
-              {activeTab === 'warnings' && (
-                <WarningsView warnings={warnings} />
-              )}
-
               {activeTab === 'sources' && (
                 <EnsembleView ensembleFc={currentFc} prefetchedSources={sources} prefetchedWeights={weights} />
               )}
 
               {activeTab === 'sol' && (
                 <SolView coords={coords} />
+              )}
+
+              {activeTab === 'profile' && (
+                <ProfileView onNavigateToSol={() => changeTab('sol')} />
               )}
 
             </div>
@@ -2103,7 +2210,12 @@ export default function MobileApp() {
               activeTab === 'now' ? 'text-white' : 'text-slate-500'
             }`}
           >
-            <Thermometer size={22} strokeWidth={1.5} />
+            <div className="relative">
+              <Thermometer size={22} strokeWidth={1.5} />
+              {warnings.some(w => WARNING_TRIANGLE_COLOR[w.level_code]) && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange-400" />
+              )}
+            </div>
             <span>Väder</span>
           </button>
           <button
@@ -2125,20 +2237,6 @@ export default function MobileApp() {
             <span>Analys</span>
           </button>
           <button
-            onClick={() => changeTab('warnings')}
-            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
-              activeTab === 'warnings' ? 'text-white' : 'text-slate-500'
-            }`}
-          >
-            <div className="relative">
-              <TriangleAlert size={22} strokeWidth={1.5} />
-              {warnings.some(w => WARNING_TRIANGLE_COLOR[w.level_code]) && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange-400" />
-              )}
-            </div>
-            <span>Varningar</span>
-          </button>
-          <button
             onClick={() => changeTab('sources')}
             className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
               activeTab === 'sources' ? 'text-white' : 'text-slate-500'
@@ -2146,6 +2244,15 @@ export default function MobileApp() {
           >
             <ChartSpline size={22} strokeWidth={1.5} />
             <span>Statistik</span>
+          </button>
+          <button
+            onClick={() => changeTab('profile')}
+            className={`flex-1 flex flex-col items-center gap-1 py-3 text-xs transition-colors ${
+              activeTab === 'profile' ? 'text-white' : 'text-slate-500'
+            }`}
+          >
+            <User size={22} strokeWidth={1.5} />
+            <span>Profil</span>
           </button>
         </div>
       </div>
