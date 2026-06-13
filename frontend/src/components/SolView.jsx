@@ -805,34 +805,37 @@ export default function SolView({ coords }) {
           </button>
       }
 
-      {/* Filter bar: Sol/Skugga | type toggles */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+      {/* Filter bar: Sol/Skugga | star | type toggles */}
+      <div className="flex items-center gap-1.5">
         {[{m:'sol', Icon:Sun}, {m:'skugga', Icon:Parasol}].map(({m, Icon}) => (
           <button key={m} onClick={() => setMode(m)}
-            className={`shrink-0 w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
+            className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
               mode === m ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
             }`}>
-            <Icon size={14}/>
+            <Icon size={16}/>
           </button>
         ))}
         <div className="w-px h-5 bg-slate-700 shrink-0"/>
         <button onClick={() => setFavOnly(v => !v)}
-          className={`shrink-0 w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
+          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
             favOnly ? 'bg-amber-500/20 text-amber-400' : favs.size > 0 ? 'bg-black/20 text-slate-400' : 'bg-black/20 text-slate-700'
           }`}
           disabled={favs.size === 0}
         >★</button>
         <div className="w-px h-5 bg-slate-700 shrink-0"/>
-        {ALL_TYPES.map(t => (
-          <button key={t} onClick={() => toggleType(t)}
-            className={`shrink-0 px-2.5 py-1 rounded-xl text-xs font-medium transition-colors ${
-              selectedTypes.has(t)
-                ? 'bg-white/20 text-white ring-1 ring-white/30'
-                : 'bg-black/20 text-slate-500'
-            }`}>
-            {TYPE_LABELS[t]}
-          </button>
-        ))}
+        {ALL_TYPES.map(t => {
+          const Icon = VENUE_ICONS[t]
+          return (
+            <button key={t} onClick={() => toggleType(t)}
+              className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+                selectedTypes.has(t)
+                  ? 'bg-white/20 text-white ring-1 ring-white/30'
+                  : 'bg-black/20 text-slate-500'
+              }`}>
+              {Icon && <Icon size={16} strokeWidth={1.5}/>}
+            </button>
+          )
+        })}
       </div>
 
       {/* Tag filter bar */}
