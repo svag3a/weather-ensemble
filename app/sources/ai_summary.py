@@ -140,6 +140,7 @@ def _build_periods(hours: list) -> list:
         temps  = [h["temperature"] for h in ph if h["temperature"] is not None]
         precips = [h["precip_probability"] or 0 for h in ph]
         winds  = [h["wind_speed"] or 0 for h in ph]
+        clouds = [h["cloud_cover"] for h in ph if h["cloud_cover"] is not None]
         confs  = [h["confidence"] or 0.5 for h in ph]
         result.append({
             "name": name,
@@ -149,6 +150,7 @@ def _build_periods(hours: list) -> list:
             "temp_max":   round(max(temps)) if temps else None,
             "precip_max": round(max(precips)) if precips else 0,
             "wind_max":   round(max(winds), 1) if winds else 0,
+            "cloud_avg":  round(sum(clouds) / len(clouds)) if clouds else None,
         })
     return result
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, Bike, Footprints, Sailboat, Sun, Droplet, Droplets } from 'lucide-react'
+import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Droplet, Droplets, UtensilsCrossed } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -1759,23 +1759,26 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
                   const tempAvg = ((p.temp_min ?? 12) + (p.temp_max ?? 16)) / 2
                   const precip  = p.precip_max ?? 0
                   const wind    = p.wind_max   ?? 0
-                  // Clothing: JacketIcon (< 16°C) or Shirt — always white
-                  const ClothIcon = tempAvg < 16 ? JacketIcon : Shirt
-                  // Accessory: Umbrella if any rain, Glasses if sunny+warm
-                  const AccIcon =
-                    precip > 5                      ? Umbrella :
-                    tempAvg > 20 && precip <= 5     ? Glasses  :
-                                                      null
-                  // Activity: only during daytime periods (not Natt)
+                  const clouds  = p.cloud_avg  ?? 80
                   const tMax = p.temp_max ?? tempAvg
                   const tMin = p.temp_min ?? tempAvg
                   const isNight = p.name === 'Natt'
+                  // Windchill-adjusted apparent temperature for clothing
+                  const apparent = feelsLike(tempAvg, wind) ?? (wind > 5 ? tempAvg - wind * 0.4 : tempAvg)
+                  const ClothIcon = apparent < 16 ? JacketIcon : Shirt
+                  // Accessory: umbrella on real rain risk; sunglasses on clear sky (not temp-dependent)
+                  const AccIcon =
+                    precip > 40                           ? Umbrella :
+                    !isNight && clouds < 40 && precip < 30 ? Glasses  :
+                                                             null
+                  // Activity: priority order, daytime only
                   const ActivityIcon = isNight ? null :
-                    tMax > 23 && precip <= 10                             ? Waves      :
-                    wind >= 4 && wind <= 10 && precip <= 15 && tMin > 14  ? Sailboat   :
-                    tMin > 10 && tMax < 28 && precip <= 15 && wind < 10   ? Bike       :
-                    tMin > 12 && precip <= 20                             ? Footprints :
-                                                                            null
+                    tMax > 23 && precip < 20 && wind < 8                          ? Waves           :
+                    tempAvg > 17 && precip < 30 && wind < 8 && clouds < 70        ? UtensilsCrossed :
+                    wind >= 4 && wind <= 10 && precip < 30 && tMin > 14           ? Sailboat        :
+                    tMin > 10 && precip < 40 && wind < 12                         ? TreePine        :
+                    tMin > 8  && precip < 50                                      ? Footprints      :
+                                                                                    null
                   return (
                     <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
                       <div className="w-20 shrink-0">
