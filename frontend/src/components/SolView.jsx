@@ -23,7 +23,7 @@ function UVChip({ uv }) {
 }
 
 const ALL_TYPES = ['cafe', 'bar', 'pub', 'restaurant']
-const TYPE_LABELS = { cafe: 'Café', bar: 'Bar', pub: 'Pub', restaurant: 'Restaurang' }
+const TYPE_LABELS = { cafe: 'Kafé', bar: 'Bar', pub: 'Pub', restaurant: 'Restaurang' }
 
 // ── Sun dots ──────────────────────────────────────────────────────────────────
 function SunDots({ score }) {
@@ -772,13 +772,10 @@ export default function SolView({ coords }) {
 
   const sortedData = data ? [...data]
     .filter(t => !favOnly || favs.has(t.id))
-    .sort((a, b) => {
-      const favDiff = (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0)
-      if (favDiff !== 0) return favDiff
-      return mode === 'skugga'
-        ? (a.day_score ?? 0) - (b.day_score ?? 0)
-        : (b.day_score ?? 0) - (a.day_score ?? 0)
-    }) : []
+    .sort((a, b) => mode === 'skugga'
+      ? (a.day_score ?? 0) - (b.day_score ?? 0)
+      : (b.day_score ?? 0) - (a.day_score ?? 0)
+    ) : []
 
   return (
     <div className="space-y-3">
@@ -812,15 +809,15 @@ export default function SolView({ coords }) {
       <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
         {[{m:'sol', Icon:Sun}, {m:'skugga', Icon:Parasol}].map(({m, Icon}) => (
           <button key={m} onClick={() => setMode(m)}
-            className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+            className={`shrink-0 w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
               mode === m ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
             }`}>
-            <Icon size={15}/>
+            <Icon size={14}/>
           </button>
         ))}
         <div className="w-px h-5 bg-slate-700 shrink-0"/>
         <button onClick={() => setFavOnly(v => !v)}
-          className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+          className={`shrink-0 w-7 h-7 rounded-xl flex items-center justify-center transition-colors ${
             favOnly ? 'bg-amber-500/20 text-amber-400' : favs.size > 0 ? 'bg-black/20 text-slate-400' : 'bg-black/20 text-slate-700'
           }`}
           disabled={favs.size === 0}
@@ -828,7 +825,7 @@ export default function SolView({ coords }) {
         <div className="w-px h-5 bg-slate-700 shrink-0"/>
         {ALL_TYPES.map(t => (
           <button key={t} onClick={() => toggleType(t)}
-            className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+            className={`shrink-0 px-2.5 py-1 rounded-xl text-xs font-medium transition-colors ${
               selectedTypes.has(t)
                 ? 'bg-white/20 text-white ring-1 ring-white/30'
                 : 'bg-black/20 text-slate-500'
