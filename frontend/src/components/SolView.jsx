@@ -668,6 +668,7 @@ export default function SolView({ coords }) {
   const [allHashtags, setAllHashtags] = useState([])
   const [tagFilter, setTagFilter] = useState(new Set())
   const [uvIndex, setUvIndex]     = useState(null)
+  const [favOnly, setFavOnly]     = useState(false)
   const debounceRef = useRef(null)
   const radiusRef   = useRef(null)
 
@@ -769,13 +770,15 @@ export default function SolView({ coords }) {
       .finally(() => setLoading(false))
   }, [coords, typeParam, debouncedRadius, debouncedSearch, tagsParam])
 
-  const sortedData = data ? [...data].sort((a, b) => {
-    const favDiff = (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0)
-    if (favDiff !== 0) return favDiff
-    return mode === 'skugga'
-      ? (a.day_score ?? 0) - (b.day_score ?? 0)
-      : (b.day_score ?? 0) - (a.day_score ?? 0)
-  }) : []
+  const sortedData = data ? [...data]
+    .filter(t => !favOnly || favs.has(t.id))
+    .sort((a, b) => {
+      const favDiff = (favs.has(b.id) ? 1 : 0) - (favs.has(a.id) ? 1 : 0)
+      if (favDiff !== 0) return favDiff
+      return mode === 'skugga'
+        ? (a.day_score ?? 0) - (b.day_score ?? 0)
+        : (b.day_score ?? 0) - (a.day_score ?? 0)
+    }) : []
 
   return (
     <div className="space-y-3">
@@ -815,6 +818,13 @@ export default function SolView({ coords }) {
             <Icon size={15}/>
           </button>
         ))}
+        <div className="w-px h-5 bg-slate-700 shrink-0"/>
+        <button onClick={() => setFavOnly(v => !v)}
+          className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+            favOnly ? 'bg-amber-500/20 text-amber-400' : favs.size > 0 ? 'bg-black/20 text-slate-400' : 'bg-black/20 text-slate-700'
+          }`}
+          disabled={favs.size === 0}
+        >★</button>
         <div className="w-px h-5 bg-slate-700 shrink-0"/>
         {ALL_TYPES.map(t => (
           <button key={t} onClick={() => toggleType(t)}
