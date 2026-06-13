@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Droplet, Droplets, UtensilsCrossed } from 'lucide-react'
+import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -17,7 +17,7 @@ function JacketIcon({ size = 24, color = 'currentColor' }) {
   )
 }
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages, fetchSunTerraces } from './api'
+import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages, fetchSunTerraces, fetchTopTerraces } from './api'
 import SolView from './components/SolView'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
 import WeatherSymbol from './components/WeatherSymbol'
@@ -1870,6 +1870,56 @@ function useSwipeNav(activeTab, setActiveTab) {
   return { onTouchStart, onTouchEnd }
 }
 
+// ── Sol just nu card ──────────────────────────────────────────────────────────
+
+const VENUE_TYPE_ICONS_TOP = { cafe: Coffee, bar: Martini, pub: Beer, restaurant: Utensils }
+
+function SolNuCard({ data, onViewAll }) {
+  if (!data || data.venues.length === 0) return null
+  const { venues, sun_window, has_sun_now } = data
+  const label = has_sun_now ? 'Sol just nu' : 'Sol snart'
+
+  return (
+    <div className="rounded-2xl overflow-hidden" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.18)' }}>
+      <div className="px-4 pt-3.5 pb-2 flex items-center gap-2">
+        <Sun size={13} className="text-amber-400 shrink-0" />
+        <span className="text-amber-300 text-sm font-medium">{label}</span>
+        {sun_window && (
+          <span className="text-amber-600 text-xs ml-0.5">· {sun_window.from}–{sun_window.to}</span>
+        )}
+      </div>
+      <div>
+        {venues.map((v, i) => {
+          const Icon = VENUE_TYPE_ICONS_TOP[v.amenity_type]
+          const dist = v.distance_km < 1
+            ? `${Math.round(v.distance_km * 1000)} m`
+            : `${v.distance_km} km`
+          const score = v.now_score >= 45 ? v.now_score : v.best_score
+          const filled = Math.round(score / 25)
+          return (
+            <div key={v.id} className="flex items-center gap-3 px-4 py-2.5 border-t border-amber-500/10">
+              {Icon && <Icon size={13} className="text-amber-500/70 shrink-0" strokeWidth={1.5} />}
+              <span className="text-white text-xs font-medium flex-1 truncate">{v.name}</span>
+              <span className="text-slate-500 text-xs shrink-0">{dist}</span>
+              <div className="flex gap-0.5 shrink-0">
+                {[1,2,3,4].map(d => (
+                  <div key={d} className={`w-1 h-3.5 rounded-sm ${d <= filled ? 'bg-amber-400' : 'bg-white/10'}`} />
+                ))}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <button
+        onClick={onViewAll}
+        className="w-full px-4 py-2.5 text-amber-400 text-xs font-medium text-right border-t border-amber-500/10 touch-manipulation"
+      >
+        Visa alla ställen →
+      </button>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MobileApp() {
@@ -1879,6 +1929,7 @@ export default function MobileApp() {
   const [weights, setWeights]         = useState(null)
   const [summaryToday, setSummaryToday]       = useState(null)
   const [summaryTomorrow, setSummaryTomorrow] = useState(null)
+  const [topTerraces, setTopTerraces]         = useState(null)
   const [activeTab, setActiveTab] = useState('now')
   const [slideDir, setSlideDir] = useState(1)
   const { radar, coords } = useRadarLocation()
@@ -1931,6 +1982,9 @@ export default function MobileApp() {
         ? await fetchLocalForecast(coords.lat, coords.lon, 168)
         : await fetchEnsemble(168))
     } catch {}
+    if (coords) {
+      try { setTopTerraces(await fetchTopTerraces({ lat: coords.lat, lon: coords.lon })) } catch {}
+    }
   }, [coords])
 
   useEffect(() => { load() }, [load])
@@ -1992,6 +2046,8 @@ export default function MobileApp() {
                       </div>
                     )
                   })()}
+
+                  <SolNuCard data={topTerraces} onViewAll={() => changeTab('sol')} />
 
                   {/* 6-timmarsprognos + kommande dagar (accordion – bara en dag öppen) */}
                   {(() => {

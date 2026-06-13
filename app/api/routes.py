@@ -1112,6 +1112,134 @@ def area_tag_status(_user: str = Depends(get_current_user)):
     return get_state()
 
 
+@router.get("/sun-terraces/top")
+def get_top_terraces(
+    lat: float = Query(default=57.7089),
+    lon: float = Query(default=11.9746),
+    radius: float = Query(default=3.0, ge=0.1, le=10.0),
+    limit: int = Query(default=3, ge=1, le=10),
+    db: Session = Depends(get_db),
+):
+    """Top sun venues near the user right now + today's sun window."""
+    import pytz
+    from app.sources.sun_terraces import compute_scores
+
+    tz = pytz.timezone("Europe/Stockholm")
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(hours=18)
+
+    all_terraces = db.query(SunTerrace).filter(SunTerrace.active == True).all()  # noqa: E712
+    nearby = [
+        t for t in all_terraces
+        if (t.outdoor_type or "") != "none"
+        and _haversine_km(lat, lon, t.lat, t.lon) <= radius
+    ]
+
+    latest_run = (
+        db.query(EnsembleForecast.computed_at)
+        .order_by(EnsembleForecast.computed_at.desc())
+        .first()
+    )
+    forecast_hours: list = []
+    if latest_run:
+        rows = (
+            db.query(EnsembleForecast)
+            .filter(
+                EnsembleForecast.computed_at == latest_run[0],
+                EnsembleForecast.valid_for >= now,
+                EnsembleForecast.valid_for <= cutoff,
+            )
+            .order_by(EnsembleForecast.valid_for)
+            .all()
+        )
+        forecast_hours = [
+            {
+                "temperature": r.temperature,
+                "precip_probability": r.precip_probability,
+                "wind_speed": r.wind_speed,
+                "cloud_cover": r.cloud_cover,
+                "valid_for_ts": (
+                    r.valid_for.replace(tzinfo=timezone.utc).timestamp()
+                    if r.valid_for.tzinfo is None
+                    else r.valid_for.timestamp()
+                ),
+            }
+            for r in rows
+        ]
+
+    venues = []
+    for t in nearby:
+        scores = compute_scores(
+            t.lat, t.lon,
+            t.street_orientation,
+            t.orientation_confidence,
+            forecast_hours,
+            outdoor_seating=t.outdoor_seating,
+            is_rooftop=(t.outdoor_type == "rooftop"),
+            polygon_coords_json=t.polygon_coords,
+            sun_arc_from=getattr(t, "sun_arc_from", None),
+            sun_arc_to=getattr(t, "sun_arc_to", None),
+        )
+        now_score  = scores.get("now", {}).get("total_score", 0)
+        score_1h   = scores.get("1h",  {}).get("total_score", 0)
+        score_2h   = scores.get("2h",  {}).get("total_score", 0)
+        best_score = max(now_score, score_1h, score_2h)
+        if best_score < 40:
+            continue
+        venues.append({
+            "id":           t.id,
+            "name":         t.name,
+            "amenity_type": t.amenity_type,
+            "distance_km":  round(_haversine_km(lat, lon, t.lat, t.lon), 2),
+            "now_score":    now_score,
+            "score_1h":     score_1h,
+            "score_2h":     score_2h,
+            "best_score":   best_score,
+        })
+
+    venues.sort(key=lambda x: (-x["now_score"], -x["best_score"], x["distance_km"]))
+    venues = venues[:limit]
+
+    # Longest contiguous block of good-weather hours from now on, today
+    today_local = datetime.now(tz).date()
+    now_hour    = datetime.now(tz).hour
+    hour_good: dict[int, bool] = {}
+    for f in forecast_hours:
+        local_dt = datetime.fromtimestamp(f["valid_for_ts"], tz=tz)
+        if local_dt.date() != today_local:
+            continue
+        hour_good[local_dt.hour] = (
+            (f.get("cloud_cover") or 100) < 65
+            and (f.get("precip_probability") or 100) < 35
+        )
+
+    upcoming = sorted(h for h, good in hour_good.items() if good and h >= now_hour)
+    sun_window = None
+    if upcoming:
+        best: list[int] = []
+        run: list[int] = [upcoming[0]]
+        for h in upcoming[1:]:
+            if h == run[-1] + 1:
+                run.append(h)
+            else:
+                if len(run) > len(best):
+                    best = run
+                run = [h]
+        if len(run) > len(best):
+            best = run
+        if best:
+            sun_window = {
+                "from": f"{best[0]:02d}:00",
+                "to":   f"{min(best[-1] + 1, 24):02d}:00",
+            }
+
+    return {
+        "venues":      venues,
+        "sun_window":  sun_window,
+        "has_sun_now": any(v["now_score"] >= 45 for v in venues),
+    }
+
+
 @router.get("/sun-terraces")
 def get_sun_terraces(
     lat: float = Query(default=57.7089),

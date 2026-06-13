@@ -121,6 +121,13 @@ export async function fetchPlanner({ lat, lon, radius = 5.0, date, fromHour, toH
   return res.json()
 }
 
+export async function fetchTopTerraces({ lat, lon, radius = 3.0, limit = 3 } = {}) {
+  const params = new URLSearchParams({ lat, lon, radius, limit })
+  const res = await fetch(`${BASE}/sun-terraces/top?${params}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchSunTerraces({ lat, lon, radius = 2.0, type = 'all', minScore = 0, name = '', tags = '' } = {}) {
   const params = new URLSearchParams({ lat, lon, radius, type, min_score: minScore })
   if (name) params.set('name', name)
