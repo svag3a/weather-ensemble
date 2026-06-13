@@ -131,7 +131,7 @@ def _detect_wind_events(hours: list, threshold: float = 10.0) -> list:
 
 
 def _build_periods(hours: list) -> list:
-    defs = [("Natt", 0, 6), ("Förmiddag", 6, 12), ("Eftermiddag", 12, 17), ("Kväll", 17, 24)]
+    defs = [("Natt", 0, 6), ("Förmiddag", 6, 12), ("Eftermiddag", 12, 18), ("Kväll", 18, 24)]
     result = []
     for name, hf, ht in defs:
         ph = [h for h in hours if hf <= h["valid_for"].hour < ht]
