@@ -669,6 +669,7 @@ export default function SolView({ coords }) {
   const [tagFilter, setTagFilter] = useState(new Set())
   const [uvIndex, setUvIndex]     = useState(null)
   const [favOnly, setFavOnly]     = useState(false)
+  useEffect(() => { if (favs.size === 0) setFavOnly(false) }, [favs.size])
   const debounceRef = useRef(null)
   const radiusRef   = useRef(null)
 
@@ -816,11 +817,10 @@ export default function SolView({ coords }) {
           </button>
         ))}
         <div className="w-px h-5 bg-slate-700 shrink-0"/>
-        <button onClick={() => setFavOnly(v => !v)}
-          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+        <button onPointerUp={() => { if (favs.size > 0) setFavOnly(v => !v) }}
+          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors touch-manipulation select-none ${
             favOnly ? 'bg-amber-500/20 text-amber-400' : favs.size > 0 ? 'bg-black/20 text-slate-400' : 'bg-black/20 text-slate-700'
           }`}
-          disabled={favs.size === 0}
         >★</button>
         <div className="w-px h-5 bg-slate-700 shrink-0"/>
         {ALL_TYPES.map(t => {
