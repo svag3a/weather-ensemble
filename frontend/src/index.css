@@ -32,6 +32,59 @@ body {
   color: #1e293b !important;
 }
 
+/* ── Range slider (sol view distance) ───────────────────────────────────── */
+.sol-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    to right,
+    rgba(255,255,255,0.55) var(--fill),
+    rgba(255,255,255,0.18) var(--fill)
+  );
+  outline: none;
+  cursor: pointer;
+}
+.sol-slider::-webkit-slider-runnable-track {
+  -webkit-appearance: none;
+  height: 2px;
+  border-radius: 1px;
+  background: linear-gradient(
+    to right,
+    rgba(255,255,255,0.55) var(--fill),
+    rgba(255,255,255,0.18) var(--fill)
+  );
+}
+.sol-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  margin-top: -6px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+.sol-slider::-moz-range-track {
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255,255,255,0.18);
+}
+.sol-slider::-moz-range-progress {
+  height: 2px;
+  border-radius: 1px;
+  background: rgba(255,255,255,0.55);
+}
+.sol-slider::-moz-range-thumb {
+  border: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+}
+
 /* ── Animations ──────────────────────────────────────────────────────────── */
 @keyframes rain-fall {
   0%   { transform: translateY(-20px) translateX(0);      opacity: 0; }

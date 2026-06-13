@@ -860,7 +860,8 @@ export default function SolView({ coords }) {
         <span className="text-slate-500 text-xs shrink-0">Avstånd</span>
         <input type="range" min="0.5" max="10" step="0.5" value={radius}
           onChange={e => setRadius(parseFloat(e.target.value))}
-          className="flex-1 accent-white/50 h-1"
+          className="sol-slider flex-1"
+          style={{'--fill': `${(radius - 0.5) / 9.5 * 100}%`}}
         />
         <span className="text-slate-400 text-xs shrink-0 w-12 text-right">{radius} km</span>
       </div>
