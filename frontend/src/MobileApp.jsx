@@ -835,6 +835,48 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
   )
 }
 
+function WindGaugeSemi({ windSpeed, windDirection }) {
+  const bf = getBeaufort(windSpeed)
+  if (!bf) return null
+
+  const color = bf.bft <= 4 ? '#2dd4bf'
+              : bf.bft <= 7 ? '#facc15'
+              : bf.bft <= 9 ? '#fb923c'
+              : '#ef4444'
+
+  const cx = 40, cy = 40, r = 32, sw = 6
+  const toXY = (deg) => {
+    const rad = (deg * Math.PI) / 180
+    return { x: +(cx + r * Math.cos(rad)).toFixed(2), y: +(cy - r * Math.sin(rad)).toFixed(2) }
+  }
+
+  const left  = toXY(180)
+  const right = toXY(0)
+  const currDeg = 180 * (1 - bf.bft / 12)
+  const curr  = toXY(currDeg)
+
+  // Upper semi-circle: sweep=1 (clockwise on screen), large-arc=0
+  const bgPath   = `M ${left.x} ${left.y} A ${r} ${r} 0 0 1 ${right.x} ${right.y}`
+  const fillPath = bf.bft > 0
+    ? `M ${left.x} ${left.y} A ${r} ${r} 0 0 1 ${curr.x} ${curr.y}`
+    : null
+
+  return (
+    <div className="flex flex-col items-center">
+      <svg viewBox="0 0 80 46" width="70" style={{ display: 'block' }}>
+        <path d={bgPath} fill="none" stroke="rgba(148,163,184,0.15)" strokeWidth={sw} strokeLinecap="round" />
+        {fillPath && (
+          <path d={fillPath} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
+        )}
+        {bf.bft > 0 && <circle cx={curr.x} cy={curr.y} r={4} fill={color} />}
+      </svg>
+      <span className="text-xs text-slate-400 text-center" style={{ marginTop: -2 }}>
+        {windDirArrow(windDirection)} {bf.label}
+      </span>
+    </div>
+  )
+}
+
 function fmtSunHour(decHours) {
   const h = Math.floor(((decHours % 24) + 24) % 24)
   const m = Math.round((decHours % 1) * 60)
@@ -878,7 +920,7 @@ function WeatherBanner({ fc, radar, coords }) {
 
       {/* 3. Beaufort gauge */}
       <div className="flex-1 flex justify-center">
-        <BeaufortGauge windSpeed={fc.wind_speed ?? 0} windDirection={fc.wind_direction} skyTheme="dark" />
+        <WindGaugeSemi windSpeed={fc.wind_speed ?? 0} windDirection={fc.wind_direction} />
       </div>
 
       <div className="w-px self-stretch bg-white/10 shrink-0" />
