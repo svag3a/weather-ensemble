@@ -91,7 +91,7 @@ class Observation(Base):
 
 class MetarObservation(Base):
     """Cloud cover observations from METAR at Göteborg-Landvetter (ESGG).
-    Stored hourly for future blend-weight calibration."""
+    Stored hourly for blend-weight calibration."""
     __tablename__ = "metar_observations"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -99,6 +99,19 @@ class MetarObservation(Base):
     cloud_cover: Mapped[float] = mapped_column(Float)
     raw_metar: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
     stored_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
+class MetarBlendConfig(Base):
+    """Calibrated METAR blend weights per lead-hour bucket (1, 3, 6).
+    Updated daily by the calibration job once ≥100 observations exist."""
+    __tablename__ = "metar_blend_config"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lead_bucket: Mapped[int] = mapped_column(Integer, unique=True, index=True)
+    weight: Mapped[float] = mapped_column(Float)
+    calibrated_at: Mapped[datetime] = mapped_column(DateTime)
+    sample_count: Mapped[int] = mapped_column(Integer)
+    mae: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
 
 class AiSummary(Base):

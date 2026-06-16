@@ -102,6 +102,15 @@ async def lifespan(app: FastAPI):
                 conn.commit()
             except Exception:
                 pass  # Column already exists
+    # Load any previously calibrated METAR blend weights
+    from app.database import SessionLocal as _SL
+    from app.sources.metar import load_calibrated_weights as _load_metar
+    _db = _SL()
+    try:
+        _load_metar(_db)
+    finally:
+        _db.close()
+
     scheduler = create_scheduler()
     scheduler.start()
     yield

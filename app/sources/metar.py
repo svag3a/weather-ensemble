@@ -176,11 +176,36 @@ async def fetch_metar_cloud(client) -> Optional[dict]:
 
 
 def metar_cloud_fraction(lead_hours: int) -> float:
-    """Return blend weight for METAR at the given lead time (0 = pure ensemble)."""
+    """Return blend weight for METAR at the given lead time.
+    Uses calibrated weight if available, otherwise falls back to defaults."""
     if lead_hours <= 1:
-        return METAR_CLOUD_WEIGHT[1]
-    if lead_hours <= 3:
-        return METAR_CLOUD_WEIGHT[3]
-    if lead_hours <= 6:
-        return METAR_CLOUD_WEIGHT[6]
-    return 0.0
+        bucket = 1
+    elif lead_hours <= 3:
+        bucket = 3
+    elif lead_hours <= 6:
+        bucket = 6
+    else:
+        return 0.0
+    return _calibrated_weights.get(bucket, METAR_CLOUD_WEIGHT[bucket])
+
+
+# ── Calibrated weight cache ───────────────────────────────────────────────────
+# Populated from MetarBlendConfig table at startup and after each calibration run.
+_calibrated_weights: dict[int, float] = {}
+
+
+def load_calibrated_weights(db) -> None:
+    """Load calibrated blend weights from DB into the module-level cache.
+    Safe to call with any SQLAlchemy Session."""
+    from app.models import MetarBlendConfig
+    try:
+        rows = db.query(MetarBlendConfig).all()
+        for row in rows:
+            _calibrated_weights[row.lead_bucket] = row.weight
+        if rows:
+            logger.info(
+                "METAR blend weights loaded: %s",
+                {r.lead_bucket: round(r.weight, 2) for r in rows},
+            )
+    except Exception as exc:
+        logger.warning("Could not load calibrated METAR weights: %s", exc)

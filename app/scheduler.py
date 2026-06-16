@@ -245,6 +245,27 @@ async def refresh_sun_terraces_job() -> None:
         _refresh_state["finished_at"] = datetime.now(timezone.utc).isoformat()
 
 
+async def calibrate_metar_job() -> None:
+    """Daily METAR blend-weight calibration (04:30 UTC).
+    No-op until ≥100 observations exist (~4 days of hourly data)."""
+    from app.sources.metar_calibration import calibrate_metar_weights
+    from app.sources.metar import load_calibrated_weights
+    db: Session = SessionLocal()
+    try:
+        results = calibrate_metar_weights(db)
+        if results:
+            load_calibrated_weights(db)
+            logger.info("METAR calibration complete: %s", {
+                k: round(v["weight"], 2) for k, v in results.items()
+            })
+        else:
+            logger.info("METAR calibration skipped (not enough data yet)")
+    except Exception as exc:
+        logger.error("METAR calibration failed: %s", exc)
+    finally:
+        db.close()
+
+
 async def nightly_terrace_pipeline() -> None:
     """Nightly pipeline: OSM import → solar arc from roads → auto-hashtag.
 
@@ -282,6 +303,7 @@ async def nightly_terrace_pipeline() -> None:
 
 def create_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
-    scheduler.add_job(collect_and_update, "cron", minute=5)          # hourly at :05
-    scheduler.add_job(nightly_terrace_pipeline, "cron", hour=3, minute=0)  # daily 03:00 UTC
+    scheduler.add_job(collect_and_update, "cron", minute=5)           # hourly at :05
+    scheduler.add_job(nightly_terrace_pipeline, "cron", hour=3, minute=0)   # daily 03:00 UTC
+    scheduler.add_job(calibrate_metar_job, "cron", hour=4, minute=30)       # daily 04:30 UTC
     return scheduler
