@@ -807,7 +807,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
   return (
     <div
       className={`rounded-2xl relative overflow-hidden backdrop-blur-sm border ${border}`}
-      style={{ minHeight: 200, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
+      style={{ minHeight: 260, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
     >
       {/* Two cloud layers at different speeds for depth parallax */}
       <CloudCanvas cloudCover={Math.max(0, (fc.cloud_cover ?? 0) - 10)} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} speedMult={0.55} opacityMult={0.75} noiseOffset={47.3} />
@@ -835,49 +835,58 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
   )
 }
 
-function WeatherBanner({ fc, radar }) {
+function fmtSunHour(decHours) {
+  const h = Math.floor(((decHours % 24) + 24) % 24)
+  const m = Math.round((decHours % 1) * 60)
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function WeatherBanner({ fc, radar, coords }) {
   if (!fc) return null
   const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, radar?.cape ?? 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0, radar?.raining ?? false, radar?.dbz ?? null)
   const feels = feelsLike(fc.temperature, fc.wind_speed)
-  const drops = fc.precip_probability >= 20 ? fc.precip_mm : null
+
+  const lat = coords?.lat ?? 57.7089
+  const lon = coords?.lon ?? 11.9746
+  const now = new Date()
+  const { sunrise, sunset } = sunTimesUTC(now, lat, lon)
+  const tz = -now.getTimezoneOffset() / 60
+  const srStr = fmtSunHour(sunrise + tz)
+  const ssStr = fmtSunHour(sunset  + tz)
 
   return (
-    <div className={`${GLASS} rounded-2xl flex items-center px-5 py-4 gap-0`}>
-      {/* Symbol + label */}
-      <div className="flex flex-col items-center gap-0.5 shrink-0 w-16">
-        <span className="text-4xl leading-none"><WeatherSymbol symbol={symbol} /></span>
-        <span className="text-slate-400 text-xs text-center leading-tight mt-1">{label}</span>
-      </div>
-
-      <div className="w-px self-stretch bg-white/10 mx-4 shrink-0" />
-
-      {/* Temperature + feels like */}
+    <div className={`${GLASS} rounded-2xl flex items-center px-4 py-4`}>
+      {/* Symbol on same row as temperature */}
       <div className="flex flex-col shrink-0">
-        <span className="text-white text-4xl font-thin leading-none">
-          {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
-        </span>
-        {feels != null && (
-          <span className="text-slate-400 text-xs mt-1">Känns {feels}°</span>
-        )}
+        <div className="flex items-center gap-2">
+          <span className="text-4xl leading-none"><WeatherSymbol symbol={symbol} /></span>
+          <span className="text-white text-4xl font-thin leading-none">
+            {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          <span className="text-slate-400 text-xs text-center w-9">{label}</span>
+          {feels != null && <span className="text-slate-400 text-xs">Känns {feels}°</span>}
+        </div>
       </div>
 
       <div className="w-px self-stretch bg-white/10 mx-4 shrink-0" />
 
-      {/* Wind + precip */}
+      {/* Beaufort gauge */}
+      <div className="shrink-0">
+        <BeaufortGauge windSpeed={fc.wind_speed ?? 0} windDirection={fc.wind_direction} skyTheme="dark" />
+      </div>
+
+      <div className="w-px self-stretch bg-white/10 mx-4 shrink-0" />
+
+      {/* Sunrise / sunset */}
       <div className="flex flex-col gap-1 flex-1">
-        {fc.wind_speed != null && (
-          <span className="text-slate-300 text-sm">
-            {Math.round(fc.wind_speed)} m/s {windDirArrow(fc.wind_direction)}
-          </span>
-        )}
-        <span className="text-slate-400 text-xs">
-          {drops != null
-            ? <span className="flex items-center gap-1"><RainDrops mm={drops} size={11} /> {Math.round(fc.precip_probability)}%</span>
-            : fc.precip_probability > 0
-              ? `${Math.round(fc.precip_probability)}% regn`
-              : 'Ingen nederbörd'
-          }
-        </span>
+        <div className="flex items-center gap-1.5 text-amber-300 text-sm">
+          <span>🌅</span><span>{srStr}</span>
+        </div>
+        <div className="flex items-center gap-1.5 text-slate-400 text-sm">
+          <span>🌇</span><span>{ssStr}</span>
+        </div>
       </div>
     </div>
   )
@@ -2286,7 +2295,7 @@ export default function MobileApp() {
                     const sky = getSkyCss(currentFc, coords)
                     return <>
                       <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} skyGradient={sky.gradient} skyTheme={getSkyTheme(sky.gradient)} />
-                      <WeatherBanner fc={currentFc} radar={radar} />
+                      <WeatherBanner fc={currentFc} radar={radar} coords={coords} />
                     </>
                   })()}
 
@@ -2302,18 +2311,6 @@ export default function MobileApp() {
                     </div>
                   )}
 
-                  {/* Prognossäkerhet + sammanfattning — under "just nu"-kortet */}
-                  {(() => {
-                    const conf = summariseConfidence(future)
-                    const summary = generateSummary(future)
-                    if (!conf && !summary) return null
-                    return (
-                      <div className={`${GLASS} rounded-2xl px-5 py-4 flex flex-col gap-2`}>
-                        <ConfidenceBadge conf={conf} />
-                        {summary && <p className="text-slate-300 text-sm leading-relaxed">{summary}</p>}
-                      </div>
-                    )
-                  })()}
 
                   <SolNuCard data={topTerraces} onViewAll={() => changeTab('sol')} />
 
