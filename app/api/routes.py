@@ -1180,6 +1180,8 @@ def get_top_terraces(
             }
             for r in rows
         ]
+        from app.sources.metar import apply_metar_cloud_correction
+        forecast_hours = apply_metar_cloud_correction(forecast_hours, now)
 
     venues = []
     for t in nearby:
@@ -1351,6 +1353,8 @@ def get_sun_terraces(
             }
             for r in rows
         ]
+        from app.sources.metar import apply_metar_cloud_correction
+        forecast_hours = apply_metar_cloud_correction(forecast_hours, now)
 
     results = []
     for t in nearby:

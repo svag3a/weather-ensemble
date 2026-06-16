@@ -10,10 +10,81 @@ near-term hours (0–3h), where model bias is largest.
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 
 logger = logging.getLogger(__name__)
+
+# ── Sync cache (for use in sync FastAPI routes) ───────────────────────────────
+_cache_lock  = threading.Lock()
+_cache: dict = {}          # {"cloud_cover": float, "fetched_at": datetime}
+_CACHE_TTL   = 25 * 60    # 25 minutes — METAR updates every 30 min
+
+
+def get_cached_metar_cloud() -> Optional[float]:
+    """
+    Synchronous METAR fetch with 25-minute in-process cache.
+    Thread-safe; used from sync FastAPI route handlers.
+    Returns stale value on network failure.
+    """
+    import httpx
+
+    with _cache_lock:
+        now = datetime.now(timezone.utc)
+        cached = _cache.get("data")
+        if cached and (now - cached["fetched_at"]).total_seconds() < _CACHE_TTL:
+            return cached["cloud_cover"]
+
+        url = "https://aviationweather.gov/api/data/metar?ids=ESGG&format=geojson&taf=false"
+        try:
+            with httpx.Client(timeout=6.0) as client:
+                resp = client.get(url)
+                resp.raise_for_status()
+                data = resp.json()
+            features = data.get("features") or []
+            if not features:
+                return (cached or {}).get("cloud_cover")
+            props = features[0].get("properties") or {}
+            cover = _parse_cover(props.get("clouds") or [])
+            if cover is None:
+                top = (props.get("cover") or "").upper()
+                cover = _COVER_PCT.get(top)
+            if cover is not None:
+                _cache["data"] = {"cloud_cover": cover, "fetched_at": now}
+                logger.debug("METAR ESGG (sync): %s → %.0f%%", props.get("rawOb", ""), cover)
+                return cover
+        except Exception as exc:
+            logger.warning("METAR sync fetch failed: %s", exc)
+
+        return (cached or {}).get("cloud_cover")  # stale fallback
+
+
+def apply_metar_cloud_correction(forecast_hours: list, now: datetime) -> list:
+    """
+    Apply METAR-based cloud cover correction to a forecast_hours list of dicts.
+    Each dict must have 'cloud_cover' (float|None) and 'valid_for_ts' (epoch float).
+    Returns a new list with corrected cloud_cover values for near-term hours.
+    """
+    metar_cloud = get_cached_metar_cloud()
+    if metar_cloud is None:
+        return forecast_hours
+
+    now_ts = now.replace(tzinfo=None).timestamp() if now.tzinfo else now.timestamp()
+    result = []
+    for f in forecast_hours:
+        ts = f.get("valid_for_ts")
+        if ts is None or f.get("cloud_cover") is None:
+            result.append(f)
+            continue
+        lead = max(1, round((ts - now_ts) / 3600))
+        mf = metar_cloud_fraction(lead)
+        if mf > 0:
+            corrected = round(mf * metar_cloud + (1 - mf) * f["cloud_cover"], 1)
+            result.append({**f, "cloud_cover": corrected})
+        else:
+            result.append(f)
+    return result
 
 # Blend weights per lead-hour bucket: fraction of METAR vs ensemble
 # Decays linearly — observation is most reliable right now, useless by hour 4.
