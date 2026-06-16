@@ -1804,6 +1804,19 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
               )}
             </div>
 
+            {/* Practical advice — moved up for quick access */}
+            {summary.practical_advice?.main && (
+              <div className="bg-slate-700/50 rounded-2xl p-4 space-y-2">
+                <div className="flex items-start gap-2">
+                  <Lightbulb size={14} className="text-slate-400 shrink-0 mt-0.5" />
+                  <p className="text-white text-sm">{summary.practical_advice.main}</p>
+                </div>
+                {summary.practical_advice.tips?.map((tip, i) => (
+                  <p key={i} className="text-slate-400 text-xs">· {tip}</p>
+                ))}
+              </div>
+            )}
+
             {/* Confidence */}
             <div className={`${GLASS} rounded-2xl p-4 flex items-start gap-3`}>
               <ShieldCheck size={15} className={`shrink-0 mt-0.5 ${confStyle.color}`} />
@@ -1902,19 +1915,6 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
                     <div className="text-slate-300 text-xs font-medium">{ins.title}</div>
                     <p className="text-slate-400 text-xs leading-relaxed">{ins.description}</p>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* Practical advice */}
-            {summary.practical_advice?.main && (
-              <div className="bg-slate-700/50 rounded-2xl p-4 space-y-2">
-                <div className="flex items-start gap-2">
-                  <Lightbulb size={14} className="text-slate-400 shrink-0 mt-0.5" />
-                  <p className="text-white text-sm">{summary.practical_advice.main}</p>
-                </div>
-                {summary.practical_advice.tips?.map((tip, i) => (
-                  <p key={i} className="text-slate-400 text-xs">· {tip}</p>
                 ))}
               </div>
             )}
