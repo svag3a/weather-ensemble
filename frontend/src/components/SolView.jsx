@@ -641,6 +641,12 @@ function AddVenueForm({ coords, onSaved, onCancel }) {
   )
 }
 
+// ── Radius + time-pref localStorage ──────────────────────────────────────────
+const RADIUS_KEY    = 'sol_radius'
+const TIME_PREF_KEY = 'sol_time_pref'
+function loadSavedRadius()   { try { return parseFloat(localStorage.getItem(RADIUS_KEY)) || 2.0 } catch { return 2.0 } }
+function loadSavedTimePref() { try { return new Set(JSON.parse(localStorage.getItem(TIME_PREF_KEY) || '[]')) } catch { return new Set() } }
+
 // ── Votes localStorage ────────────────────────────────────────────────────────
 const VOTES_KEY = 'sol_votes'
 function loadVotes() { try { return JSON.parse(localStorage.getItem(VOTES_KEY) || '{}') } catch { return {} } }
@@ -667,8 +673,8 @@ export default function SolView({ coords }) {
   const [loading, setLoading]     = useState(true)
   const [error, setError]         = useState(null)
   const [selectedTypes, setSelectedTypes] = useState(new Set(ALL_TYPES))
-  const [radius, setRadius]       = useState(2.0)
-  const [debouncedRadius, setDebouncedRadius] = useState(2.0)
+  const [radius, setRadius]       = useState(loadSavedRadius)
+  const [debouncedRadius, setDebouncedRadius] = useState(loadSavedRadius)
   const [favs, setFavs]           = useState(loadFavs)
   const [votes, setVotes]         = useState(loadVotes)
   const [showAdd, setShowAdd]     = useState(false)
@@ -676,7 +682,7 @@ export default function SolView({ coords }) {
   const [search, setSearch]       = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [allHashtags, setAllHashtags] = useState([])
-  const [tagFilter, setTagFilter] = useState(new Set())
+  const [tagFilter, setTagFilter] = useState(loadSavedTimePref)
   const [uvIndex, setUvIndex]     = useState(null)
   const [favOnly, setFavOnly]     = useState(false)
   useEffect(() => { if (favs.size === 0) setFavOnly(false) }, [favs.size])
@@ -870,7 +876,7 @@ export default function SolView({ coords }) {
       <div className="flex items-center gap-3 px-0.5">
         <span className="text-slate-500 text-xs shrink-0">Avstånd</span>
         <input type="range" min="0.5" max="10" step="0.5" value={radius}
-          onChange={e => setRadius(parseFloat(e.target.value))}
+          onChange={e => { const v = parseFloat(e.target.value); setRadius(v); localStorage.setItem(RADIUS_KEY, String(v)) }}
           className="sol-slider flex-1"
           style={{'--fill': `${(radius - 0.5) / 9.5 * 100}%`}}
         />

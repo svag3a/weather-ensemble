@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star } from 'lucide-react'
+import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -1771,14 +1771,16 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
                     precip > 40                           ? Umbrella :
                     !isNight && clouds < 40 && precip < 30 ? Glasses  :
                                                              null
-                  // Activity: priority order, daytime only
+                  // Activity: priority order, daytime only — filtered by user's activity preferences
+                  const _actPref = loadActPref()
+                  const _act = k => !_actPref || _actPref.has(k)
                   const ActivityIcon = isNight ? null :
-                    tMax > 23 && precip < 20 && wind < 8                          ? Waves           :
-                    tempAvg > 17 && precip < 30 && wind < 8 && clouds < 70        ? UtensilsCrossed :
-                    wind >= 4 && wind <= 10 && precip < 30 && tMin > 14           ? Sailboat        :
-                    tMin > 10 && precip < 40 && wind < 12                         ? TreePine        :
-                    tMin > 8  && precip < 50                                      ? Footprints      :
-                                                                                    null
+                    _act('badliv')       && tMax > 23 && precip < 20 && wind < 8                   ? Waves           :
+                    _act('uteservering') && tempAvg > 17 && precip < 30 && wind < 8 && clouds < 70 ? UtensilsCrossed :
+                    _act('segling')      && wind >= 4 && wind <= 10 && precip < 30 && tMin > 14    ? Sailboat        :
+                    _act('natur')        && tMin > 10 && precip < 40 && wind < 12                  ? TreePine        :
+                    _act('promenad')     && tMin > 8  && precip < 50                               ? Footprints      :
+                                                                                                     null
                   return (
                     <div key={i} className="flex items-start gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0">
                       <div className="w-20 shrink-0">
@@ -1872,13 +1874,33 @@ function useSwipeNav(activeTab, setActiveTab) {
 
 // ── Profile view ─────────────────────────────────────────────────────────────
 
-const FAVS_KEY_P     = 'sol_favourites'
-const FAV_DATA_KEY_P = 'sol_favourites_data'
-const UV_PREF_KEY    = 'sol_uv_threshold'
-const VENUE_ICONS_P  = { cafe: Coffee, bar: Martini, pub: Beer, restaurant: Utensils }
+const FAVS_KEY_P      = 'sol_favourites'
+const FAV_DATA_KEY_P  = 'sol_favourites_data'
+const UV_PREF_KEY     = 'sol_uv_threshold'
+const SOL_RADIUS_KEY  = 'sol_radius'
+const SOL_TIME_KEY    = 'sol_time_pref'
+const SOL_ACT_KEY     = 'sol_activities'
+const VENUE_ICONS_P   = { cafe: Coffee, bar: Martini, pub: Beer, restaurant: Utensils }
+
+const TIME_SLOTS = [
+  { key: 'förmiddag',  label: 'Förmiddag',  hint: '6–12'  },
+  { key: 'eftermiddag', label: 'Eftermiddag', hint: '12–18' },
+  { key: 'kväll',      label: 'Kväll',       hint: '18–24' },
+]
+
+const ALL_ACTIVITIES = [
+  { key: 'badliv',        label: 'Badliv',         Icon: Waves         },
+  { key: 'uteservering',  label: 'Uteservering',    Icon: UtensilsCrossed },
+  { key: 'segling',       label: 'Segling',         Icon: Sailboat      },
+  { key: 'natur',         label: 'Natur',           Icon: TreePine      },
+  { key: 'promenad',      label: 'Promenad',        Icon: Footprints    },
+]
 
 function loadFavsP()    { try { return new Set(JSON.parse(localStorage.getItem(FAVS_KEY_P) || '[]')) } catch { return new Set() } }
 function loadFavDataP() { try { return JSON.parse(localStorage.getItem(FAV_DATA_KEY_P) || '{}') } catch { return {} } }
+function loadRadiusPref() { try { return parseFloat(localStorage.getItem(SOL_RADIUS_KEY)) || 2.0 } catch { return 2.0 } }
+function loadTimePrefP()  { try { return new Set(JSON.parse(localStorage.getItem(SOL_TIME_KEY) || '[]')) } catch { return new Set() } }
+function loadActPref()    { try { const s = localStorage.getItem(SOL_ACT_KEY); return s ? new Set(JSON.parse(s)) : null } catch { return null } }
 
 function ProfileView({ onNavigateToSol }) {
   const [favs]         = useState(loadFavsP)
@@ -1886,12 +1908,43 @@ function ProfileView({ onNavigateToSol }) {
   const [uvThreshold, setUvThreshold] = useState(
     () => { try { return parseInt(localStorage.getItem(UV_PREF_KEY) || '6') } catch { return 6 } }
   )
+  const [timePref, setTimePref] = useState(loadTimePrefP)
+  const [radius, setRadius]     = useState(loadRadiusPref)
+  const [actPref, setActPref]   = useState(() => loadActPref() ?? new Set(ALL_ACTIVITIES.map(a => a.key)))
 
   const favorites = [...favs].map(id => favData[id]).filter(Boolean)
 
   function handleUv(v) {
     setUvThreshold(v)
     localStorage.setItem(UV_PREF_KEY, String(v))
+  }
+
+  function toggleTime(key) {
+    setTimePref(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      localStorage.setItem(SOL_TIME_KEY, JSON.stringify([...next]))
+      return next
+    })
+  }
+
+  function handleRadius(v) {
+    setRadius(v)
+    localStorage.setItem(SOL_RADIUS_KEY, String(v))
+  }
+
+  function toggleActivity(key) {
+    setActPref(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        if (next.size === 1) return prev  // keep at least one
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      localStorage.setItem(SOL_ACT_KEY, JSON.stringify([...next]))
+      return next
+    })
   }
 
   const UV_LEVELS = [
@@ -1943,6 +1996,75 @@ function ProfileView({ onNavigateToSol }) {
             </button>
           </>
         )}
+      </div>
+
+      {/* Solpreferenser */}
+      <div className={`${GLASS} rounded-2xl px-5 py-4 space-y-3`}>
+        <div className="flex items-center gap-2">
+          <Clock size={13} className="text-amber-400 shrink-0" />
+          <span className="text-white text-sm font-medium">Solpreferens</span>
+          {timePref.size === 0 && <span className="text-slate-500 text-xs ml-auto">Ingen inställd</span>}
+        </div>
+        <div className="flex gap-2">
+          {TIME_SLOTS.map(({ key, label, hint }) => {
+            const active = timePref.has(key)
+            return (
+              <button
+                key={key}
+                onPointerUp={() => toggleTime(key)}
+                className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors touch-manipulation select-none ${
+                  active ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
+                         : 'bg-white/5 text-slate-400 border border-white/5'
+                }`}
+              >
+                <div>{label}</div>
+                <div className="text-[10px] opacity-60 mt-0.5">{hint}</div>
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-slate-500 text-xs">Förmarkerar tidsfilter när du öppnar sol-vyn.</p>
+      </div>
+
+      {/* Standardradius */}
+      <div className={`${GLASS} rounded-2xl px-5 py-4 space-y-3`}>
+        <div className="flex items-center gap-2">
+          <MapPin size={13} className="text-slate-400 shrink-0" />
+          <span className="text-white text-sm font-medium">Standardradius</span>
+          <span className="text-slate-400 text-xs ml-auto">{radius} km</span>
+        </div>
+        <input
+          type="range" min="0.5" max="10" step="0.5" value={radius}
+          onChange={e => handleRadius(parseFloat(e.target.value))}
+          className="sol-slider w-full"
+          style={{'--fill': `${(radius - 0.5) / 9.5 * 100}%`}}
+        />
+        <p className="text-slate-500 text-xs">Sökradie som används som standard i sol-vyn.</p>
+      </div>
+
+      {/* Aktivitetspreferenser */}
+      <div className={`${GLASS} rounded-2xl overflow-hidden`}>
+        <div className="px-5 pt-4 pb-3 border-b border-slate-700 flex items-center gap-2">
+          <TreePine size={13} className="text-slate-400 shrink-0" />
+          <span className="text-white text-sm font-medium">Aktiviteter</span>
+        </div>
+        {ALL_ACTIVITIES.map(({ key, label, Icon }) => {
+          const on = actPref.has(key)
+          return (
+            <button
+              key={key}
+              onPointerUp={() => toggleActivity(key)}
+              className="w-full flex items-center gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0 touch-manipulation select-none active:bg-white/5 transition-colors"
+            >
+              <Icon size={14} className={on ? 'text-white shrink-0' : 'text-slate-600 shrink-0'} strokeWidth={1.5} />
+              <span className={`flex-1 text-xs text-left ${on ? 'text-white' : 'text-slate-500'}`}>{label}</span>
+              <span className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center text-[10px] ${
+                on ? 'bg-white/20 border-white/40 text-white' : 'border-slate-600 text-transparent'
+              }`}>✓</span>
+            </button>
+          )
+        })}
+        <p className="px-5 py-3 text-slate-500 text-xs">Vilka aktiviteter visas i analysvy under "Under dagen".</p>
       </div>
 
       {/* UV threshold */}
