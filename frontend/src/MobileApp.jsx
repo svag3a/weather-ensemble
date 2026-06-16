@@ -832,6 +832,16 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
           }}
         />
       )}
+
+      {/* Motif label — top right, readable on any background */}
+      {motifImage?.label && (
+        <span
+          className="absolute top-3 right-3 text-xs text-white"
+          style={{ zIndex: 3, textShadow: '0 1px 4px rgba(0,0,0,0.8), 0 0 8px rgba(0,0,0,0.5)', pointerEvents: 'none' }}
+        >
+          {motifImage.label}
+        </span>
+      )}
     </div>
   )
 }
