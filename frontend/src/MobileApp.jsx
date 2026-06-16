@@ -549,7 +549,8 @@ function SixHourTable({ forecasts }) {
   if (!rows.length) return null
 
   return (
-    <div className="mt-4 border-t border-slate-700 pt-4 space-y-1">
+    <div className="mt-4 border-t border-slate-700 pt-4">
+      <div className="max-w-xs mx-auto space-y-1">
       {rows.map((fc, i) => {
         const { symbol } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0)
         const drops = fc.precip_probability >= 20 ? fc.precip_mm : null
@@ -584,6 +585,7 @@ function SixHourTable({ forecasts }) {
           {expanded ? '↑ Visa färre' : `↓ Visa hela dagen`}
         </button>
       )}
+      </div>
     </div>
   )
 }
@@ -807,7 +809,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
   return (
     <div
       className={`rounded-2xl relative overflow-hidden backdrop-blur-sm border ${border}`}
-      style={{ minHeight: 260, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
+      style={{ minHeight: 312, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
     >
       {/* Two cloud layers at different speeds for depth parallax */}
       <CloudCanvas cloudCover={Math.max(0, (fc.cloud_cover ?? 0) - 10)} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} speedMult={0.55} opacityMult={0.75} noiseOffset={47.3} />
@@ -869,9 +871,14 @@ function WindGaugeSemi({ windSpeed, windDirection }) {
           <path d={fillPath} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
         )}
         {bf.bft > 0 && <circle cx={curr.x} cy={curr.y} r={4} fill={color} />}
+        {/* Wind direction arrow centred inside the arc */}
+        <text x="40" y="38" textAnchor="middle" dominantBaseline="middle"
+          fontSize="18" fill={color} style={{ userSelect: 'none' }}>
+          {windDirArrow(windDirection)}
+        </text>
       </svg>
       <span className="text-xs text-slate-400 text-center" style={{ marginTop: -2 }}>
-        {windDirArrow(windDirection)} {bf.label}
+        {bf.label}
       </span>
     </div>
   )
@@ -898,16 +905,16 @@ function WeatherBanner({ fc, radar, coords }) {
 
   return (
     <div className={`${GLASS} rounded-2xl flex items-center px-5 py-4`}>
-      {/* 1. Weather symbol */}
-      <div className="flex-1 flex flex-col items-center gap-1">
+      {/* 1. Weather symbol — nudged left */}
+      <div className="flex-1 flex flex-col items-center gap-1" style={{ marginLeft: -10 }}>
         <span className="text-4xl leading-none"><WeatherSymbol symbol={symbol} /></span>
-        <span className="text-slate-400 text-xs text-center leading-tight">{label}</span>
+        <span className="text-slate-400 text-xs text-center leading-tight max-w-[56px] break-words">{label}</span>
       </div>
 
       <div className="w-px self-stretch bg-white/10 shrink-0" />
 
-      {/* 2. Temperature */}
-      <div className="flex-1 flex flex-col items-center gap-1">
+      {/* 2. Temperature — nudged right */}
+      <div className="flex-1 flex flex-col items-center gap-1" style={{ marginLeft: 6 }}>
         <span className="text-white text-4xl font-thin leading-none">
           {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
         </span>
@@ -925,8 +932,8 @@ function WeatherBanner({ fc, radar, coords }) {
 
       <div className="w-px self-stretch bg-white/10 shrink-0" />
 
-      {/* 4. Sunrise / sunset */}
-      <div className="flex-1 flex flex-col items-center gap-1">
+      {/* 4. Sunrise / sunset — nudged right */}
+      <div className="flex-1 flex flex-col items-center gap-1" style={{ marginLeft: 8 }}>
         <div className="flex items-center gap-1.5">
           <Sun size={14} className="text-amber-300 shrink-0" />
           <span className="text-amber-300 text-sm">{srStr}</span>
