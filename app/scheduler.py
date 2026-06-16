@@ -14,7 +14,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.orm import Session
 
 from app.database import SessionLocal
-from app.models import Forecast, Observation, SourceWeight, SourceWeightHistory, SunTerrace
+from app.models import Forecast, Observation, MetarObservation, SourceWeight, SourceWeightHistory, SunTerrace
 from app.ensemble import update_weights, build_ensemble
 from app.sources import (
     smhi, yr, open_meteo, open_meteo_icon_eu, open_meteo_ecmwf,
@@ -99,6 +99,16 @@ async def collect_and_update() -> None:
         except Exception as exc:
             logger.warning("  smhi_obs fetch failed: %s", exc)
 
+        metar_data = None
+        try:
+            from app.sources.metar import fetch_metar_cloud
+            metar_data = await fetch_metar_cloud(client)
+            if metar_data:
+                logger.info("  metar ESGG: %.0f%% cloud (%s)",
+                            metar_data["cloud_cover"], metar_data.get("raw", ""))
+        except Exception as exc:
+            logger.warning("  metar fetch failed: %s", exc)
+
     db: Session = SessionLocal()
     try:
         if obs_data:
@@ -111,6 +121,20 @@ async def collect_and_update() -> None:
                     temperature=obs_data["temperature"],
                     wind_speed=obs_data.get("wind_speed"),
                     precip_mm=obs_data.get("precip_mm"),
+                ))
+                db.commit()
+
+        if metar_data and metar_data.get("observed_at"):
+            obs_ts = metar_data["observed_at"].replace(tzinfo=None)
+            existing_metar = db.query(MetarObservation).filter(
+                MetarObservation.observed_at == obs_ts
+            ).first()
+            if existing_metar is None:
+                db.add(MetarObservation(
+                    observed_at=obs_ts,
+                    cloud_cover=metar_data["cloud_cover"],
+                    raw_metar=metar_data.get("raw", "")[:200],
+                    stored_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 ))
                 db.commit()
 

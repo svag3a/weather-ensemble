@@ -89,6 +89,18 @@ class Observation(Base):
     precip_mm: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
 
+class MetarObservation(Base):
+    """Cloud cover observations from METAR at Göteborg-Landvetter (ESGG).
+    Stored hourly for future blend-weight calibration."""
+    __tablename__ = "metar_observations"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    observed_at: Mapped[datetime] = mapped_column(DateTime, unique=True, index=True)
+    cloud_cover: Mapped[float] = mapped_column(Float)
+    raw_metar: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+    stored_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+
+
 class AiSummary(Base):
     __tablename__ = "ai_summaries"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
