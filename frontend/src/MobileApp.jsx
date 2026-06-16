@@ -816,18 +816,17 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
       <CloudCanvas cloudCover={fc.cloud_cover ?? 0} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} speedMult={1.45} opacityMult={1.0} noiseOffset={0} />
       <WeatherParticles precip={fc.precip_probability ?? 0} temperature={fc.temperature ?? 10} />
 
-      {/* Motif fills entire card */}
+      {/* Motif anchored to bottom at natural aspect ratio */}
       {motifImage && (
         <img
           src={motifImage.url}
           alt={motifImage.label}
           style={{
             position: 'absolute',
-            inset: 0,
+            bottom: 0,
+            left: 0,
             width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            objectPosition: 'center bottom',
+            height: 'auto',
             pointerEvents: 'none',
             zIndex: 2,
           }}
