@@ -590,6 +590,224 @@ function SixHourTable({ forecasts }) {
   )
 }
 
+// ── Star canvas ───────────────────────────────────────────────────────────────
+// Coordinates J2000: [ra_hours, dec_degrees, visual_magnitude]
+// ~120 brightest stars visible from Göteborg (dec > -35°)
+const STAR_CATALOG = [
+  // Sirius region
+  [6.753, -16.72, -1.46], [6.378, -17.96,  1.98], [6.977, -28.97,  1.50],
+  // Arcturus / Boötes
+  [14.261, 19.18, -0.05], [14.749, 27.07,  2.37], [15.032, 40.39,  3.49],
+  // Vega / Lyra
+  [18.616, 38.78,  0.03], [18.835, 33.36,  3.52], [18.982, 32.69,  3.24],
+  // Capella / Auriga
+  [5.278,  45.998, 0.08], [5.992,  44.95,  1.90], [4.950,  33.17,  2.69],
+  // Orion
+  [5.242,  -8.202, 0.13], [5.920,   7.407, 0.45], [5.419,   6.350, 1.64],
+  [5.533,  -0.300, 2.23], [5.603,  -1.202, 1.69], [5.680,  -1.943, 1.77],
+  [5.796,  -9.670, 2.06],
+  // Procyon / CMi
+  [7.655,   5.217, 0.38], [7.452,   8.289, 2.89],
+  // Altair / Aquila
+  [19.847,  8.867, 0.77], [19.771, 10.613, 2.72],
+  // Aldebaran / Taurus
+  [4.598,  16.509, 0.87], [5.438,  28.608, 1.65], [3.793,  24.113, 2.87],
+  [4.476,  15.953, 3.42],
+  // Spica / Virgo
+  [13.420, -11.161, 1.04], [12.695, -1.450, 2.74],
+  // Antares / Scorpius
+  [16.490, -26.432, 1.06],
+  // Gemini
+  [7.755,  28.026, 1.16], [7.577,  31.883, 1.58],
+  [6.628,  16.400, 1.93], [6.383,  22.514, 2.88],
+  // Fomalhaut
+  [22.960, -29.62, 1.16],
+  // Deneb / Cygnus
+  [20.690, 45.280, 1.25], [20.370, 40.257, 2.23], [20.770, 33.970, 2.48],
+  [19.512, 27.960, 3.05], [19.749, 45.130, 2.87],
+  // Regulus / Leo
+  [10.140, 11.967, 1.36], [11.818, 14.572, 2.14], [10.332, 19.842, 2.14],
+  [10.278, 23.417, 3.44],
+  // Ursa Major (Big Dipper)
+  [12.900, 55.958, 1.76], [11.062, 61.750, 1.81], [13.792, 49.317, 1.86],
+  [11.031, 56.382, 2.37], [11.897, 53.695, 2.44], [12.257, 57.033, 3.32],
+  [13.398, 54.925, 2.23],
+  // Ursa Minor + Polaris
+  [2.530,  89.264, 2.02], [14.845, 74.155, 2.08], [15.345, 71.834, 3.05],
+  // Cassiopeia
+  [0.675,  56.537, 2.23], [0.153,  59.150, 2.27], [0.945,  60.717, 2.15],
+  [1.432,  60.234, 2.68], [1.907,  63.670, 3.35],
+  // Perseus
+  [3.405,  49.861, 1.81], [3.137,  40.957, 2.12], [3.080,  53.502, 2.93],
+  // Mirfak already above
+  // Ophiuchus
+  [17.582, 12.550, 2.08], [17.173, -15.725, 2.43],
+  // Corona Borealis
+  [15.578, 26.714, 2.23],
+  // Hercules
+  [16.503, 21.490, 2.78], [17.244, 14.390, 3.31],
+  // Andromeda
+  [0.140,  29.090, 2.07], [1.162,  35.620, 2.06], [2.065,  42.330, 2.10],
+  // Pegasus (Great Square)
+  [23.080, 15.206, 2.49], [23.063, 28.083, 2.44],
+  [0.220,  15.183, 2.83], [21.737,  9.875, 2.38],
+  // Aquarius
+  [21.527, -5.571, 2.87], [22.097, -0.320, 2.95],
+  // Aries / Cetus
+  [2.120,  23.462, 2.00], [0.727, -17.987, 2.04], [3.038,  4.090, 2.53],
+  // Cepheus
+  [21.310, 62.583, 2.45], [21.478, 70.561, 3.23],
+  // Draco
+  [17.943, 51.489, 2.24], [17.507, 52.301, 2.79],
+  // Miscellaneous
+  [14.261, 19.180, 2.89], // Cor Caroli (CVn)
+  [9.460,  -8.659, 2.00], // Alphard (Hya)
+  [15.737,  6.426, 2.63], // Unukalhai (Ser)
+  [5.132,  -5.086, 2.79], // Cursa (Eri)
+  [3.967, -13.509, 2.95], // Zaurak (Eri)
+  [8.275,   9.186, 3.52], // Altarf (Cnc)
+  [10.372, 41.500, 3.05], // Tania Australis (UMa)
+  [8.987,  48.042, 3.14], // Talitha (UMa)
+  [14.530, 30.372, 3.46], // Seginus (Boo)
+  [19.043,-29.880, 2.59], // Ascella (Sgr, low)
+  [18.921,-26.297, 2.05], // Nunki (Sgr, low)
+  [3.820,  24.054, 3.63], // Atlas (Pleiades)
+]
+
+const GBG_LAT = 57.7089
+const GBG_LON = 11.9746
+
+function _gmstHours(date) {
+  const D = date.getTime() / 86400000 + 2440587.5 - 2451545.0
+  const g = (18.697374558 + 24.06570982441908 * D) % 24
+  return g < 0 ? g + 24 : g
+}
+
+function _sunAltDeg(date) {
+  const n = date.getTime() / 86400000 + 2440587.5 - 2451545.0
+  const L = ((280.460 + 0.9856474 * n) % 360 + 360) % 360
+  const g = ((357.528 + 0.9856003 * n) % 360 + 360) % 360
+  const gR = g * Math.PI / 180
+  const lam = (L + 1.915 * Math.sin(gR) + 0.02 * Math.sin(2 * gR)) * Math.PI / 180
+  const eps = (23.439 - 0.0000004 * n) * Math.PI / 180
+  const raSun = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam))
+  const decSun = Math.asin(Math.sin(eps) * Math.sin(lam))
+  const lst = (_gmstHours(date) + GBG_LON / 15 + 24) % 24
+  const H = ((lst - raSun * 12 / Math.PI) % 24 + 24) % 24 * 15 * Math.PI / 180
+  const lat = GBG_LAT * Math.PI / 180
+  return Math.asin(Math.sin(lat) * Math.sin(decSun) + Math.cos(lat) * Math.cos(decSun) * Math.cos(H)) * 180 / Math.PI
+}
+
+function _raDecToAltAz(raH, decDeg, lstH) {
+  const H = ((lstH - raH) % 24 + 24) % 24 * 15 * Math.PI / 180
+  const dec = decDeg * Math.PI / 180
+  const lat = GBG_LAT * Math.PI / 180
+  const alt = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(H))
+  const az  = Math.atan2(-Math.cos(dec) * Math.sin(H), Math.sin(dec) * Math.cos(lat) - Math.cos(dec) * Math.sin(lat) * Math.cos(H))
+  return { alt: alt * 180 / Math.PI, az: ((az * 180 / Math.PI) + 360) % 360 }
+}
+
+function StarCanvas() {
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const canvas = ref.current
+    if (!canvas) return
+
+    const draw = () => {
+      const parent = canvas.parentElement
+      if (!parent) return
+      const W = parent.offsetWidth
+      const H = parent.offsetHeight
+      const dpr = window.devicePixelRatio || 1
+      canvas.width  = W * dpr
+      canvas.height = H * dpr
+      const ctx = canvas.getContext('2d')
+      ctx.scale(dpr, dpr)
+      ctx.clearRect(0, 0, W, H)
+
+      const now    = new Date()
+      const sunAlt = _sunAltDeg(now)
+      if (sunAlt > -6) return   // too bright, nothing to draw
+
+      const lst = (_gmstHours(now) + GBG_LON / 15 + 24) % 24
+
+      for (const [ra, dec, mag] of STAR_CATALOG) {
+        const { alt, az } = _raDecToAltAz(ra, dec, lst)
+        if (alt < 1) continue   // below horizon
+
+        // Magnitude-aware fade per twilight depth
+        let opacity = 0
+        if (sunAlt <= -18) {
+          opacity = Math.min(1, (5.5 - mag) / 3.5)
+        } else if (sunAlt <= -12) {
+          const t = (-sunAlt - 12) / 6        // 0→1 as sun goes -12→-18
+          const magLim = 1.0 + t * 4.5        // opens from mag 1 to 5.5
+          if (mag > magLim) continue
+          opacity = Math.min(1, (magLim - mag + 0.5)) * Math.min(1, t * 1.8 + 0.2)
+        } else {
+          // nautical twilight (-6 to -12): only mag < 1.5
+          if (mag > 1.5) continue
+          opacity = ((-sunAlt - 6) / 6) * 0.85
+        }
+        if (opacity < 0.03) continue
+
+        // Equirectangular: az 0-360 → x, alt 0-90 → y (0=bottom)
+        const x = (az / 360) * W
+        const y = H * (1 - alt / 90)
+        const r = Math.max(0.45, 1.9 - mag * 0.28)
+
+        // Soft glow for bright stars (mag < 2)
+        if (mag < 2.0) {
+          const gr = ctx.createRadialGradient(x, y, 0, x, y, r * 4)
+          gr.addColorStop(0, `rgba(255,252,230,${(opacity * 0.35).toFixed(2)})`)
+          gr.addColorStop(1, 'rgba(255,252,230,0)')
+          ctx.beginPath()
+          ctx.arc(x, y, r * 4, 0, Math.PI * 2)
+          ctx.fillStyle = gr
+          ctx.fill()
+          // Also draw at wrapped position
+          const x2 = x < W / 2 ? x + W : x - W
+          const gr2 = ctx.createRadialGradient(x2, y, 0, x2, y, r * 4)
+          gr2.addColorStop(0, `rgba(255,252,230,${(opacity * 0.35).toFixed(2)})`)
+          gr2.addColorStop(1, 'rgba(255,252,230,0)')
+          ctx.beginPath()
+          ctx.arc(x2, y, r * 4, 0, Math.PI * 2)
+          ctx.fillStyle = gr2
+          ctx.fill()
+        }
+
+        ctx.globalAlpha = Math.min(1, opacity)
+        ctx.fillStyle = 'rgba(255,252,235,1)'
+        ctx.beginPath()
+        ctx.arc(x, y, r, 0, Math.PI * 2)
+        ctx.fill()
+        // Wrapped copy for seamless horizon edge
+        const x2 = x < W / 2 ? x + W : x - W
+        ctx.beginPath()
+        ctx.arc(x2, y, r, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.globalAlpha = 1
+      }
+    }
+
+    draw()
+    const id = setInterval(draw, 60_000)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <canvas
+      ref={ref}
+      style={{
+        position: 'absolute', inset: 0,
+        width: '100%', height: '100%',
+        pointerEvents: 'none', zIndex: 0,
+      }}
+    />
+  )
+}
+
 // ── Cloud canvas ──────────────────────────────────────────────────────────────
 
 function CloudCanvas({ cloudCover = 0, windSpeed = 2, precipProbability = 0, speedMult = 1, opacityMult = 1, noiseOffset = 0 }) {
@@ -811,6 +1029,9 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
       className={`rounded-2xl relative overflow-hidden backdrop-blur-sm border ${border}`}
       style={{ minHeight: 312, background: skyGradient ?? 'rgba(0,0,0,0.2)' }}
     >
+      {/* Stars — beneath clouds, z-index 0 */}
+      <StarCanvas />
+
       {/* Two cloud layers at different speeds for depth parallax */}
       <CloudCanvas cloudCover={Math.max(0, (fc.cloud_cover ?? 0) - 10)} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} speedMult={0.55} opacityMult={0.75} noiseOffset={47.3} />
       <CloudCanvas cloudCover={fc.cloud_cover ?? 0} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} speedMult={1.45} opacityMult={1.0} noiseOffset={0} />
