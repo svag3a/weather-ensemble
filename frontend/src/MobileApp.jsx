@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin } from 'lucide-react'
+import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Moon, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -855,37 +855,43 @@ function WeatherBanner({ fc, radar, coords }) {
   const ssStr = fmtSunHour(sunset  + tz)
 
   return (
-    <div className={`${GLASS} rounded-2xl flex items-center px-4 py-4`}>
-      {/* Symbol on same row as temperature */}
-      <div className="flex flex-col shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-4xl leading-none"><WeatherSymbol symbol={symbol} /></span>
-          <span className="text-white text-4xl font-thin leading-none">
-            {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 mt-1">
-          <span className="text-slate-400 text-xs text-center w-9">{label}</span>
-          {feels != null && <span className="text-slate-400 text-xs">Känns {feels}°</span>}
-        </div>
+    <div className={`${GLASS} rounded-2xl flex items-center px-5 py-4`}>
+      {/* 1. Weather symbol */}
+      <div className="flex-1 flex flex-col items-center gap-1">
+        <span className="text-4xl leading-none"><WeatherSymbol symbol={symbol} /></span>
+        <span className="text-slate-400 text-xs text-center leading-tight">{label}</span>
       </div>
 
-      <div className="w-px self-stretch bg-white/10 mx-4 shrink-0" />
+      <div className="w-px self-stretch bg-white/10 shrink-0" />
 
-      {/* Beaufort gauge */}
-      <div className="shrink-0">
+      {/* 2. Temperature */}
+      <div className="flex-1 flex flex-col items-center gap-1">
+        <span className="text-white text-4xl font-thin leading-none">
+          {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+        </span>
+        {feels != null
+          ? <span className="text-slate-400 text-xs">Känns {feels}°</span>
+          : <span className="text-xs opacity-0">–</span>}
+      </div>
+
+      <div className="w-px self-stretch bg-white/10 shrink-0" />
+
+      {/* 3. Beaufort gauge */}
+      <div className="flex-1 flex justify-center">
         <BeaufortGauge windSpeed={fc.wind_speed ?? 0} windDirection={fc.wind_direction} skyTheme="dark" />
       </div>
 
-      <div className="w-px self-stretch bg-white/10 mx-4 shrink-0" />
+      <div className="w-px self-stretch bg-white/10 shrink-0" />
 
-      {/* Sunrise / sunset */}
-      <div className="flex flex-col gap-1 flex-1">
-        <div className="flex items-center gap-1.5 text-amber-300 text-sm">
-          <span>🌅</span><span>{srStr}</span>
+      {/* 4. Sunrise / sunset */}
+      <div className="flex-1 flex flex-col items-center gap-1">
+        <div className="flex items-center gap-1.5">
+          <Sun size={14} className="text-amber-300 shrink-0" />
+          <span className="text-amber-300 text-sm">{srStr}</span>
         </div>
-        <div className="flex items-center gap-1.5 text-slate-400 text-sm">
-          <span>🌇</span><span>{ssStr}</span>
+        <div className="flex items-center gap-1.5">
+          <Moon size={14} className="text-slate-400 shrink-0" />
+          <span className="text-slate-400 text-sm">{ssStr}</span>
         </div>
       </div>
     </div>
