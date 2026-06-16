@@ -883,29 +883,29 @@ export default function SolView({ coords, initialData }) {
         <span className="text-slate-400 text-xs shrink-0 w-12 text-right">{radius} km</span>
       </div>
 
-      {/* Loading */}
-      {loading && (
+      {/* Loading — only shown when no data yet */}
+      {loading && !data && (
         <div className={`${GLASS} rounded-2xl p-8 text-slate-500 text-center text-sm`}>
           Beräknar sollägen…
         </div>
       )}
 
       {/* Error */}
-      {error && !loading && (
+      {error && !data && (
         <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm`}>
           Kunde inte hämta uteserveringar.
         </div>
       )}
 
       {/* No coords */}
-      {!coords && !loading && !debouncedSearch && (
+      {!coords && !data && !debouncedSearch && (
         <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm`}>
           Aktivera platstjänster för att hitta uteserveringar nära dig.
         </div>
       )}
 
       {/* Results */}
-      {!loading && data && data.length === 0 && (
+      {data && data.length === 0 && (
         <div className={`${GLASS} rounded-2xl p-8 flex flex-col items-center gap-3 text-center`}>
           <span className="text-3xl">☀️</span>
           <p className="text-white font-medium">Inga träffar</p>
@@ -913,7 +913,7 @@ export default function SolView({ coords, initialData }) {
         </div>
       )}
 
-      {!loading && data && data.length > 0 && (
+      {data && data.length > 0 && (
         <>
           <p className="text-slate-500 text-xs px-1">
             {data.length} uteserveringar{debouncedSearch ? '' : ` inom ${debouncedRadius} km`}
