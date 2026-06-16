@@ -1295,13 +1295,14 @@ def get_sun_terraces(
         tag_names = {t.strip().lower() for t in tags.split(",") if t.strip()}
 
     if name.strip():
-        # Name search: ignore radius, match anywhere in name, address, or hashtag
+        # Name search: ignore radius, match anywhere in name, address, hashtag, or outdoor_type
         q = name.strip().lower()
         nearby = [
             t for t in all_terraces
             if q in (t.name or "").lower()
             or q in (t.address or "").lower()
             or any(q in ht["name"] for ht in terrace_hashtags.get(t.id, []))
+            or q == (t.outdoor_type or "").lower()
         ]
     else:
         nearby = [
