@@ -668,9 +668,9 @@ function removeFavData(id) {
 }
 
 // ── Main view ─────────────────────────────────────────────────────────────────
-export default function SolView({ coords }) {
-  const [data, setData]           = useState(null)
-  const [loading, setLoading]     = useState(true)
+export default function SolView({ coords, initialData }) {
+  const [data, setData]           = useState(initialData ?? null)
+  const [loading, setLoading]     = useState(!initialData)
   const [error, setError]         = useState(null)
   const [selectedTypes, setSelectedTypes] = useState(new Set(ALL_TYPES))
   const [radius, setRadius]       = useState(loadSavedRadius)
@@ -773,7 +773,7 @@ export default function SolView({ coords }) {
 
   useEffect(() => {
     if (!coords && !debouncedSearch) return
-    setLoading(true)
+    if (!data) setLoading(true)
     setError(null)
     fetchSunTerraces({
       lat:    coords?.lat ?? 57.7089,

@@ -2147,6 +2147,7 @@ export default function MobileApp() {
   const [summaryToday, setSummaryToday]       = useState(null)
   const [summaryTomorrow, setSummaryTomorrow] = useState(null)
   const [topTerraces, setTopTerraces]         = useState(null)
+  const [prefetchedTerraces, setPrefetchedTerraces] = useState(null)
   const [activeTab, setActiveTab] = useState('now')
   const [slideDir, setSlideDir] = useState(1)
   const { radar, coords } = useRadarLocation()
@@ -2201,6 +2202,15 @@ export default function MobileApp() {
     } catch {}
     if (coords) {
       try { setTopTerraces(await fetchTopTerraces({ lat: coords.lat, lon: coords.lon })) } catch {}
+      try {
+        const terraces = await fetchSunTerraces({
+          lat: coords.lat, lon: coords.lon,
+          radius: loadRadiusPref(),
+          type: 'all',
+          tags: [...loadTimePrefP()].join(','),
+        })
+        setPrefetchedTerraces(terraces)
+      } catch {}
     }
   }, [coords])
 
@@ -2311,7 +2321,7 @@ export default function MobileApp() {
               )}
 
               {activeTab === 'sol' && (
-                <SolView coords={coords} />
+                <SolView coords={coords} initialData={prefetchedTerraces} />
               )}
 
               {activeTab === 'profile' && (
