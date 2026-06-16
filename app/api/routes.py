@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Body
@@ -195,11 +196,12 @@ async def get_local_forecast(
     hours_ahead: int = Query(default=48, ge=1, le=168),
     db: Session = Depends(get_db),
 ):
-    """Ensemble forecast with live radar blended at the given lat/lon for near-term hours."""
+    """Ensemble forecast with live radar + METAR cloud blended at the given lat/lon for near-term hours."""
     import httpx
     from app.sources.radar_nowcast import (
         check_rain_at, _dbz_to_rain_rate, _rain_rate_to_prob, _CONFIDENCE
     )
+    from app.sources.metar import fetch_metar_cloud, metar_cloud_fraction
     from app.ensemble import RADAR_PRECIP_WEIGHT, _lead_bucket
 
     now = datetime.now(timezone.utc)
@@ -225,7 +227,12 @@ async def get_local_forecast(
     )
 
     async with httpx.AsyncClient() as client:
-        radar = await check_rain_at(client, lat, lon)
+        radar, metar = await asyncio.gather(
+            check_rain_at(client, lat, lon),
+            fetch_metar_cloud(client),
+        )
+
+    metar_cloud = metar["cloud_cover"] if metar else None
 
     now_naive = now.replace(tzinfo=None)
     result = []
@@ -244,6 +251,13 @@ async def get_local_forecast(
                 radar_precip = 0.0
             precip = round(radar_fraction * radar_precip + (1 - radar_fraction) * r.precip_probability, 1)
 
+        # Blend METAR cloud cover into near-term hours (decays to 0 by hour 7+)
+        cloud = r.cloud_cover
+        if metar_cloud is not None and r.cloud_cover is not None:
+            mf = metar_cloud_fraction(lead_from_now)
+            if mf > 0:
+                cloud = round(mf * metar_cloud + (1 - mf) * r.cloud_cover, 1)
+
         result.append(ForecastOut(
             valid_for=r.valid_for,
             lead_hours=lead_from_now,
@@ -251,7 +265,7 @@ async def get_local_forecast(
             precip_probability=precip,
             wind_speed=r.wind_speed,
             wind_direction=r.wind_direction,
-            cloud_cover=r.cloud_cover,
+            cloud_cover=cloud,
             precip_mm=r.precip_mm,
             confidence=r.confidence,
             fog_probability=r.fog_probability,
