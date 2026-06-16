@@ -102,6 +102,16 @@ async def lifespan(app: FastAPI):
                 conn.commit()
             except Exception:
                 pass  # Column already exists
+    # Fix existing rooftop venues that have a non-360 arc
+    with engine.connect() as conn:
+        try:
+            conn.execute(text(
+                "UPDATE sun_terraces SET sun_arc_from=0, sun_arc_to=360 "
+                "WHERE outdoor_type='rooftop' AND (sun_arc_from != 0 OR sun_arc_to != 360)"
+            ))
+            conn.commit()
+        except Exception:
+            pass
     # Load any previously calibrated METAR blend weights
     from app.database import SessionLocal as _SL
     from app.sources.metar import load_calibrated_weights as _load_metar

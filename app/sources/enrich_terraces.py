@@ -232,8 +232,15 @@ async def run_osm_orientation_job(get_db_func) -> None:
         COMMIT_EVERY = 100
         now_dt = datetime.now(timezone.utc).replace(tzinfo=None)
         for i, t in enumerate(terraces):
-            bearing = _bearing_from_index(t.lat, t.lon, index)
             _osm_state["done"] += 1
+            if t.outdoor_type == "rooftop":
+                # Rooftops are sky-facing — full 360° regardless of road bearing
+                t.sun_arc_from = 0.0
+                t.sun_arc_to   = 360.0
+                t.updated_at   = now_dt
+                _osm_state["updated"] += 1
+                continue
+            bearing = _bearing_from_index(t.lat, t.lon, index)
             if bearing is not None:
                 # Store exact arc (±90° around the bearing)
                 t.sun_arc_from = (bearing - 90 + 360) % 360
@@ -369,20 +376,27 @@ async def run_ai_enrichment_job(get_db_func) -> None:
                         if not t.outdoor_type or t.outdoor_type == "unknown":
                             t.outdoor_type = ot
                             changed = True
-                    valid_dirs = {"N","NE","E","SE","S","SW","W","NW","UNKNOWN"}
-                    if ori in valid_dirs and ori != "UNKNOWN":
-                        if not t.street_orientation or t.street_orientation == "UNKNOWN":
-                            t.street_orientation = ori
-                            t.orientation_confidence = 0.45  # AI-estimated
+                    # Rooftops are sky-facing — override arc to full 360°
+                    if t.outdoor_type == "rooftop":
+                        if t.sun_arc_from != 0.0 or t.sun_arc_to != 360.0:
+                            t.sun_arc_from = 0.0
+                            t.sun_arc_to   = 360.0
                             changed = True
-                        # Always set arc from AI direction if not yet set
-                        if t.sun_arc_from is None:
-                            from app.sources.sun_terraces import ORIENTATION_AZIMUTHS
-                            center = ORIENTATION_AZIMUTHS.get(ori)
-                            if center is not None:
-                                t.sun_arc_from = (center - 90 + 360) % 360
-                                t.sun_arc_to   = (center + 90) % 360
+                    else:
+                        valid_dirs = {"N","NE","E","SE","S","SW","W","NW","UNKNOWN"}
+                        if ori in valid_dirs and ori != "UNKNOWN":
+                            if not t.street_orientation or t.street_orientation == "UNKNOWN":
+                                t.street_orientation = ori
+                                t.orientation_confidence = 0.45  # AI-estimated
                                 changed = True
+                            # Always set arc from AI direction if not yet set
+                            if t.sun_arc_from is None:
+                                from app.sources.sun_terraces import ORIENTATION_AZIMUTHS
+                                center = ORIENTATION_AZIMUTHS.get(ori)
+                                if center is not None:
+                                    t.sun_arc_from = (center - 90 + 360) % 360
+                                    t.sun_arc_to   = (center + 90) % 360
+                                    changed = True
                     if changed:
                         t.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
                         _ai_state["updated"] += 1
