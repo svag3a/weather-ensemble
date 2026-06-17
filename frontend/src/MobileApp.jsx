@@ -69,11 +69,21 @@ function useRadarLocation() {
     try { setRadar(await fetchRadarNow(lat, lon)) } catch {}
   }, [])
 
+  const locate = useCallback(() => {
+    if (!navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(pos => {
+      const lat = pos.coords.latitude
+      const lon = pos.coords.longitude
+      setCoords({ lat, lon })
+      poll(lat, lon)
+    })
+  }, [poll])
+
   useEffect(() => {
     const start = (lat, lon) => {
       setCoords({ lat, lon })
       poll(lat, lon)
-      timerRef.current = setInterval(() => poll(lat, lon), 5 * 60 * 1000)
+      timerRef.current = setInterval(locate, 5 * 60 * 1000)
     }
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -84,7 +94,7 @@ function useRadarLocation() {
       start(57.7089, 11.9746)
     }
     return () => clearInterval(timerRef.current)
-  }, [poll])
+  }, [poll, locate])
 
   return { radar, coords }
 }
