@@ -2599,25 +2599,24 @@ export default function MobileApp() {
 
                   <SolNuCard data={topTerraces} onViewAll={() => changeTab('sol')} />
 
-                  {/* 6-timmarsprognos + kommande dagar (accordion – bara en dag öppen) */}
+                  {/* Dagsprognos accordion — idag + kommande dagar */}
                   {(() => {
-                    const visibleDays = days.slice(1).filter(h => h.length >= 23)
+                    const today      = days[0] ? [days[0]] : []
+                    const futureDays = days.slice(1).filter(h => h.length >= 23)
+                    const visibleDays = [...today, ...futureDays]
                     const summaries   = visibleDays.map(getDaySummary)
                     const wMin = Math.min(...summaries.map(s => s.minTemp ?? 99))
                     const wMax = Math.max(...summaries.map(s => s.maxTemp ?? -99))
                     const cutoff48 = new Date(Date.now() + 48 * 3600 * 1000)
                     return (
-                      <>
-                        <SixHourTable forecasts={future} />
-                        <WeekDaysAccordion
-                          visibleDays={visibleDays}
-                          summaries={summaries}
-                          wMin={wMin}
-                          wMax={wMax}
-                          cutoff48={cutoff48}
-                          warnings={warnings}
-                        />
-                      </>
+                      <WeekDaysAccordion
+                        visibleDays={visibleDays}
+                        summaries={summaries}
+                        wMin={wMin}
+                        wMax={wMax}
+                        cutoff48={cutoff48}
+                        warnings={warnings}
+                      />
                     )
                   })()}
                 </>
