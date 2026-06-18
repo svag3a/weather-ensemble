@@ -34,7 +34,7 @@ OVERPASS_ENDPOINTS = [
 
 _shadow_state: dict = {
     "running": False, "total": 0, "done": 0, "updated": 0, "skipped": 0,
-    "started_at": None, "finished_at": None, "error": None,
+    "phase": "", "started_at": None, "finished_at": None, "error": None,
 }
 
 
@@ -228,6 +228,7 @@ async def run_shadow_enrichment_job(get_db_func) -> None:
 
     _shadow_state = {
         "running": True, "total": 0, "done": 0, "updated": 0, "skipped": 0,
+        "phase": "Hämtar byggnader från Overpass…",
         "started_at": datetime.now(timezone.utc).isoformat(),
         "finished_at": None, "error": None,
     }
@@ -241,6 +242,7 @@ async def run_shadow_enrichment_job(get_db_func) -> None:
         async with httpx.AsyncClient() as client:
             buildings = await fetch_all_buildings(client)
 
+        _shadow_state["phase"] = f"Bygger index ({len(buildings)} byggnader)…"
         grid = build_grid(buildings)
 
         db = next(get_db_func())
@@ -251,6 +253,7 @@ async def run_shadow_enrichment_job(get_db_func) -> None:
             .all()
         )
         _shadow_state["total"] = len(terraces)
+        _shadow_state["phase"] = "Beräknar skuggor per venue…"
 
         for i, t in enumerate(terraces):
             try:

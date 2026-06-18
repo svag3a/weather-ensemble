@@ -622,12 +622,18 @@ function JobWidget({ label, triggerFn, statusFn, color = 'blue', title }) {
   useEffect(() => () => clearInterval(pollRef.current), [])
 
   const pct = status?.total > 0 ? Math.round((status.done / status.total) * 100) : 0
-  const btnClass = color === 'emerald'
-    ? 'bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-600'
-    : color === 'violet'
-    ? 'bg-violet-700 hover:bg-violet-600 disabled:bg-slate-600'
-    : 'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600'
-  const barClass = color === 'emerald' ? 'bg-emerald-500' : color === 'violet' ? 'bg-violet-500' : 'bg-blue-500'
+  const btnClass =
+    color === 'emerald' ? 'bg-emerald-700 hover:bg-emerald-600 disabled:bg-slate-600' :
+    color === 'violet'  ? 'bg-violet-700 hover:bg-violet-600 disabled:bg-slate-600' :
+    color === 'orange'  ? 'bg-orange-700 hover:bg-orange-600 disabled:bg-slate-600' :
+    color === 'pink'    ? 'bg-pink-700 hover:bg-pink-600 disabled:bg-slate-600' :
+                          'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600'
+  const barClass =
+    color === 'emerald' ? 'bg-emerald-500' :
+    color === 'violet'  ? 'bg-violet-500' :
+    color === 'orange'  ? 'bg-orange-500' :
+    color === 'pink'    ? 'bg-pink-500' :
+                          'bg-blue-500'
 
   return (
     <div className="bg-slate-700 rounded-lg px-4 py-2 flex flex-col gap-1 min-w-[200px]" title={title}>
@@ -640,10 +646,13 @@ function JobWidget({ label, triggerFn, statusFn, color = 'blue', title }) {
       </div>
       {status?.running && (
         <>
+          {status.phase && (
+            <span className="text-slate-400 text-[10px] italic">{status.phase}</span>
+          )}
           <div className="w-full bg-slate-600 rounded-full h-1.5">
-            <div className={`${barClass} h-1.5 rounded-full transition-all`} style={{width:`${pct}%`}}/>
+            <div className={`${barClass} h-1.5 rounded-full transition-all`} style={{width: status.total > 0 ? `${pct}%` : '100%', opacity: status.total > 0 ? 1 : 0.3}}/>
           </div>
-          <span className="text-slate-400 text-[10px]">{status.done}/{status.total} · {status.updated} uppdaterade</span>
+          <span className="text-slate-400 text-[10px]">{status.total > 0 ? `${status.done}/${status.total} · ${status.updated} uppdaterade` : 'Väntar…'}</span>
         </>
       )}
       {!status?.running && status?.finished_at && (
