@@ -650,6 +650,25 @@ def enrich_ai_status(_user: str = Depends(get_current_user)):
     return get_ai_state()
 
 
+@router.post("/sun-terraces/enrich/shadow")
+async def enrich_shadow(_user: str = Depends(get_current_user)):
+    """Trigger shadow-building enrichment job (background)."""
+    import asyncio
+    from app.sources.shadow_model import run_shadow_enrichment_job, get_shadow_state
+    from app.database import get_db as _get_db
+    state = get_shadow_state()
+    if state["running"]:
+        return {"status": "already_running", **state}
+    asyncio.create_task(run_shadow_enrichment_job(_get_db))
+    return {"status": "started"}
+
+
+@router.get("/sun-terraces/enrich/shadow/status")
+def enrich_shadow_status(_user: str = Depends(get_current_user)):
+    from app.sources.shadow_model import get_shadow_state
+    return get_shadow_state()
+
+
 @router.post("/sun-terraces/auto-arc", status_code=200)
 def auto_arc_terraces(
     db: Session = Depends(get_db),
@@ -1219,6 +1238,7 @@ def get_top_terraces(
             polygon_coords_json=t.polygon_coords,
             sun_arc_from=getattr(t, "sun_arc_from", None),
             sun_arc_to=getattr(t, "sun_arc_to", None),
+            shadow_buildings_json=getattr(t, "shadow_buildings_json", None),
         )
         now_score  = scores.get("now", {}).get("total_score", 0)
         score_1h   = scores.get("1h",  {}).get("total_score", 0)
@@ -1408,6 +1428,7 @@ def get_sun_terraces(
             polygon_coords_json=t.polygon_coords,
             sun_arc_from=getattr(t, 'sun_arc_from', None),
             sun_arc_to=getattr(t, 'sun_arc_to', None),
+            shadow_buildings_json=getattr(t, 'shadow_buildings_json', None),
         )
         now_score = scores.get("now", {}).get("total_score", 0)
         best_score = max(

@@ -176,6 +176,7 @@ class SunTerrace(Base):
     polygon_coords: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON [[lat,lon],...]
     sun_arc_from: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     sun_arc_to:   Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    shadow_buildings_json: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON [{h,p},...] nearby buildings
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

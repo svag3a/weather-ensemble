@@ -427,6 +427,7 @@ def compute_scores(
     polygon_coords_json: Optional[str] = None,
     sun_arc_from: Optional[float] = None,
     sun_arc_to:   Optional[float] = None,
+    shadow_buildings_json: Optional[str] = None,
 ) -> dict:
     """Compute now / +1h / +2h scores for a terrace given pre-fetched forecast hours."""
     now = datetime.now(timezone.utc)
@@ -449,6 +450,15 @@ def compute_scores(
 
         alt_factor = max(0.0, min(1.0, (alt - 5.0) / 20.0))  # 0 at ≤5°, 1 at ≥25°
 
+        # Shadow check: parse buildings once per compute_scores call (lazy)
+        _shadow_bldgs: list | None = None
+        if shadow_buildings_json:
+            try:
+                import json as _json_s
+                _shadow_bldgs = _json_s.loads(shadow_buildings_json)
+            except Exception:
+                _shadow_bldgs = None
+
         if is_rooftop:
             total = int(0.50 * ws["cloud"] + 0.35 * ws["precip"] + 0.10 * ws["temp"] + 0.05 * ws["wind"])
             total = min(100, total + 10)
@@ -462,6 +472,7 @@ def compute_scores(
                 "total_score": min(100, total),
                 "sun_azimuth": round(az, 1),
                 "sun_altitude": round(alt, 1),
+                "shadowed": False,  # rooftops see open sky
             }
             continue
 
@@ -490,6 +501,13 @@ def compute_scores(
         # Rain veto: any detectable rain (precip_probability > ~27%) → score = 0
         if ws["precip"] < 60:
             total = 0
+        # Shadow veto: nearby building blocks the sun at this moment
+        shadowed = False
+        if total > 0 and _shadow_bldgs:
+            from app.sources.shadow_model import is_shadowed as _is_shadowed
+            shadowed = _is_shadowed(lat, lon, az, alt, _shadow_bldgs)
+            if shadowed:
+                total = 0
         result[key] = {
             "sun_score": int((alt / 90) * eff_os),
             "orientation_score": int(eff_os),   # pure directional exposure, 0–100
@@ -497,6 +515,7 @@ def compute_scores(
             "total_score": min(100, total),
             "sun_azimuth": round(az, 1),
             "sun_altitude": round(alt, 1),
+            "shadowed": shadowed,
         }
     best_time = max(["now", "1h", "2h"], key=lambda k: result[k]["total_score"])
     result["best_time"] = best_time
