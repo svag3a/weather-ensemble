@@ -178,7 +178,7 @@ async def fetch_all_buildings(client, state: dict | None = None) -> list[dict]:
             state["phase"] = f"Hämtar byggnader från Overpass ({i+1}/{len(_TILES)})…"
         logger.info("Shadow model: fetching tile %d %s", i + 1, tile)
         try:
-            nodes, ways = await _fetch_tile(client, tile, i + 1)
+            nodes, ways = await asyncio.wait_for(_fetch_tile(client, tile, i + 1), timeout=75)
         except Exception as exc:
             logger.warning("Shadow model: tile %d skipped: %s", i + 1, exc)
             continue
