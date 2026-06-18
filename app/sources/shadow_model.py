@@ -113,11 +113,11 @@ _TILES = [
 ]
 
 
-async def _fetch_tile(client, bbox: tuple, tile_idx: int) -> tuple[dict, list]:
-    """Fetch one Overpass tile. Returns (nodes, ways) dicts."""
+def _fetch_tile_sync(bbox: tuple, tile_idx: int) -> tuple[dict, list]:
+    """Synchronous Overpass fetch — runs in a thread so asyncio can cancel it cleanly."""
+    import httpx as _httpx
     s, w, n, e = bbox
-    query = f"""
-[out:json][timeout:60];
+    query = f"""[out:json][timeout:55];
 (
   way["building"]({s},{w},{n},{e});
 );
@@ -126,48 +126,44 @@ out body;
 out skel qt;
 """
     encoded = urllib.parse.urlencode({"data": query})
-    import httpx as _httpx
-    _timeout = _httpx.Timeout(connect=10.0, read=50.0, write=10.0, pool=5.0)
-    resp = None
+    _timeout = _httpx.Timeout(connect=10.0, read=55.0, write=10.0, pool=5.0)
     last_exc = None
     for url in OVERPASS_ENDPOINTS:
         try:
-            resp = await client.post(
-                url,
-                content=encoded.encode(),
-                headers={
-                    "User-Agent": "gbgvader.se/1.0 (shadow-model; https://gbgvader.se)",
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                timeout=_timeout,
-            )
-            if resp.status_code == 200:
-                break
-            resp = None
+            with _httpx.Client() as client:
+                resp = client.post(
+                    url,
+                    content=encoded.encode(),
+                    headers={
+                        "User-Agent": "gbgvader.se/1.0 (shadow-model; https://gbgvader.se)",
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    timeout=_timeout,
+                )
+            if resp.status_code != 200:
+                last_exc = Exception(f"HTTP {resp.status_code}")
+                continue
+            elements = resp.json().get("elements", [])
+            nodes: dict = {}
+            ways: list = []
+            for el in elements:
+                if el["type"] == "node":
+                    nodes[el["id"]] = (el["lat"], el["lon"])
+                elif el["type"] == "way":
+                    ways.append(el)
+            logger.info("Shadow tile %d: %d nodes, %d ways", tile_idx, len(nodes), len(ways))
+            return nodes, ways
         except Exception as exc:
             last_exc = exc
             logger.warning("Overpass tile %d endpoint %s failed: %s", tile_idx, url, exc)
-            resp = None
             continue
-
-    if resp is None:
-        raise Exception(f"Overpass tile {tile_idx} failed after all endpoints: {last_exc}")
-
-    elements = resp.json().get("elements", [])
-    nodes: dict = {}
-    ways: list = []
-    for el in elements:
-        if el["type"] == "node":
-            nodes[el["id"]] = (el["lat"], el["lon"])
-        elif el["type"] == "way":
-            ways.append(el)
-    logger.info("Shadow tile %d: %d nodes, %d ways", tile_idx, len(nodes), len(ways))
-    return nodes, ways
+    raise Exception(f"Overpass tile {tile_idx} failed after all endpoints: {last_exc}")
 
 
-async def fetch_all_buildings(client, state: dict | None = None) -> list[dict]:
+async def fetch_all_buildings(state: dict | None = None) -> list[dict]:
     """Fetch all building polygons in Göteborg via 4 tiled Overpass queries.
 
+    Runs each tile in a thread so asyncio.wait_for can reliably cancel hangers.
     Returns list of {"h": float, "p": [[lat,lon],...], "c": [lat,lon]}
     """
     all_nodes: dict = {}
@@ -178,7 +174,10 @@ async def fetch_all_buildings(client, state: dict | None = None) -> list[dict]:
             state["phase"] = f"Hämtar byggnader från Overpass ({i+1}/{len(_TILES)})…"
         logger.info("Shadow model: fetching tile %d %s", i + 1, tile)
         try:
-            nodes, ways = await asyncio.wait_for(_fetch_tile(client, tile, i + 1), timeout=75)
+            nodes, ways = await asyncio.wait_for(
+                asyncio.to_thread(_fetch_tile_sync, tile, i + 1),
+                timeout=80,
+            )
         except Exception as exc:
             logger.warning("Shadow model: tile %d skipped: %s", i + 1, exc)
             continue
@@ -270,11 +269,9 @@ async def run_shadow_enrichment_job(get_db_func) -> None:
     db: Session | None = None
 
     try:
-        import httpx
         from app.models import SunTerrace
 
-        async with httpx.AsyncClient() as client:
-            buildings = await fetch_all_buildings(client, state=_shadow_state)
+        buildings = await fetch_all_buildings(state=_shadow_state)
 
         _shadow_state["phase"] = f"Bygger index ({len(buildings)} byggnader)…"
         grid = build_grid(buildings)
