@@ -104,15 +104,22 @@ def _simplify(coords: list, max_pts: int) -> list:
 
 # ── Overpass building fetch ────────────────────────────────────────────────────
 
-async def fetch_all_buildings(client) -> list[dict]:
-    """One bulk Overpass query: all building polygons in Göteborg.
+# Split Göteborg into 4 tiles so each Overpass query is manageable
+_TILES = [
+    (57.60, 11.70, 57.725, 11.90),
+    (57.60, 11.90, 57.725, 12.10),
+    (57.725, 11.70, 57.85, 11.90),
+    (57.725, 11.90, 57.85, 12.10),
+]
 
-    Returns list of {"h": float, "p": [[lat,lon],...], "c": [lat,lon]}
-    """
-    query = """
-[out:json][timeout:120];
+
+async def _fetch_tile(client, bbox: tuple, tile_idx: int) -> tuple[dict, list]:
+    """Fetch one Overpass tile. Returns (nodes, ways) dicts."""
+    s, w, n, e = bbox
+    query = f"""
+[out:json][timeout:60];
 (
-  way["building"](57.60,11.70,57.85,12.10);
+  way["building"]({s},{w},{n},{e});
 );
 out body;
 >;
@@ -130,20 +137,21 @@ out skel qt;
                     "User-Agent": "gbgvader.se/1.0 (shadow-model; https://gbgvader.se)",
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
-                timeout=120,
+                timeout=90,
             )
             if resp.status_code == 200:
                 break
+            resp = None
         except Exception as exc:
             last_exc = exc
+            logger.warning("Overpass tile %d endpoint %s failed: %s", tile_idx, url, exc)
+            resp = None
             continue
 
-    if resp is None or resp.status_code != 200:
-        raise Exception(f"Overpass shadow fetch failed: {last_exc or resp.status_code}")
+    if resp is None:
+        raise Exception(f"Overpass tile {tile_idx} failed: {last_exc}")
 
     elements = resp.json().get("elements", [])
-
-    # Pass 1: node positions
     nodes: dict = {}
     ways: list = []
     for el in elements:
@@ -151,10 +159,30 @@ out skel qt;
             nodes[el["id"]] = (el["lat"], el["lon"])
         elif el["type"] == "way":
             ways.append(el)
+    logger.info("Shadow tile %d: %d nodes, %d ways", tile_idx, len(nodes), len(ways))
+    return nodes, ways
 
-    # Pass 2: build polygon objects
+
+async def fetch_all_buildings(client, state: dict | None = None) -> list[dict]:
+    """Fetch all building polygons in Göteborg via 4 tiled Overpass queries.
+
+    Returns list of {"h": float, "p": [[lat,lon],...], "c": [lat,lon]}
+    """
+    all_nodes: dict = {}
+    all_ways: dict = {}  # keyed by way id to deduplicate across tile boundaries
+
+    for i, tile in enumerate(_TILES):
+        if state is not None:
+            state["phase"] = f"Hämtar byggnader från Overpass ({i+1}/{len(_TILES)})…"
+        logger.info("Shadow model: fetching tile %d %s", i + 1, tile)
+        nodes, ways = await _fetch_tile(client, tile, i + 1)
+        all_nodes.update(nodes)
+        for w in ways:
+            all_ways[w["id"]] = w
+
+    # Build polygon objects
     buildings: list = []
-    for way in ways:
+    for way in all_ways.values():
         tags = way.get("tags", {})
         h = DEFAULT_HEIGHT_M
         if "building:height" in tags:
@@ -169,7 +197,7 @@ out skel qt;
                 pass
 
         nds = way.get("nodes", [])
-        coords = [nodes[n] for n in nds if n in nodes]
+        coords = [all_nodes[n] for n in nds if n in all_nodes]
         if len(coords) < 3:
             continue
 
@@ -183,7 +211,7 @@ out skel qt;
             "c": [round(clat, 6), round(clon, 6)],
         })
 
-    logger.info("Shadow model: fetched %d building polygons", len(buildings))
+    logger.info("Shadow model: fetched %d building polygons total", len(buildings))
     return buildings
 
 
@@ -240,7 +268,7 @@ async def run_shadow_enrichment_job(get_db_func) -> None:
         from app.models import SunTerrace
 
         async with httpx.AsyncClient() as client:
-            buildings = await fetch_all_buildings(client)
+            buildings = await fetch_all_buildings(client, state=_shadow_state)
 
         _shadow_state["phase"] = f"Bygger index ({len(buildings)} byggnader)…"
         grid = build_grid(buildings)
