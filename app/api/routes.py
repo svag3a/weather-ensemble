@@ -1262,10 +1262,21 @@ def get_top_terraces(
                 "to":   f"{min(best[-1] + 1, 24):02d}:00",
             }
 
+    # Sky must be fairly clear right now for "Sol just nu" to be warranted
+    now_fc = next(
+        (f for f in forecast_hours if abs(f["valid_for_ts"] - now.timestamp()) < 1800),
+        None,
+    )
+    sky_clear_now = (
+        now_fc is not None
+        and (now_fc.get("cloud_cover") or 100) < 50
+        and (now_fc.get("precip_probability") or 100) < 25
+    )
+
     return {
         "venues":      venues,
         "sun_window":  sun_window,
-        "has_sun_now": any(v["now_score"] >= 45 for v in venues),
+        "has_sun_now": sky_clear_now and any(v["now_score"] >= 45 for v in venues),
     }
 
 
