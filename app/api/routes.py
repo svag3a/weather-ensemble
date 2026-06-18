@@ -664,7 +664,7 @@ async def enrich_shadow(_user: str = Depends(get_current_user)):
 
 
 @router.get("/sun-terraces/enrich/shadow/status")
-def enrich_shadow_status(_user: str = Depends(get_current_user)):
+def enrich_shadow_status():
     from app.sources.shadow_model import get_shadow_state
     return get_shadow_state()
 
