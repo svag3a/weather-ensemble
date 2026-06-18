@@ -477,11 +477,13 @@ def compute_scores(
             has_known_orientation = orientation and orientation != "UNKNOWN"
             eff_os = os_val if has_known_orientation else min(os_val, 60)
 
-        total = int(0.55 * eff_os + 0.30 * ws["cloud"] + 0.10 * ws["temp"] + 0.05 * ws["wind"])
+        # Multiplicative: bad weather kills the score even if orientation is perfect,
+        # and wrong orientation kills it even if the weather is gorgeous.
+        orientation_factor = eff_os / 100.0
+        weather_factor = ws["combined"] / 100.0
+        total = int(100 * orientation_factor * weather_factor)
         if outdoor_seating:
-            total = min(100, total + 8)
-        if ws["precip"] < 40:
-            total = int(total * ws["precip"] / 40)
+            total = min(100, total + 5)
         result[key] = {
             "sun_score": int((alt / 90) * eff_os),
             "orientation_score": int(eff_os),   # pure directional exposure, 0–100

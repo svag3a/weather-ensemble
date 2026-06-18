@@ -776,12 +776,13 @@ export default function SolView({ coords, initialData }) {
     if (!data) setLoading(true)
     setError(null)
     fetchSunTerraces({
-      lat:    coords?.lat ?? 57.7089,
-      lon:    coords?.lon ?? 11.9746,
-      radius: debouncedRadius,
-      type:   typeParam,
-      name:   debouncedSearch,
-      tags:   tagsParam,
+      lat:       coords?.lat ?? 57.7089,
+      lon:       coords?.lon ?? 11.9746,
+      radius:    debouncedRadius,
+      type:      typeParam,
+      name:      debouncedSearch,
+      tags:      tagsParam,
+      min_score: 25,
     })
       .then(setData)
       .catch(e => setError(e.message))

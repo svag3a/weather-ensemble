@@ -2628,6 +2628,7 @@ export default function MobileApp() {
           radius: loadRadiusPref(),
           type: 'all',
           tags: [...loadTimePrefP()].join(','),
+          min_score: 25,
         })
         setPrefetchedTerraces(terraces)
       } catch {}
