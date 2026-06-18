@@ -1539,6 +1539,52 @@ function WarningsView({ warnings }) {
   )
 }
 
+function WarningsBanner({ warnings }) {
+  const [open, setOpen] = useState(false)
+  const active = warnings.filter(w => WARNING_TRIANGLE_COLOR[w.level_code])
+  if (!active.length) return null
+
+  const topColor = WARNING_TRIANGLE_COLOR[active[0].level_code]
+  const summary = active.length === 1
+    ? active[0].event
+    : `${active.length} aktiva SMHI-varningar`
+
+  return (
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl w-full text-left"
+        style={{ background: 'rgba(251,146,60,0.10)', border: '1px solid rgba(251,146,60,0.20)' }}
+      >
+        <TriangleAlert size={13} className={`${topColor} shrink-0`} />
+        <span className="text-orange-300 text-xs flex-1 leading-snug">{summary}</span>
+        <span className="text-orange-400/50 text-xs">›</span>
+      </button>
+
+      {open && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setOpen(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-t-3xl px-5 pt-5 pb-8 space-y-4"
+            style={{ background: '#0f172a', maxHeight: '80vh', overflowY: 'auto' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-white font-semibold text-base">SMHI-varningar</span>
+              <button onClick={() => setOpen(false)} className="text-slate-400 text-xl leading-none px-1">×</button>
+            </div>
+            {active.map((w, i) => <WarningCard key={i} warning={w} />)}
+            <p className="text-white/30 text-xs pt-1">Uppdateras var 30:e minut · Källa: SMHI IBW</p>
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 // ── CollectButton ─────────────────────────────────────────────────────────────
 
 function CollectButton() {
@@ -2640,15 +2686,7 @@ export default function MobileApp() {
                   })()}
 
                   {warnings.some(w => WARNING_TRIANGLE_COLOR[w.level_code]) && (
-                    <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl"
-                      style={{ background: 'rgba(251,146,60,0.10)', border: '1px solid rgba(251,146,60,0.20)' }}>
-                      <TriangleAlert size={13} className="text-orange-400 shrink-0" />
-                      <span className="text-orange-300 text-xs flex-1 leading-snug">
-                        {warnings.filter(w => WARNING_TRIANGLE_COLOR[w.level_code]).length === 1
-                          ? warnings.find(w => WARNING_TRIANGLE_COLOR[w.level_code]).event
-                          : `${warnings.filter(w => WARNING_TRIANGLE_COLOR[w.level_code]).length} aktiva SMHI-varningar`}
-                      </span>
-                    </div>
+                    <WarningsBanner warnings={warnings} />
                   )}
 
 
