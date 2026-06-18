@@ -1151,10 +1151,10 @@ function WeatherBanner({ fc, radar, coords }) {
 
   return (
     <div className={`${GLASS} rounded-2xl flex items-center px-5 py-4`}>
-      {/* 1. Weather symbol — nudged left */}
-      <div className="flex-1 flex flex-col items-center gap-1" style={{ marginLeft: -10 }}>
+      {/* 1. Weather symbol — wider to fit label text */}
+      <div className="flex flex-col items-center gap-1" style={{ flex: '1.4', marginLeft: -10 }}>
         <span className="text-4xl leading-none"><WeatherSymbol symbol={symbol} /></span>
-        <span className="text-slate-400 text-xs text-center leading-tight max-w-[56px] break-words">{label}</span>
+        <span className="text-slate-400 text-xs text-center leading-tight">{label}</span>
       </div>
 
       <div className="w-px self-stretch bg-white/10 shrink-0" />
@@ -1423,9 +1423,12 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
         onClick={toggle}
         className="w-full flex items-center gap-3 px-5 py-3.5 active:bg-slate-700/50 transition-colors"
       >
-        {/* Day name + date */}
+        {/* Day name + date + optional warning icon */}
         <div className="w-24 shrink-0 text-left">
-          <div className="text-white text-sm font-medium leading-tight">{label}</div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-white text-sm font-medium leading-tight">{label}</span>
+            <WarningTriangle warning={warning} />
+          </div>
           <div className="text-slate-400 text-xs">{date}</div>
         </div>
 
@@ -1450,9 +1453,6 @@ function WeekDayRow({ hours, minTemp, maxTemp, symbol, totalPrecipMm, maxWind, w
             </div>
           )}
         </div>
-
-        {/* Warning triangle */}
-        <span className="w-4 text-center shrink-0"><WarningTriangle warning={warning} /></span>
 
         {/* Chevron */}
         <span className={`text-white/50 text-xs transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
