@@ -98,7 +98,7 @@ function useRadarLocation() {
     return () => clearInterval(timerRef.current)
   }, [poll, locate])
 
-  return { radar, rainTimeline, coords }
+  return { radar, rainTimeline, coords, locate }
 }
 
 function currentTimeSlot() {
@@ -2570,7 +2570,7 @@ export default function MobileApp() {
   const [prefetchedTerraces, setPrefetchedTerraces] = useState(null)
   const [activeTab, setActiveTab] = useState('now')
   const [slideDir, setSlideDir] = useState(1)
-  const { radar, rainTimeline, coords } = useRadarLocation()
+  const { radar, rainTimeline, coords, locate } = useRadarLocation()
   const geoLocation = useReverseGeocode(coords)
   const bgImage = useCityBackground(coords)
   const motifImage = useCityMotif(coords)
@@ -2638,10 +2638,15 @@ export default function MobileApp() {
 
   useEffect(() => {
     const interval = setInterval(load, 10 * 60 * 1000)
-    const onVisible = () => { if (document.visibilityState === 'visible') load() }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        locate()   // refresh GPS immediately → triggers coords update → load() reruns
+        load()     // also reload forecast with current coords while GPS resolves
+      }
+    }
     document.addEventListener('visibilitychange', onVisible)
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', onVisible) }
-  }, [load])
+  }, [load, locate])
 
   const now = new Date()
   const future = forecast?.filter(fc => parseTS(fc.valid_for) > now) ?? []
