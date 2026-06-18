@@ -329,9 +329,13 @@ function getSkyCss(fc, coords) {
 
 // ── Weather particles ─────────────────────────────────────────────────────────
 
-function WeatherParticles({ precip = 0, temperature = 10 }) {
+function WeatherParticles({ precip = 0, temperature = 10, radar = null }) {
   const isSnow = temperature < 1
-  const count  = precip >= 80 ? 55 : precip >= 60 ? 35 : precip >= 30 ? 15 : 0
+  // Boost effective precip if radar confirms active rain right now
+  const effectivePrecip = (radar?.raining && radar?.dbz != null)
+    ? Math.max(precip, radar.dbz >= 35 ? 80 : radar.dbz >= 25 ? 60 : 30)
+    : precip
+  const count  = effectivePrecip >= 80 ? 55 : effectivePrecip >= 60 ? 35 : effectivePrecip >= 30 ? 15 : 0
 
   const particles = useMemo(() =>
     Array.from({ length: count }, (_, i) => ({
@@ -1045,7 +1049,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
       {/* Two cloud layers at different speeds for depth parallax */}
       <CloudCanvas cloudCover={Math.max(0, (fc.cloud_cover ?? 0) - 10)} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} speedMult={0.55} opacityMult={0.75} noiseOffset={47.3} />
       <CloudCanvas cloudCover={fc.cloud_cover ?? 0} windSpeed={fc.wind_speed ?? 2} precipProbability={fc.precip_probability ?? 0} speedMult={1.45} opacityMult={1.0} noiseOffset={0} />
-      <WeatherParticles precip={fc.precip_probability ?? 0} temperature={fc.temperature ?? 10} />
+      <WeatherParticles precip={fc.precip_probability ?? 0} temperature={fc.temperature ?? 10} radar={radar} />
 
       {/* Motif anchored to bottom at natural aspect ratio */}
       {motifImage && (
