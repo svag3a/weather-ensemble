@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, fixTerraceAddresses, triggerGeocodeTerraces, fetchGeocodeStatus,
          triggerEnrichOsm, fetchEnrichOsmStatus,
          triggerEnrichAi, fetchEnrichAiStatus,
+         triggerEnrichShadow, fetchEnrichShadowStatus,
          triggerAutoTag, fetchAutoTagStatus,
          triggerAreaTag, fetchAreaTagStatus,
          deleteHashtag, deleteTerrace,
@@ -1054,6 +1055,8 @@ export default function SunTerraceAdmin({ onOverride }) {
             title="Sätter hashtags automatiskt baserat på namn, typ och solbåge" />
           <JobWidget label="Stadsdels-taggar" triggerFn={triggerAreaTag} statusFn={fetchAreaTagStatus} color="pink"
             title="Reverse-geocodar varje venue via Nominatim och sätter stadsdel som hashtag (~1 req/s)" />
+          <JobWidget label="Skuggmodell" triggerFn={triggerEnrichShadow} statusFn={fetchEnrichShadowStatus} color="orange"
+            title="Hämtar byggnadspolygoner från Overpass och beräknar vilka byggnader kan skugga varje venue" />
         </div>
       </div>
 

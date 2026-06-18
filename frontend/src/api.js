@@ -285,6 +285,18 @@ export async function fetchAreaTagStatus() {
   return res.json()
 }
 
+export async function triggerEnrichShadow() {
+  const res = await fetch(`${BASE}/sun-terraces/enrich/shadow`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function fetchEnrichShadowStatus() {
+  const res = await fetch(`${BASE}/sun-terraces/enrich/shadow/status`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchSunTerracesAdmin() {
   const res = await fetch(`${BASE}/sun-terraces/admin`, { cache: 'no-store' })
   if (!res.ok) throw new Error(await res.text())
