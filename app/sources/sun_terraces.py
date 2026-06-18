@@ -368,10 +368,10 @@ def compute_day_score(
         # Blend with weather: same weights as per-hour total_score
         fc = min(forecast_hours, key=lambda f: abs(f.get("valid_for_ts", 0) - target_ts))
         ws = weather_score(fc)
-        combined = 0.55 * geo + 0.30 * ws["cloud"] + 0.10 * ws["temp"] + 0.05 * ws["wind"]
-        # Rain kills the score
-        if ws["precip"] < 40:
-            combined = combined * ws["precip"] / 40
+        alt_factor = max(0.0, min(1.0, (alt - 5.0) / 20.0))  # 0 at ≤5°, 1 at ≥25°
+        combined = (geo / 100.0) * (ws["combined"] / 100.0) * alt_factor * 100.0
+        if ws["precip"] < 60:
+            combined = 0.0
         return max(0.0, min(100.0, combined))
 
     # Scan up to 50 steps (25 h) to cover nighttime → next sunrise → next sunset.
@@ -447,11 +447,14 @@ def compute_scores(
             fc = {}
         ws = weather_score(fc)
 
+        alt_factor = max(0.0, min(1.0, (alt - 5.0) / 20.0))  # 0 at ≤5°, 1 at ≥25°
+
         if is_rooftop:
             total = int(0.50 * ws["cloud"] + 0.35 * ws["precip"] + 0.10 * ws["temp"] + 0.05 * ws["wind"])
             total = min(100, total + 10)
-            if ws["precip"] < 40:
-                total = int(total * ws["precip"] / 40)
+            if ws["precip"] < 60:
+                total = 0
+            total = int(total * alt_factor)
             result[key] = {
                 "sun_score": int((alt / 90) * 100),
                 "orientation_score": 100,   # rooftop always fully sky-exposed
@@ -481,9 +484,12 @@ def compute_scores(
         # and wrong orientation kills it even if the weather is gorgeous.
         orientation_factor = eff_os / 100.0
         weather_factor = ws["combined"] / 100.0
-        total = int(100 * orientation_factor * weather_factor)
+        total = int(100 * orientation_factor * weather_factor * alt_factor)
         if outdoor_seating:
             total = min(100, total + 5)
+        # Rain veto: any detectable rain (precip_probability > ~27%) → score = 0
+        if ws["precip"] < 60:
+            total = 0
         result[key] = {
             "sun_score": int((alt / 90) * eff_os),
             "orientation_score": int(eff_os),   # pure directional exposure, 0–100
