@@ -535,7 +535,7 @@ function WarningTriangle({ warning }) {
   if (!warning) return null
   const color = WARNING_TRIANGLE_COLOR[warning.level_code]
   if (!color) return null
-  return <span className={`text-xs ${color}`} title={`${warning.level_label}: ${warning.event}`}>▲</span>
+  return <TriangleAlert size={12} className={color} title={`${warning.level_label}: ${warning.event}`} />
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
