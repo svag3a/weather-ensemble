@@ -292,6 +292,19 @@ async def radar_now(
     return {**radar, "cape": cape}
 
 
+@router.get("/radar/nowcast")
+async def radar_nowcast(
+    lat: float = Query(default=57.7089),
+    lon: float = Query(default=11.9746),
+):
+    """30-minute rain timeline in 5-min steps using Lagrangian radar extrapolation."""
+    import httpx
+    from app.sources.radar_nowcast import nowcast_timeline
+    async with httpx.AsyncClient() as client:
+        timeline = await nowcast_timeline(client, lat, lon)
+    return {"timeline": timeline}
+
+
 @router.get("/warnings")
 async def get_warnings():
     """Active SMHI weather warnings for Västra Götalands län (covers Göteborg)."""

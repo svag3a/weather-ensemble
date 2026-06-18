@@ -45,6 +45,12 @@ export async function fetchRadarNow(lat, lon) {
   return res.json()
 }
 
+export async function fetchRainNowcast(lat, lon) {
+  const res = await fetch(`${BASE}/radar/nowcast?lat=${lat}&lon=${lon}`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchWarnings() {
   const res = await fetch(`${BASE}/warnings`)
   if (!res.ok) throw new Error(await res.text())

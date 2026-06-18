@@ -17,7 +17,7 @@ function JacketIcon({ size = 24, color = 'currentColor' }) {
   )
 }
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages, fetchSunTerraces, fetchTopTerraces } from './api'
+import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchRainNowcast, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages, fetchSunTerraces, fetchTopTerraces } from './api'
 import SolView from './components/SolView'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
 import WeatherSymbol from './components/WeatherSymbol'
@@ -62,11 +62,13 @@ function useReverseGeocode(coords) {
 
 function useRadarLocation() {
   const [radar, setRadar] = useState(null)
+  const [rainTimeline, setRainTimeline] = useState(null)
   const [coords, setCoords] = useState(null)
   const timerRef = useRef(null)
 
   const poll = useCallback(async (lat, lon) => {
     try { setRadar(await fetchRadarNow(lat, lon)) } catch {}
+    try { const r = await fetchRainNowcast(lat, lon); setRainTimeline(r.timeline) } catch {}
   }, [])
 
   const locate = useCallback(() => {
@@ -96,7 +98,7 @@ function useRadarLocation() {
     return () => clearInterval(timerRef.current)
   }, [poll, locate])
 
-  return { radar, coords }
+  return { radar, rainTimeline, coords }
 }
 
 function currentTimeSlot() {
@@ -2423,6 +2425,44 @@ function ProfileView({ onNavigateToSol }) {
 
 // ── Sol just nu card ──────────────────────────────────────────────────────────
 
+function RainBand({ timeline }) {
+  if (!timeline || timeline.length === 0) return null
+  const hasRain = timeline.some(s => s.raining)
+  if (!hasRain) return null
+
+  function dbzToColor(dbz) {
+    if (dbz === null || dbz === undefined) return 'rgba(255,255,255,0.05)'
+    if (dbz < 20) return 'rgba(147,197,253,0.40)'
+    if (dbz < 30) return 'rgba(96,165,250,0.70)'
+    if (dbz < 40) return 'rgba(59,130,246,0.90)'
+    return 'rgba(29,78,216,0.98)'
+  }
+
+  const n = timeline.length
+  const stops = timeline.map((step, i) => {
+    const pct = ((i / (n - 1)) * 100).toFixed(1)
+    return `${dbzToColor(step.dbz)} ${pct}%`
+  })
+  const gradient = `linear-gradient(to right, ${stops.join(', ')})`
+
+  return (
+    <div className="rounded-2xl px-4 py-3" style={{ background: 'rgba(23,37,84,0.35)', border: '1px solid rgba(96,165,250,0.18)' }}>
+      <div className="flex items-center gap-2 mb-2.5">
+        <Droplets size={13} className="text-blue-400 shrink-0" />
+        <span className="text-blue-300 text-sm font-medium">Regnband</span>
+      </div>
+      <div className="h-4 rounded-lg" style={{ background: gradient }} />
+      <div className="flex justify-between mt-1.5">
+        {timeline.map((step, i) => (
+          <span key={i} style={{ fontSize: '10px', color: 'rgba(147,197,253,0.65)' }}>
+            {step.offset_min === 0 ? 'Nu' : `+${step.offset_min}`}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 const VENUE_TYPE_ICONS_TOP = { cafe: Coffee, bar: Martini, pub: Beer, restaurant: Utensils }
 
 function SolNuCard({ data, onViewAll }) {
@@ -2484,7 +2524,7 @@ export default function MobileApp() {
   const [prefetchedTerraces, setPrefetchedTerraces] = useState(null)
   const [activeTab, setActiveTab] = useState('now')
   const [slideDir, setSlideDir] = useState(1)
-  const { radar, coords } = useRadarLocation()
+  const { radar, rainTimeline, coords } = useRadarLocation()
   const geoLocation = useReverseGeocode(coords)
   const bgImage = useCityBackground(coords)
   const motifImage = useCityMotif(coords)
@@ -2595,6 +2635,7 @@ export default function MobileApp() {
                     return <>
                       <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} skyGradient={sky.gradient} skyTheme={getSkyTheme(sky.gradient)} />
                       <WeatherBanner fc={currentFc} radar={radar} coords={coords} />
+                      <RainBand timeline={rainTimeline} />
                     </>
                   })()}
 
@@ -2611,7 +2652,9 @@ export default function MobileApp() {
                   )}
 
 
-                  <SolNuCard data={topTerraces} onViewAll={() => changeTab('sol')} />
+                  {!(rainTimeline && rainTimeline.some(s => s.raining)) && (
+                    <SolNuCard data={topTerraces} onViewAll={() => changeTab('sol')} />
+                  )}
 
                   {/* Dagsprognos accordion — idag + kommande dagar */}
                   {(() => {

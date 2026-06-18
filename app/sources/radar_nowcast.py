@@ -164,6 +164,121 @@ async def check_rain_at(client: httpx.AsyncClient, lat: float, lon: float) -> di
     }
 
 
+def _estimate_motion(
+    f_new: np.ndarray, f_old: np.ndarray,
+    center_row: int, center_col: int,
+    window: int = 100,
+) -> tuple[float, float]:
+    """
+    Estimate motion vector (dy, dx) pixels/5-min via FFT phase correlation
+    on a window around the user's location.
+    Positive dy = southward, positive dx = eastward.
+    """
+    h, w = f_new.shape
+    r0, r1 = max(0, center_row - window), min(h, center_row + window)
+    c0, c1 = max(0, center_col - window), min(w, center_col + window)
+    w1 = f_new[r0:r1, c0:c1]
+    w2 = f_old[r0:r1, c0:c1]
+    if w1.sum() < 10 or w2.sum() < 10:
+        return 0.0, 0.0
+    # Hann window to reduce edge ringing
+    hann_r = np.hanning(w1.shape[0])[:, None]
+    hann_c = np.hanning(w1.shape[1])[None, :]
+    w1 = w1 * hann_r * hann_c
+    w2 = w2 * hann_r * hann_c
+    f1 = np.fft.fft2(w1)
+    f2 = np.fft.fft2(w2)
+    cross = f1 * np.conj(f2)
+    denom = np.abs(cross)
+    denom[denom < 1e-10] = 1e-10
+    r = np.fft.ifft2(cross / denom).real
+    peak = np.unravel_index(r.argmax(), r.shape)
+    dy, dx = float(peak[0]), float(peak[1])
+    ph, pw = r.shape
+    if dy > ph / 2: dy -= ph
+    if dx > pw / 2: dx -= pw
+    # Clamp to physically reasonable storm speeds (~150 km/h max ≈ 75 px/step at 2 km/px)
+    dy = max(-75.0, min(75.0, dy))
+    dx = max(-75.0, min(75.0, dx))
+    return dy, dx
+
+
+def _bilinear_sample(field: np.ndarray, r: float, c: float) -> Optional[float]:
+    h, w = field.shape
+    r0, c0 = int(np.floor(r)), int(np.floor(c))
+    r1, c1 = r0 + 1, c0 + 1
+    if not (0 <= r0 < h and 0 <= c0 < w and r1 < h and c1 < w):
+        return None
+    dr, dc = r - r0, c - c0
+    val = (
+        field[r0, c0] * (1 - dr) * (1 - dc) +
+        field[r0, c1] * (1 - dr) * dc +
+        field[r1, c0] * dr * (1 - dc) +
+        field[r1, c1] * dr * dc
+    )
+    return None if np.isnan(val) else round(float(val), 1)
+
+
+async def nowcast_timeline(
+    client: httpx.AsyncClient,
+    lat: float,
+    lon: float,
+    steps: int = 7,
+) -> list[dict]:
+    """
+    Returns 7 dicts (t=0, +5, +10 … +30 min), each:
+      {offset_min, dbz, raining}
+    Uses Lagrangian persistence: motion vector from FFT phase correlation
+    applied to the most recent radar frame.
+    """
+    now = datetime.now(timezone.utc)
+    urls = [_image_url(now - timedelta(minutes=5 * i)) for i in range(_N_IMAGES)]
+    raw = await asyncio.gather(*[_fetch_tif(client, u) for u in urls])
+    results = [r for r in raw if r is not None]
+    if not results:
+        return []
+
+    _, transform, crs = results[0]
+    row, col = _latlon_to_pixel(lat, lon, transform, crs)
+
+    # Build dbZ fields (NaN where no data or below clutter threshold)
+    def to_dbz(frame: np.ndarray) -> np.ndarray:
+        out = frame.astype(float) * 0.4 - 30.0
+        out[frame == 0] = np.nan
+        out[frame == 255] = np.nan
+        out[out < _DBZ_MIN] = np.nan
+        return out
+
+    dbz_frames = [to_dbz(r[0]) for r in results]
+
+    # Estimate motion from up to 3 consecutive frame pairs, take median
+    motion_dy, motion_dx = [], []
+    for i in range(min(3, len(dbz_frames) - 1)):
+        fn = np.nan_to_num(dbz_frames[i])
+        fo = np.nan_to_num(dbz_frames[i + 1])
+        dy, dx = _estimate_motion(fn, fo, row, col)
+        motion_dy.append(dy)
+        motion_dx.append(dx)
+
+    dy = float(np.median(motion_dy)) if motion_dy else 0.0
+    dx = float(np.median(motion_dx)) if motion_dx else 0.0
+
+    # Current (newest) dbZ field for sampling
+    field = dbz_frames[0]
+
+    timeline = []
+    for step in range(steps):
+        proj_r = row - step * dy
+        proj_c = col - step * dx
+        dbz = _bilinear_sample(field, proj_r, proj_c)
+        timeline.append({
+            "offset_min": step * 5,
+            "dbz": dbz,
+            "raining": dbz is not None,
+        })
+    return timeline
+
+
 async def fetch(client: httpx.AsyncClient) -> list[HourlyForecast]:
     now = datetime.now(timezone.utc)
 
