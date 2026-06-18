@@ -126,6 +126,8 @@ out body;
 out skel qt;
 """
     encoded = urllib.parse.urlencode({"data": query})
+    import httpx as _httpx
+    _timeout = _httpx.Timeout(connect=10.0, read=50.0, write=10.0, pool=5.0)
     resp = None
     last_exc = None
     for url in OVERPASS_ENDPOINTS:
@@ -137,7 +139,7 @@ out skel qt;
                     "User-Agent": "gbgvader.se/1.0 (shadow-model; https://gbgvader.se)",
                     "Content-Type": "application/x-www-form-urlencoded",
                 },
-                timeout=90,
+                timeout=_timeout,
             )
             if resp.status_code == 200:
                 break
@@ -149,7 +151,7 @@ out skel qt;
             continue
 
     if resp is None:
-        raise Exception(f"Overpass tile {tile_idx} failed: {last_exc}")
+        raise Exception(f"Overpass tile {tile_idx} failed after all endpoints: {last_exc}")
 
     elements = resp.json().get("elements", [])
     nodes: dict = {}
@@ -175,7 +177,11 @@ async def fetch_all_buildings(client, state: dict | None = None) -> list[dict]:
         if state is not None:
             state["phase"] = f"Hämtar byggnader från Overpass ({i+1}/{len(_TILES)})…"
         logger.info("Shadow model: fetching tile %d %s", i + 1, tile)
-        nodes, ways = await _fetch_tile(client, tile, i + 1)
+        try:
+            nodes, ways = await _fetch_tile(client, tile, i + 1)
+        except Exception as exc:
+            logger.warning("Shadow model: tile %d skipped: %s", i + 1, exc)
+            continue
         all_nodes.update(nodes)
         for w in ways:
             all_ways[w["id"]] = w
