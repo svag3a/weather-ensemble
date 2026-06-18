@@ -331,6 +331,12 @@ export async function overrideTerrace(id, { orientation, orientation_confidence,
   return res.json()
 }
 
+export async function deleteTerrace(id) {
+  const res = await fetch(`${BASE}/sun-terraces/${id}`, { method: 'DELETE' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function deriveArcFromPolygon(id) {
   const res = await fetch(`${BASE}/sun-terraces/${id}/derive-arc`, { method: 'POST' })
   if (!res.ok) throw new Error(await res.text())

@@ -4,7 +4,7 @@ import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, 
          triggerEnrichAi, fetchEnrichAiStatus,
          triggerAutoTag, fetchAutoTagStatus,
          triggerAreaTag, fetchAreaTagStatus,
-         deleteHashtag,
+         deleteHashtag, deleteTerrace,
          fetchHashtags, createHashtag,
          triggerOsmRefresh, fetchOsmRefreshStatus,
          triggerGoogleImport, fetchGoogleImportStatus,
@@ -970,6 +970,7 @@ export default function SunTerraceAdmin({ onOverride }) {
   const [loading, setLoading]         = useState(false)
   const [loadError, setLoadError]     = useState(null)
   const [editingId, setEditingId]     = useState(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [showAdd, setShowAdd]         = useState(false)
   const [typeFilter, setTypeFilter]   = useState('all')
   const [activeFilter, setActiveFilter] = useState('active')
@@ -1165,11 +1166,29 @@ export default function SunTerraceAdmin({ onOverride }) {
                     )}
                   </td>
                   <td className="px-4 py-3 text-slate-500 text-xs max-w-[140px] truncate">{t.address||'—'}</td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => setEditingId(editingId===t.id?null:t.id)}
+                  <td className="px-4 py-3 flex items-center gap-3">
+                    <button onClick={() => { setEditingId(editingId===t.id?null:t.id); setConfirmDeleteId(null) }}
                       className={`text-xs transition-colors ${editingId===t.id?'text-slate-400 hover:text-slate-300':'text-blue-400 hover:text-blue-300'}`}>
                       {editingId===t.id?'Stäng':'Redigera'}
                     </button>
+                    {confirmDeleteId === t.id ? (
+                      <span className="flex items-center gap-1.5 text-xs">
+                        <span className="text-red-400">Radera?</span>
+                        <button
+                          onClick={async () => {
+                            await deleteTerrace(t.id)
+                            setConfirmDeleteId(null)
+                            reload()
+                          }}
+                          className="text-red-400 hover:text-red-300 font-medium">ja</button>
+                        <button onClick={() => setConfirmDeleteId(null)} className="text-slate-500 hover:text-slate-300">nej</button>
+                      </span>
+                    ) : (
+                      <button onClick={() => { setConfirmDeleteId(t.id); setEditingId(null) }}
+                        className="text-xs text-slate-500 hover:text-red-400 transition-colors">
+                        Radera
+                      </button>
+                    )}
                   </td>
                 </tr>
                 {editingId === t.id && (

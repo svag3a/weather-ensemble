@@ -1047,6 +1047,17 @@ def add_terrace_hashtag(terrace_id: int, hashtag_id: int, db: Session = Depends(
     return {"terrace_id": row.terrace_id, "hashtag_id": row.hashtag_id, "count": row.count}
 
 
+@router.delete("/sun-terraces/{terrace_id}", dependencies=[Depends(get_current_user)])
+def delete_sun_terrace(terrace_id: int, db: Session = Depends(get_db)):
+    """Permanently delete a venue and all its related rows."""
+    t = db.query(SunTerrace).filter(SunTerrace.id == terrace_id).first()
+    if t is None:
+        raise HTTPException(status_code=404, detail="Venue not found")
+    db.delete(t)
+    db.commit()
+    return {"deleted": terrace_id}
+
+
 @router.delete("/sun-terraces/{terrace_id}/hashtags/{hashtag_id}")
 def remove_terrace_hashtag(terrace_id: int, hashtag_id: int, db: Session = Depends(get_db)):
     """Decrement hashtag count. Delete row if count reaches 0."""
