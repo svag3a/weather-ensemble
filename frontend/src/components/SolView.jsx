@@ -827,7 +827,7 @@ export default function SolView({ coords, initialData }) {
             {mode === 'sol' ? 'Uteserveringar med bäst solläge just nu' : 'Uteserveringar i skugga just nu'}
           </p>
         </div>
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-4 shrink-0">
           {uvIndex != null && <UVChip uv={uvIndex} />}
           <div className="flex flex-col items-end gap-0.5">
             <div className="flex items-center gap-1">

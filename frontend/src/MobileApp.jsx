@@ -1170,18 +1170,20 @@ function WeatherBanner({ fc, radar, coords, forecastHours }) {
         <WindGaugeSemi windSpeed={fc.wind_speed ?? 0} windDirection={fc.wind_direction} />
       </div>
 
-      {/* 4. Weather momentum — only when a significant change is expected */}
-      {momentum.visible && (
-        <>
-          <div className="w-px self-stretch bg-white/10 shrink-0" />
-          <div className="flex-1 flex flex-col items-center gap-1">
+      {/* 4. Weather momentum — symbol when change expected, dash when stable */}
+      <div className="w-px self-stretch bg-white/10 shrink-0" />
+      <div className="flex-1 flex flex-col items-center gap-1">
+        {momentum.visible ? (
+          <>
             <span className="text-2xl leading-none">{momentum.symbol}</span>
             <span className={`text-xs text-center leading-tight ${
               momentum.direction === 'worsening' ? 'text-slate-400' : 'text-emerald-400'
             }`}>{momentum.label}</span>
-          </div>
-        </>
-      )}
+          </>
+        ) : (
+          <span className="text-slate-600 text-2xl leading-none">—</span>
+        )}
+      </div>
     </div>
   )
 }
