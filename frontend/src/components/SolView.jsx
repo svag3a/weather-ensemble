@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchSunTerraces, fetchHashtags, addHashtag, removeHashtag, reportTerrace, createTerrace, fetchUV } from '../api'
 import { sunTimesUTC } from '../weatherSymbol'
-import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRight, Spline, Hash, Martini, Beer, Coffee, Utensils } from 'lucide-react'
+import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRight, Spline, Hash, Martini, Beer, Coffee, Utensils, AlarmClock } from 'lucide-react'
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
@@ -692,6 +692,7 @@ export default function SolView({ coords, initialData }) {
   const [tagFilter, setTagFilter] = useState(loadSavedTimePref)
   const [uvIndex, setUvIndex]     = useState(null)
   const [favOnly, setFavOnly]     = useState(false)
+  const [showClosed, setShowClosed] = useState(false)
   useEffect(() => { if (favs.size === 0) setFavOnly(false) }, [favs.size])
   const debounceRef = useRef(null)
   const radiusRef   = useRef(null)
@@ -798,6 +799,7 @@ export default function SolView({ coords, initialData }) {
 
   const sortedData = data ? [...data]
     .filter(t => !favOnly || favs.has(t.id))
+    .filter(t => showClosed || t.is_open_now !== false)
     .sort((a, b) => mode === 'skugga'
       ? (a.day_score ?? 0) - (b.day_score ?? 0)
       : (b.day_score ?? 0) - (a.day_score ?? 0)
@@ -861,6 +863,14 @@ export default function SolView({ coords, initialData }) {
             </button>
           )
         })}
+        <div className="w-px h-5 bg-slate-700 shrink-0"/>
+        <button onClick={() => setShowClosed(v => !v)}
+          title={showClosed ? 'Visar stängda venues — klicka för att dölja' : 'Döljer stängda venues — klicka för att visa'}
+          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+            showClosed ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
+          }`}>
+          <AlarmClock size={16} strokeWidth={1.5}/>
+        </button>
       </div>
 
       {/* Tag filter bar */}
