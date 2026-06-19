@@ -47,6 +47,8 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE sun_terraces ADD COLUMN sun_arc_from REAL",
             "ALTER TABLE sun_terraces ADD COLUMN sun_arc_to REAL",
             "ALTER TABLE sun_terraces ADD COLUMN shadow_buildings_json TEXT",
+            "ALTER TABLE sun_terraces ADD COLUMN google_place_id TEXT",
+            "ALTER TABLE sun_terraces ADD COLUMN opening_hours_json TEXT",
             "ALTER TABLE terrace_votes RENAME TO terrace_reports",
             "ALTER TABLE terrace_reports RENAME COLUMN voted_at TO reported_at",
             """CREATE TABLE IF NOT EXISTS terrace_reports (

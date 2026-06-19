@@ -301,9 +301,20 @@ async def nightly_terrace_pipeline() -> None:
     logger.info("Nightly terrace pipeline finished")
 
 
+async def weekly_opening_hours_job() -> None:
+    """Weekly refresh of opening hours from Google Places (Monday 03:30 UTC)."""
+    from app.sources.opening_hours import run_opening_hours_job
+    logger.info("Weekly opening hours refresh started")
+    try:
+        await run_opening_hours_job(SessionLocal)
+    except Exception as exc:
+        logger.error("weekly_opening_hours_job failed: %s", exc)
+
+
 def create_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler(timezone="UTC")
-    scheduler.add_job(collect_and_update, "cron", minute=5)           # hourly at :05
-    scheduler.add_job(nightly_terrace_pipeline, "cron", hour=3, minute=0)   # daily 03:00 UTC
-    scheduler.add_job(calibrate_metar_job, "cron", hour=4, minute=30)       # daily 04:30 UTC
+    scheduler.add_job(collect_and_update, "cron", minute=5)                         # hourly at :05
+    scheduler.add_job(nightly_terrace_pipeline, "cron", hour=3, minute=0)           # daily 03:00 UTC
+    scheduler.add_job(calibrate_metar_job, "cron", hour=4, minute=30)               # daily 04:30 UTC
+    scheduler.add_job(weekly_opening_hours_job, "cron", day_of_week="mon", hour=3, minute=30)  # weekly Mon 03:30 UTC
     return scheduler

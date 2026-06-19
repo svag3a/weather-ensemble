@@ -3,6 +3,7 @@ import { overrideTerrace, createTerrace, deriveArcFromPolygon, autoArcTerraces, 
          triggerEnrichOsm, fetchEnrichOsmStatus,
          triggerEnrichAi, fetchEnrichAiStatus,
          triggerEnrichShadow, fetchEnrichShadowStatus,
+         triggerEnrichOpeningHours, fetchEnrichOpeningHoursStatus,
          triggerAutoTag, fetchAutoTagStatus,
          triggerAreaTag, fetchAreaTagStatus,
          deleteHashtag, deleteTerrace,
@@ -627,12 +628,14 @@ function JobWidget({ label, triggerFn, statusFn, color = 'blue', title }) {
     color === 'violet'  ? 'bg-violet-700 hover:bg-violet-600 disabled:bg-slate-600' :
     color === 'orange'  ? 'bg-orange-700 hover:bg-orange-600 disabled:bg-slate-600' :
     color === 'pink'    ? 'bg-pink-700 hover:bg-pink-600 disabled:bg-slate-600' :
+    color === 'teal'    ? 'bg-teal-700 hover:bg-teal-600 disabled:bg-slate-600' :
                           'bg-blue-600 hover:bg-blue-500 disabled:bg-slate-600'
   const barClass =
     color === 'emerald' ? 'bg-emerald-500' :
     color === 'violet'  ? 'bg-violet-500' :
     color === 'orange'  ? 'bg-orange-500' :
     color === 'pink'    ? 'bg-pink-500' :
+    color === 'teal'    ? 'bg-teal-500' :
                           'bg-blue-500'
 
   return (
@@ -1066,6 +1069,8 @@ export default function SunTerraceAdmin({ onOverride }) {
             title="Reverse-geocodar varje venue via Nominatim och sätter stadsdel som hashtag (~1 req/s)" />
           <JobWidget label="Skuggmodell" triggerFn={triggerEnrichShadow} statusFn={fetchEnrichShadowStatus} color="orange"
             title="Hämtar byggnadspolygoner från Overpass och beräknar vilka byggnader kan skugga varje venue" />
+          <JobWidget label="Öppettider" triggerFn={triggerEnrichOpeningHours} statusFn={fetchEnrichOpeningHoursStatus} color="teal"
+            title="Hämtar öppettider från Google Places API för alla aktiva venues (körs automatiskt varje måndag 05:30)" />
         </div>
       </div>
 

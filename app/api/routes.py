@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 import math as _math
 
+import app.sources.opening_hours as _opening_hours
 from app.database import get_db
 from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace, TerraceReport, Hashtag, TerraceHashtag
 from app.api.auth import get_current_user
@@ -667,6 +668,25 @@ async def enrich_shadow(_user: str = Depends(get_current_user)):
 def enrich_shadow_status():
     from app.sources.shadow_model import get_shadow_state
     return get_shadow_state()
+
+
+@router.post("/sun-terraces/enrich/opening-hours")
+async def enrich_opening_hours(_user: str = Depends(get_current_user)):
+    """Trigger opening hours enrichment job via Google Places API (background)."""
+    import asyncio
+    from app.sources.opening_hours import run_opening_hours_job, get_opening_hours_state
+    from app.database import get_db as _get_db
+    state = get_opening_hours_state()
+    if state["running"]:
+        return {"status": "already_running", **state}
+    asyncio.create_task(run_opening_hours_job(_get_db))
+    return {"status": "started"}
+
+
+@router.get("/sun-terraces/enrich/opening-hours/status")
+def enrich_opening_hours_status():
+    from app.sources.opening_hours import get_opening_hours_state
+    return get_opening_hours_state()
 
 
 @router.post("/sun-terraces/auto-arc", status_code=200)
@@ -1461,6 +1481,8 @@ def get_sun_terraces(
             "day_score": scores.get("day_score", 0),
             "explanation": _build_explanation(scores, t.street_orientation, scores["confidence"]),
             "hashtags": terrace_hashtags.get(t.id, []),
+            "is_open_now": _opening_hours.is_open_now(getattr(t, 'opening_hours_json', None)),
+            "opening_hours_today": _opening_hours.opening_hours_today(getattr(t, 'opening_hours_json', None)),
         })
 
     # Sort: day_score desc (rest-of-day sun exposure), then distance asc on tie

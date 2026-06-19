@@ -509,6 +509,7 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords, al
   const altitude = scores?.[best]?.sun_altitude
   const isRooftop = outdoor_type === 'rooftop'
   const dayScore = scores?.day_score ?? null
+  const isOpen = terrace.is_open_now  // true/false/null
 
   return (
     <div className={`${GLASS} rounded-2xl p-4 space-y-3`}>
@@ -521,6 +522,12 @@ function TerraceCard({ terrace, isFav, onToggleFav, userVote, onVote, coords, al
             <VenueTypeIcon type={amenity_type}/>
             {isRooftop && (
               <span className="text-amber-400 text-[10px] font-medium tracking-wide shrink-0">ROOFTOP</span>
+            )}
+            {isOpen === false && (
+              <span className="text-slate-500 text-[10px] font-medium tracking-wide shrink-0 bg-slate-700/60 px-1 py-0.5 rounded">
+                STÄNGT
+                {terrace.opening_hours_today ? ` · ${terrace.opening_hours_today}` : ''}
+              </span>
             )}
           </div>
           {address && <div className="text-slate-400 text-xs mt-0.5 truncate">{address}</div>}

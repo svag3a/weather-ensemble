@@ -297,6 +297,18 @@ export async function fetchEnrichShadowStatus() {
   return res.json()
 }
 
+export async function triggerEnrichOpeningHours() {
+  const res = await fetch(`${BASE}/sun-terraces/enrich/opening-hours`, { method: 'POST' })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
+export async function fetchEnrichOpeningHoursStatus() {
+  const res = await fetch(`${BASE}/sun-terraces/enrich/opening-hours/status`)
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function fetchSunTerracesAdmin() {
   const res = await fetch(`${BASE}/sun-terraces/admin`, { cache: 'no-store' })
   if (!res.ok) throw new Error(await res.text())
