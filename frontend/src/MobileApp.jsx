@@ -1155,12 +1155,12 @@ function WeatherBanner({ fc, radar, coords, forecastHours }) {
 
       {/* 2. Temperature */}
       <div className="flex-1 flex flex-col items-center gap-1" style={{ marginLeft: 6 }}>
-        <span className="text-white text-4xl font-thin leading-none">
+        <span className={`text-white text-4xl font-thin leading-none${feels == null ? ' mt-2' : ''}`}>
           {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
         </span>
         {feels != null
           ? <span className="text-slate-400 text-xs">Känns {feels}°</span>
-          : <span className="text-xs opacity-0">–</span>}
+          : null}
       </div>
 
       <div className="w-px self-stretch bg-white/10 shrink-0" />
