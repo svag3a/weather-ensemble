@@ -20,6 +20,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceL
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchRainNowcast, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages, fetchSunTerraces, fetchTopTerraces } from './api'
 import SolView from './components/SolView'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
+import { getWeatherMomentum } from './weatherMomentum'
 import WeatherSymbol from './components/WeatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
 
@@ -1136,22 +1137,15 @@ function fmtSunHour(decHours) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
 }
 
-function WeatherBanner({ fc, radar, coords }) {
+function WeatherBanner({ fc, radar, coords, forecastHours }) {
   if (!fc) return null
   const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, radar?.cape ?? 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0, radar?.raining ?? false, radar?.dbz ?? null)
   const feels = feelsLike(fc.temperature, fc.wind_speed)
-
-  const lat = coords?.lat ?? 57.7089
-  const lon = coords?.lon ?? 11.9746
-  const now = new Date()
-  const { sunrise, sunset } = sunTimesUTC(now, lat, lon)
-  const tz = -now.getTimezoneOffset() / 60
-  const srStr = fmtSunHour(sunrise + tz)
-  const ssStr = fmtSunHour(sunset  + tz)
+  const momentum = getWeatherMomentum(fc, forecastHours ?? [])
 
   return (
     <div className={`${GLASS} rounded-2xl flex items-center px-5 py-4`}>
-      {/* 1. Weather symbol — wider to fit label text */}
+      {/* 1. Weather symbol */}
       <div className="flex flex-col items-center gap-1" style={{ flex: '1.4', marginLeft: -10 }}>
         <span className="text-4xl leading-none"><WeatherSymbol symbol={symbol} /></span>
         <span className="text-slate-400 text-xs text-center leading-tight">{label}</span>
@@ -1159,7 +1153,7 @@ function WeatherBanner({ fc, radar, coords }) {
 
       <div className="w-px self-stretch bg-white/10 shrink-0" />
 
-      {/* 2. Temperature — nudged right */}
+      {/* 2. Temperature */}
       <div className="flex-1 flex flex-col items-center gap-1" style={{ marginLeft: 6 }}>
         <span className="text-white text-4xl font-thin leading-none">
           {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
@@ -1171,24 +1165,23 @@ function WeatherBanner({ fc, radar, coords }) {
 
       <div className="w-px self-stretch bg-white/10 shrink-0" />
 
-      {/* 3. Beaufort gauge */}
+      {/* 3. Wind gauge */}
       <div className="flex-1 flex justify-center">
         <WindGaugeSemi windSpeed={fc.wind_speed ?? 0} windDirection={fc.wind_direction} />
       </div>
 
-      <div className="w-px self-stretch bg-white/10 shrink-0" />
-
-      {/* 4. Sunrise / sunset — nudged right */}
-      <div className="flex-1 flex flex-col items-center gap-1" style={{ marginLeft: 8 }}>
-        <div className="flex items-center gap-1.5">
-          <Sun size={14} className="text-amber-300 shrink-0" />
-          <span className="text-amber-300 text-sm">{srStr}</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <Moon size={14} className="text-slate-400 shrink-0" />
-          <span className="text-slate-400 text-sm">{ssStr}</span>
-        </div>
-      </div>
+      {/* 4. Weather momentum — only when a significant change is expected */}
+      {momentum.visible && (
+        <>
+          <div className="w-px self-stretch bg-white/10 shrink-0" />
+          <div className="flex-1 flex flex-col items-center gap-1">
+            <span className="text-2xl leading-none">{momentum.symbol}</span>
+            <span className={`text-xs text-center leading-tight ${
+              momentum.direction === 'worsening' ? 'text-slate-400' : 'text-emerald-400'
+            }`}>{momentum.label}</span>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -2718,7 +2711,7 @@ export default function MobileApp() {
                     const sky = getSkyCss(currentFc, coords)
                     return <>
                       <CurrentCard fc={currentFc} radar={radar} allForecasts={future} motifImage={motifImage} skyGradient={sky.gradient} skyTheme={getSkyTheme(sky.gradient)} />
-                      <WeatherBanner fc={currentFc} radar={radar} coords={coords} />
+                      <WeatherBanner fc={currentFc} radar={radar} coords={coords} forecastHours={future} />
                       <RainBand timeline={rainTimeline} />
                     </>
                   })()}

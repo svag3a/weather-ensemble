@@ -692,6 +692,16 @@ export default function SolView({ coords, initialData }) {
   const [tagFilter, setTagFilter] = useState(loadSavedTimePref)
   const [uvIndex, setUvIndex]     = useState(null)
   const [favOnly, setFavOnly]       = useState(false)
+
+  // Sunrise / sunset for header
+  const _now = new Date()
+  const _lat = coords?.lat ?? 57.706
+  const _lon = coords?.lon ?? 11.967
+  const { sunrise: _srUTC, sunset: _ssUTC } = sunTimesUTC(_now, _lat, _lon)
+  const _tz  = -_now.getTimezoneOffset() / 60
+  const _fmtSun = (h) => { const hh = Math.floor(((h % 24) + 24) % 24); const mm = Math.round((h % 1) * 60); return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}` }
+  const srStr = _fmtSun(_srUTC + _tz)
+  const ssStr = _fmtSun(_ssUTC + _tz)
   const [showClosed, setShowClosed] = useState(false)
   const [rooftopOnly, setRooftopOnly] = useState(false)
   useEffect(() => { if (favs.size === 0) setFavOnly(false) }, [favs.size])
@@ -817,7 +827,19 @@ export default function SolView({ coords, initialData }) {
             {mode === 'sol' ? 'Uteserveringar med bäst solläge just nu' : 'Uteserveringar i skugga just nu'}
           </p>
         </div>
-        {uvIndex != null && <UVChip uv={uvIndex} />}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {uvIndex != null && <UVChip uv={uvIndex} />}
+          <div className="flex flex-col items-end gap-0.5">
+            <div className="flex items-center gap-1">
+              <Sun size={11} className="text-amber-300 shrink-0" />
+              <span className="text-amber-300 text-xs">{srStr}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Moon size={11} className="text-slate-400 shrink-0" />
+              <span className="text-slate-400 text-xs">{ssStr}</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Search */}
