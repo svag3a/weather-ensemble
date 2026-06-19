@@ -691,8 +691,9 @@ export default function SolView({ coords, initialData }) {
   const [allHashtags, setAllHashtags] = useState([])
   const [tagFilter, setTagFilter] = useState(loadSavedTimePref)
   const [uvIndex, setUvIndex]     = useState(null)
-  const [favOnly, setFavOnly]     = useState(false)
+  const [favOnly, setFavOnly]       = useState(false)
   const [showClosed, setShowClosed] = useState(false)
+  const [rooftopOnly, setRooftopOnly] = useState(false)
   useEffect(() => { if (favs.size === 0) setFavOnly(false) }, [favs.size])
   const debounceRef = useRef(null)
   const radiusRef   = useRef(null)
@@ -800,6 +801,7 @@ export default function SolView({ coords, initialData }) {
   const sortedData = data ? [...data]
     .filter(t => !favOnly || favs.has(t.id))
     .filter(t => showClosed || t.is_open_now !== false)
+    .filter(t => !rooftopOnly || t.outdoor_type === 'rooftop')
     .sort((a, b) => mode === 'skugga'
       ? (a.day_score ?? 0) - (b.day_score ?? 0)
       : (b.day_score ?? 0) - (a.day_score ?? 0)
@@ -833,7 +835,7 @@ export default function SolView({ coords, initialData }) {
           </button>
       }
 
-      {/* Filter bar: Sol/Skugga | star | type toggles */}
+      {/* Filter bar: Sol/Skugga | clock | star | rooftop | type toggles */}
       <div className="flex items-center gap-1.5">
         {[{m:'sol', Icon:Sun}, {m:'skugga', Icon:Parasol}].map(({m, Icon}) => (
           <button key={m} onClick={() => setMode(m)}
@@ -844,11 +846,25 @@ export default function SolView({ coords, initialData }) {
           </button>
         ))}
         <div className="w-px h-5 bg-slate-700 shrink-0"/>
+        <button onClick={() => setShowClosed(v => !v)}
+          title={showClosed ? 'Visar stängda venues — klicka för att dölja' : 'Döljer stängda venues — klicka för att visa'}
+          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+            showClosed ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
+          }`}>
+          <AlarmClock size={16} strokeWidth={1.5}/>
+        </button>
+        <div className="w-px h-5 bg-slate-700 shrink-0"/>
         <button onPointerUp={() => { if (favs.size > 0) setFavOnly(v => !v) }}
           className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors touch-manipulation select-none ${
             favOnly ? 'bg-amber-500/20 text-amber-400' : favs.size > 0 ? 'bg-black/20 text-slate-400' : 'bg-black/20 text-slate-700'
           }`}
         >★</button>
+        <button onClick={() => setRooftopOnly(v => !v)}
+          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors leading-none ${
+            rooftopOnly ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
+          }`}>
+          <span className="text-[8px] font-semibold text-center leading-tight">ROOF<br/>TOP</span>
+        </button>
         <div className="w-px h-5 bg-slate-700 shrink-0"/>
         {ALL_TYPES.map(t => {
           const Icon = VENUE_ICONS[t]
@@ -863,14 +879,6 @@ export default function SolView({ coords, initialData }) {
             </button>
           )
         })}
-        <div className="w-px h-5 bg-slate-700 shrink-0"/>
-        <button onClick={() => setShowClosed(v => !v)}
-          title={showClosed ? 'Visar stängda venues — klicka för att dölja' : 'Döljer stängda venues — klicka för att visa'}
-          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
-            showClosed ? 'bg-white/20 text-white' : 'bg-black/20 text-slate-400'
-          }`}>
-          <AlarmClock size={16} strokeWidth={1.5}/>
-        </button>
       </div>
 
       {/* Tag filter bar */}
