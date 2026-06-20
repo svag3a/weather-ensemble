@@ -2213,17 +2213,19 @@ class ChatRequest(BaseModel):
 
 @router.post("/chat")
 async def weather_chat(body: ChatRequest, db: Session = Depends(get_db)):
-    """Premium: answer a weather question using current ensemble forecast as context."""
+    """Premium: answer a weather question using local forecast + radar nowcast as context."""
     import anthropic as _anthropic
     import os
+    import httpx as _httpx
     from zoneinfo import ZoneInfo
+    from app.sources.radar_nowcast import check_rain_at, nowcast_timeline
 
     tz = ZoneInfo("Europe/Stockholm")
     now_local = datetime.now(tz)
     now_utc   = datetime.now(timezone.utc)
     cutoff    = now_utc + timedelta(hours=24)
 
-    # Fetch latest ensemble forecast for the next 24 h
+    # Fetch ensemble forecast + radar data in parallel
     latest_run = (
         db.query(EnsembleForecast.computed_at)
         .order_by(EnsembleForecast.computed_at.desc())
@@ -2242,11 +2244,20 @@ async def weather_chat(body: ChatRequest, db: Session = Depends(get_db)):
             .all()
         )
 
-    # Build a compact context string (~150 tokens)
+    radar, nowcast = {"raining": False, "dbz": None}, []
+    try:
+        async with _httpx.AsyncClient(timeout=8) as hc:
+            radar, nowcast = await asyncio.gather(
+                check_rain_at(hc, body.lat, body.lon),
+                nowcast_timeline(hc, body.lat, body.lon),
+            )
+    except Exception:
+        pass  # radar unavailable — proceed with forecast only
+
+    # ── Build compact context string ──────────────────────────────────────────
     def _wind_dir(deg):
         if deg is None: return ""
-        dirs = ["N","NO","O","SO","S","SW","W","NW"]
-        return dirs[round(deg / 45) % 8]
+        return ["N","NO","O","SO","S","SW","W","NW"][round(deg / 45) % 8]
 
     def _sky(cloud, precip, mm):
         if precip >= 70 and mm and mm > 3: return "kraftigt regn"
@@ -2257,11 +2268,33 @@ async def weather_chat(body: ChatRequest, db: Session = Depends(get_db)):
         if cloud > 20:   return "lätt molnighet"
         return "klart"
 
+    def _dbz_label(dbz):
+        if dbz is None: return "uppehåll"
+        if dbz >= 40: return f"kraftigt regn (dBZ {round(dbz)})"
+        if dbz >= 25: return f"regn (dBZ {round(dbz)})"
+        return f"svagt regn (dBZ {round(dbz)})"
+
     ctx_lines = [f"Göteborg, {now_local.strftime('%A %d %B %H:%M')} (Europe/Stockholm)"]
-    ctx_lines.append("Prognos (UTC+2):")
-    for r in rows[::2]:  # every other hour to keep context short
-        local_h = (r.valid_for.replace(tzinfo=timezone.utc).astimezone(tz)).strftime("%H:%M")
-        sky = _sky(r.cloud_cover or 0, r.precip_probability or 0, r.precip_mm or 0)
+    ctx_lines.append(f"Position: {body.lat:.4f}N {body.lon:.4f}E")
+
+    # Radar now
+    if radar["raining"]:
+        ctx_lines.append(f"Radar just nu: {_dbz_label(radar['dbz'])}")
+    else:
+        ctx_lines.append("Radar just nu: inget regn")
+
+    # Nowcast 0–30 min
+    if nowcast:
+        ctx_lines.append("Regnradarprognos nästa 30 min:")
+        for step in nowcast:
+            label = _dbz_label(step["dbz"]) if step["raining"] else "uppehåll"
+            ctx_lines.append(f"  +{step['offset_min']} min: {label}")
+
+    # Hourly forecast next 24 h (every 2nd hour)
+    ctx_lines.append("Timarprognos (lokal tid):")
+    for r in rows[::2]:
+        local_h = r.valid_for.replace(tzinfo=timezone.utc).astimezone(tz).strftime("%H:%M")
+        sky  = _sky(r.cloud_cover or 0, r.precip_probability or 0, r.precip_mm or 0)
         wind = f"{round(r.wind_speed)} m/s {_wind_dir(r.wind_direction)}" if r.wind_speed else ""
         ctx_lines.append(
             f"  {local_h}: {round(r.temperature)}°C, {sky}"
@@ -2274,7 +2307,7 @@ async def weather_chat(body: ChatRequest, db: Session = Depends(get_db)):
     system_prompt = (
         "Du är en väderassistent för Göteborg inbyggd i appen gbgsol.se. "
         "Svara kortfattat och naturligt på svenska. "
-        "Använd väderdata nedan som underlag.\n\n"
+        "Prioritera regnradardata för frågor om närtid (0–30 min) och timarprognosen för längre sikt. "
         "VIKTIG REGEL: Om användarens fråga inte alls handlar om väder, aktiviteter utomhus "
         "eller liknande väderrelaterade ämnen, svara ENBART med strängen: EJ_VÄDERRELATERAD\n\n"
         f"{weather_context}"
