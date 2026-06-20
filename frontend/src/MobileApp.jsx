@@ -1188,7 +1188,7 @@ function WeatherBanner({ fc, radar, coords, forecastHours }) {
           <WindGaugeSVG windSpeed={fc.wind_speed ?? 0} windDirection={fc.wind_direction} />
         </div>
         <div className="h-5 flex items-center justify-center">
-          {bf && <span className="text-xs text-slate-400">{windDirArrow(fc.wind_direction)} {bf.label}</span>}
+          {bf && <span className="text-xs text-slate-400">{bf.label}</span>}
         </div>
       </div>
 
