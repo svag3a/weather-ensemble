@@ -159,6 +159,21 @@ function useCityMotif(coords) {
   return nearest
 }
 
+// Returns all unique motif locations (one representative image per label, preferring 'day' slot).
+function useCityMotifs() {
+  const [motifs, setMotifs] = useState([])
+  useEffect(() => {
+    fetchCityImages().then(imgs => {
+      const byLabel = {}
+      for (const img of imgs.filter(i => i.image_type === 'motif')) {
+        if (!byLabel[img.label] || img.time_slot === 'day') byLabel[img.label] = img
+      }
+      setMotifs(Object.values(byLabel))
+    }).catch(() => {})
+  }, [])
+  return motifs
+}
+
 // How bright each slot's photo is relative to a neutral day photo.
 // Used to compensate when a fallback slot is shown instead of the ideal one.
 const SLOT_BASE_BRIGHTNESS = { night: 0.32, morning: 0.85, day: 1.00, evening: 0.72 }
@@ -2276,6 +2291,21 @@ function useSwipeNav(activeTab, setActiveTab) {
 
 // ── Profile view ─────────────────────────────────────────────────────────────
 
+const BADGES_KEY      = 'city_badges'
+const BADGE_RADIUS_M  = 600
+
+function loadBadges() { try { return new Set(JSON.parse(localStorage.getItem(BADGES_KEY) || '[]')) } catch { return new Set() } }
+function saveBadges(s) { localStorage.setItem(BADGES_KEY, JSON.stringify([...s])) }
+
+function distanceM(lat1, lon1, lat2, lon2) {
+  const R = 6371000
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180
+  const dφ = (lat2 - lat1) * Math.PI / 180
+  const dλ = (lon2 - lon1) * Math.PI / 180
+  const a = Math.sin(dφ/2)**2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ/2)**2
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+}
+
 const FAVS_KEY_P      = 'sol_favourites'
 const FAV_DATA_KEY_P  = 'sol_favourites_data'
 const UV_PREF_KEY     = 'sol_uv_threshold'
@@ -2306,7 +2336,63 @@ function loadRadiusPref() { try { return parseFloat(localStorage.getItem(SOL_RAD
 function loadTimePrefP()  { try { return new Set(JSON.parse(localStorage.getItem(SOL_TIME_KEY) || '[]')) } catch { return new Set() } }
 function loadActPref()    { try { const s = localStorage.getItem(SOL_ACT_KEY); return s ? new Set(JSON.parse(s)) : null } catch { return null } }
 
-function ProfileView({ onNavigateToSol }) {
+function BadgesCard({ motifs }) {
+  const [open, setOpen] = useState(false)
+  const [earned, setEarned] = useState(loadBadges)
+
+  useEffect(() => {
+    const handler = () => setEarned(loadBadges())
+    window.addEventListener('badges-updated', handler)
+    return () => window.removeEventListener('badges-updated', handler)
+  }, [])
+
+  const count = motifs.filter(m => earned.has(m.label)).length
+
+  return (
+    <div className={`${GLASS} rounded-2xl overflow-hidden`}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center gap-2 px-5 py-4 touch-manipulation active:bg-white/5 transition-colors"
+      >
+        <MapPin size={13} className="text-sky-400 shrink-0" />
+        <span className="text-white text-sm font-medium flex-1 text-left">Platsmärken</span>
+        <span className="text-slate-400 text-xs">{count}/{motifs.length}</span>
+        <span className={`text-white/50 text-xs ml-1 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}>▼</span>
+      </button>
+      {open && (
+        <div className="px-4 pb-4 border-t border-slate-700">
+          {count === 0 && (
+            <p className="text-slate-500 text-xs pt-3 pb-1">Du får ett märke när du befinner dig inom {BADGE_RADIUS_M} m från platsen.</p>
+          )}
+          <div className="grid grid-cols-4 gap-2 pt-3">
+            {motifs.map(m => {
+              const has = earned.has(m.label)
+              return (
+                <div key={m.label} className="flex flex-col items-center gap-1">
+                  <div
+                    className={`w-full aspect-square rounded-xl overflow-hidden border-2 ${has ? 'border-sky-400/50' : 'border-white/5'}`}
+                    style={{ background: '#bfdbfe' }}
+                  >
+                    <img
+                      src={m.url}
+                      alt={m.label}
+                      className={`w-full h-full object-cover ${has ? '' : 'grayscale opacity-25'}`}
+                    />
+                  </div>
+                  <span className={`text-[9px] text-center leading-tight w-full truncate ${has ? 'text-slate-300' : 'text-slate-600'}`}>
+                    {m.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ProfileView({ onNavigateToSol, motifs }) {
   const [favs]         = useState(loadFavsP)
   const [favData]      = useState(loadFavDataP)
   const [uvThreshold, setUvThreshold] = useState(
@@ -2403,6 +2489,9 @@ function ProfileView({ onNavigateToSol }) {
           </>
         )}
       </div>
+
+      {/* Platsmärken */}
+      <BadgesCard motifs={motifs} />
 
       {/* Solpreferenser */}
       <div className={`${GLASS} rounded-2xl px-5 py-4 space-y-3`}>
@@ -2626,6 +2715,21 @@ export default function MobileApp() {
   const geoLocation = useReverseGeocode(coords)
   const bgImage = useCityBackground(coords)
   const motifImage = useCityMotif(coords)
+  const allMotifs = useCityMotifs()
+
+  // Award location badges when user is within BADGE_RADIUS_M of a motif.
+  useEffect(() => {
+    if (!coords || !allMotifs.length) return
+    const current = loadBadges()
+    let changed = false
+    for (const m of allMotifs) {
+      if (!current.has(m.label) && distanceM(coords.lat, coords.lon, m.lat, m.lon) <= BADGE_RADIUS_M) {
+        current.add(m.label)
+        changed = true
+      }
+    }
+    if (changed) { saveBadges(current); window.dispatchEvent(new Event('badges-updated')) }
+  }, [coords, allMotifs])
 
   // Direction-aware tab change: drives the slide animation
   const changeTab = useCallback((newTab) => {
@@ -2788,7 +2892,7 @@ export default function MobileApp() {
               )}
 
               {activeTab === 'profile' && (
-                <ProfileView onNavigateToSol={() => changeTab('sol')} />
+                <ProfileView onNavigateToSol={() => changeTab('sol')} motifs={allMotifs} />
               )}
 
             </div>
