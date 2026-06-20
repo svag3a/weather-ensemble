@@ -1084,7 +1084,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
   )
 }
 
-function WindGaugeSemi({ windSpeed, windDirection }) {
+function WindGaugeSVG({ windSpeed, windDirection }) {
   const bf = getBeaufort(windSpeed)
   if (!bf) return null
 
@@ -1104,26 +1104,32 @@ function WindGaugeSemi({ windSpeed, windDirection }) {
   const currDeg = 180 * (1 - bf.bft / 12)
   const curr  = toXY(currDeg)
 
-  // Upper semi-circle: sweep=1 (clockwise on screen), large-arc=0
   const bgPath   = `M ${left.x} ${left.y} A ${r} ${r} 0 0 1 ${right.x} ${right.y}`
   const fillPath = bf.bft > 0
     ? `M ${left.x} ${left.y} A ${r} ${r} 0 0 1 ${curr.x} ${curr.y}`
     : null
 
   return (
+    <svg viewBox="0 0 80 46" width="70" style={{ display: 'block' }}>
+      <path d={bgPath} fill="none" stroke="rgba(148,163,184,0.15)" strokeWidth={sw} strokeLinecap="round" />
+      {fillPath && (
+        <path d={fillPath} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
+      )}
+      {bf.bft > 0 && <circle cx={curr.x} cy={curr.y} r={4} fill={color} />}
+      <text x="40" y="38" textAnchor="middle" dominantBaseline="middle"
+        fontSize="18" fill={color} style={{ userSelect: 'none' }}>
+        {windDirArrow(windDirection)}
+      </text>
+    </svg>
+  )
+}
+
+function WindGaugeSemi({ windSpeed, windDirection }) {
+  const bf = getBeaufort(windSpeed)
+  if (!bf) return null
+  return (
     <div className="flex flex-col items-center">
-      <svg viewBox="0 0 80 46" width="70" style={{ display: 'block' }}>
-        <path d={bgPath} fill="none" stroke="rgba(148,163,184,0.15)" strokeWidth={sw} strokeLinecap="round" />
-        {fillPath && (
-          <path d={fillPath} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
-        )}
-        {bf.bft > 0 && <circle cx={curr.x} cy={curr.y} r={4} fill={color} />}
-        {/* Wind direction arrow centred inside the arc */}
-        <text x="40" y="38" textAnchor="middle" dominantBaseline="middle"
-          fontSize="18" fill={color} style={{ userSelect: 'none' }}>
-          {windDirArrow(windDirection)}
-        </text>
-      </svg>
+      <WindGaugeSVG windSpeed={windSpeed} windDirection={windDirection} />
       <span className="text-xs text-slate-400 text-center" style={{ marginTop: -2 }}>
         {bf.label}
       </span>
@@ -1142,47 +1148,66 @@ function WeatherBanner({ fc, radar, coords, forecastHours }) {
   const { symbol, label } = getWeatherInfo(fc.temperature, fc.precip_probability, fc.wind_speed, fc.cloud_cover, fc.valid_for, radar?.cape ?? 0, fc.fog_probability ?? 0, fc.precip_mm ?? 0, radar?.raining ?? false, radar?.dbz ?? null)
   const feels = feelsLike(fc.temperature, fc.wind_speed)
   const momentum = getWeatherMomentum(fc, forecastHours ?? [])
+  const bf = getBeaufort(fc.wind_speed ?? 0)
+
+  // Fixed-height rows keep all symbols on one line and all labels on another.
+  // h-11 = 44px for the symbol/gauge row, h-5 = 20px for the label row.
+  const SEP = <div className="w-px self-stretch bg-white/10 shrink-0" />
 
   return (
-    <div className={`${GLASS} rounded-2xl flex items-center px-5 py-4`}>
+    <div className={`${GLASS} rounded-2xl flex items-stretch px-5 py-4`}>
       {/* 1. Weather symbol */}
-      <div className="flex flex-col items-center gap-1" style={{ flex: '1.4', marginLeft: -10 }}>
-        <span className="text-4xl leading-none"><WeatherSymbol symbol={symbol} /></span>
-        <span className="text-slate-400 text-xs text-center leading-tight">{label}</span>
+      <div className="flex flex-col items-center" style={{ flex: '1.4', marginLeft: -10 }}>
+        <div className="h-11 flex items-center justify-center">
+          <span className="text-4xl leading-none"><WeatherSymbol symbol={symbol} /></span>
+        </div>
+        <div className="h-5 flex items-center justify-center">
+          <span className="text-slate-400 text-xs text-center leading-tight">{label}</span>
+        </div>
       </div>
 
-      <div className="w-px self-stretch bg-white/10 shrink-0" />
+      {SEP}
 
       {/* 2. Temperature */}
-      <div className="flex-1 flex flex-col items-center gap-1" style={{ marginLeft: 6 }}>
-        <span className={`text-white text-4xl font-thin leading-none${feels == null ? ' mt-2' : ''}`}>
-          {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
-        </span>
-        {feels != null
-          ? <span className="text-slate-400 text-xs">Känns {feels}°</span>
-          : null}
+      <div className="flex-1 flex flex-col items-center" style={{ marginLeft: 6 }}>
+        <div className="h-11 flex items-center justify-center">
+          <span className="text-white text-4xl font-thin leading-none">
+            {fc.temperature != null ? `${Math.round(fc.temperature)}°` : '—'}
+          </span>
+        </div>
+        <div className="h-5 flex items-center justify-center">
+          {feels != null && <span className="text-slate-400 text-xs">Känns {feels}°</span>}
+        </div>
       </div>
 
-      <div className="w-px self-stretch bg-white/10 shrink-0" />
+      {SEP}
 
       {/* 3. Wind gauge */}
-      <div className="flex-1 flex justify-center">
-        <WindGaugeSemi windSpeed={fc.wind_speed ?? 0} windDirection={fc.wind_direction} />
+      <div className="flex-1 flex flex-col items-center">
+        <div className="h-11 flex items-center justify-center">
+          <WindGaugeSVG windSpeed={fc.wind_speed ?? 0} windDirection={fc.wind_direction} />
+        </div>
+        <div className="h-5 flex items-center justify-center">
+          {bf && <span className="text-xs text-slate-400">{windDirArrow(fc.wind_direction)} {bf.label}</span>}
+        </div>
       </div>
 
+      {SEP}
+
       {/* 4. Weather momentum — symbol when change expected, dash when stable */}
-      <div className="w-px self-stretch bg-white/10 shrink-0" />
-      <div className="flex-1 flex flex-col items-center gap-1">
-        {momentum.visible ? (
-          <>
-            <span className="text-2xl leading-none">{momentum.symbol}</span>
-            <span className={`text-xs text-center leading-tight ${
+      <div className="flex-1 flex flex-col items-center">
+        <div className="h-11 flex items-center justify-center">
+          {momentum.visible
+            ? <span className="text-xl leading-none whitespace-nowrap">{momentum.symbol}</span>
+            : <span className="text-slate-600 text-2xl leading-none">—</span>}
+        </div>
+        <div className="h-5 flex items-center justify-center">
+          {momentum.visible && (
+            <span className={`text-xs text-center leading-tight whitespace-nowrap ${
               momentum.direction === 'worsening' ? 'text-slate-400' : 'text-emerald-400'
             }`}>{momentum.label}</span>
-          </>
-        ) : (
-          <span className="text-slate-600 text-2xl leading-none">—</span>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )
