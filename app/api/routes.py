@@ -2201,3 +2201,98 @@ async def get_uv(lat: float = Query(default=57.7089), lon: float = Query(default
     if current is None and hours:
         current = min(hours, key=lambda h: abs(h["hour"] - current_hour))["uv"]
     return {"current": current, "hours": hours}
+
+
+# ── Weather chat ──────────────────────────────────────────────────────────────
+
+class ChatRequest(BaseModel):
+    q: str
+    lat: float = 57.7089
+    lon: float = 11.9746
+
+
+@router.post("/chat")
+async def weather_chat(body: ChatRequest, db: Session = Depends(get_db)):
+    """Premium: answer a weather question using current ensemble forecast as context."""
+    import anthropic as _anthropic
+    import os
+    from zoneinfo import ZoneInfo
+
+    tz = ZoneInfo("Europe/Stockholm")
+    now_local = datetime.now(tz)
+    now_utc   = datetime.now(timezone.utc)
+    cutoff    = now_utc + timedelta(hours=24)
+
+    # Fetch latest ensemble forecast for the next 24 h
+    latest_run = (
+        db.query(EnsembleForecast.computed_at)
+        .order_by(EnsembleForecast.computed_at.desc())
+        .first()
+    )
+    rows = []
+    if latest_run:
+        rows = (
+            db.query(EnsembleForecast)
+            .filter(
+                EnsembleForecast.computed_at == latest_run[0],
+                EnsembleForecast.valid_for >= now_utc,
+                EnsembleForecast.valid_for <= cutoff,
+            )
+            .order_by(EnsembleForecast.valid_for)
+            .all()
+        )
+
+    # Build a compact context string (~150 tokens)
+    def _wind_dir(deg):
+        if deg is None: return ""
+        dirs = ["N","NO","O","SO","S","SW","W","NW"]
+        return dirs[round(deg / 45) % 8]
+
+    def _sky(cloud, precip, mm):
+        if precip >= 70 and mm and mm > 3: return "kraftigt regn"
+        if precip >= 60: return "regn"
+        if precip >= 30: return "risk för regn"
+        if cloud > 75:   return "mulet"
+        if cloud > 45:   return "halvmulet"
+        if cloud > 20:   return "lätt molnighet"
+        return "klart"
+
+    ctx_lines = [f"Göteborg, {now_local.strftime('%A %d %B %H:%M')} (Europe/Stockholm)"]
+    ctx_lines.append("Prognos (UTC+2):")
+    for r in rows[::2]:  # every other hour to keep context short
+        local_h = (r.valid_for.replace(tzinfo=timezone.utc).astimezone(tz)).strftime("%H:%M")
+        sky = _sky(r.cloud_cover or 0, r.precip_probability or 0, r.precip_mm or 0)
+        wind = f"{round(r.wind_speed)} m/s {_wind_dir(r.wind_direction)}" if r.wind_speed else ""
+        ctx_lines.append(
+            f"  {local_h}: {round(r.temperature)}°C, {sky}"
+            + (f", {wind}" if wind else "")
+            + (f", regn {round(r.precip_probability)}%" if (r.precip_probability or 0) >= 15 else "")
+        )
+
+    weather_context = "\n".join(ctx_lines)
+
+    system_prompt = (
+        "Du är en väderassistent för Göteborg inbyggd i appen gbgsol.se. "
+        "Svara kortfattat och naturligt på svenska. "
+        "Använd väderdata nedan som underlag.\n\n"
+        "VIKTIG REGEL: Om användarens fråga inte alls handlar om väder, aktiviteter utomhus "
+        "eller liknande väderrelaterade ämnen, svara ENBART med strängen: EJ_VÄDERRELATERAD\n\n"
+        f"{weather_context}"
+    )
+
+    client = _anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
+    try:
+        msg = await client.messages.create(
+            model="claude-haiku-4-5",
+            max_tokens=400,
+            system=system_prompt,
+            messages=[{"role": "user", "content": body.q}],
+        )
+        answer = msg.content[0].text.strip()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Claude error: {exc}")
+
+    if answer == "EJ_VÄDERRELATERAD":
+        return {"relevant": False, "answer": None}
+
+    return {"relevant": True, "answer": answer}

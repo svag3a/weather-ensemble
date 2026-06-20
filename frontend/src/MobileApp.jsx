@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Moon, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin, Bell } from 'lucide-react'
+import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Moon, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin, Bell, Crown, Send } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -17,7 +17,7 @@ function JacketIcon({ size = 24, color = 'currentColor' }) {
   )
 }
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
-import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchRainNowcast, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages, fetchSunTerraces, fetchTopTerraces } from './api'
+import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchRainNowcast, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages, fetchSunTerraces, fetchTopTerraces, askWeatherChat } from './api'
 import SolView from './components/SolView'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
 import { getWeatherMomentum } from './weatherMomentum'
@@ -2333,6 +2333,85 @@ function loadRadiusPref() { try { return parseFloat(localStorage.getItem(SOL_RAD
 function loadTimePrefP()  { try { return new Set(JSON.parse(localStorage.getItem(SOL_TIME_KEY) || '[]')) } catch { return new Set() } }
 function loadActPref()    { try { const s = localStorage.getItem(SOL_ACT_KEY); return s ? new Set(JSON.parse(s)) : null } catch { return null } }
 
+function WeatherChatCard({ coords }) {
+  const [input, setInput]     = useState('')
+  const [history, setHistory] = useState([])  // [{q, answer, relevant}]
+  const [loading, setLoading] = useState(false)
+
+  async function handleSend() {
+    const q = input.trim()
+    if (!q || loading) return
+    setInput('')
+    setLoading(true)
+    try {
+      const res = await askWeatherChat({ q, lat: coords?.lat, lon: coords?.lon })
+      setHistory(h => [...h, { q, answer: res.answer, relevant: res.relevant }])
+    } catch {
+      setHistory(h => [...h, { q, answer: null, relevant: false, error: true }])
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+  }
+
+  return (
+    <div className={`${GLASS} rounded-2xl overflow-hidden`}>
+      <div className="px-5 pt-4 pb-3 border-b border-slate-700 flex items-center gap-2">
+        <Crown size={13} className="text-amber-400 shrink-0" />
+        <span className="text-white text-sm font-medium">Fråga om vädret</span>
+      </div>
+
+      {history.length > 0 && (
+        <div className="px-5 py-3 space-y-3 max-h-72 overflow-y-auto">
+          {history.map((entry, i) => (
+            <div key={i} className="space-y-1.5">
+              <div className="flex justify-end">
+                <span className="bg-white/10 text-white text-xs px-3 py-1.5 rounded-2xl rounded-br-sm max-w-[85%]">{entry.q}</span>
+              </div>
+              <div className="flex justify-start">
+                {entry.error ? (
+                  <span className="text-red-400 text-xs px-3 py-1.5">Något gick fel, försök igen.</span>
+                ) : !entry.relevant ? (
+                  <span className="text-slate-500 text-xs px-3 py-1.5">Jag svarar bara på väderrelaterade frågor 🌤</span>
+                ) : (
+                  <span className="bg-sky-900/40 text-slate-200 text-xs px-3 py-1.5 rounded-2xl rounded-bl-sm max-w-[85%] leading-relaxed">{entry.answer}</span>
+                )}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <span className="text-slate-500 text-xs px-3 py-1.5 animate-pulse">Tänker…</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 px-4 py-3 border-t border-slate-700/50">
+        <input
+          type="text"
+          value={input}
+          onChange={e => setInput(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Fråga om vädret…"
+          className="flex-1 bg-white/5 text-white text-sm placeholder-slate-600 rounded-xl px-3 py-2 outline-none focus:bg-white/8 transition-colors"
+          disabled={loading}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!input.trim() || loading}
+          className="shrink-0 p-2 rounded-xl bg-sky-600/40 text-sky-300 disabled:opacity-30 disabled:cursor-not-allowed active:bg-sky-600/60 transition-colors touch-manipulation"
+        >
+          <Send size={15} />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function BadgesCard({ motifs }) {
   const [open, setOpen] = useState(false)
   const [earned, setEarned] = useState(loadBadges)
@@ -2389,7 +2468,7 @@ function BadgesCard({ motifs }) {
   )
 }
 
-function ProfileView({ onNavigateToSol, motifs }) {
+function ProfileView({ onNavigateToSol, motifs, coords }) {
   const [favs]         = useState(loadFavsP)
   const [favData]      = useState(loadFavDataP)
   const [uvThreshold, setUvThreshold] = useState(
@@ -2446,6 +2525,15 @@ function ProfileView({ onNavigateToSol, motifs }) {
 
   return (
     <div className="px-4 pt-10 pb-8 space-y-3 max-w-lg mx-auto">
+
+      {/* Premium badge */}
+      <div className="flex items-center justify-center gap-2 py-2">
+        <Crown size={16} className="text-amber-400" />
+        <span className="text-amber-400 text-sm font-semibold tracking-widest">PREMIUM</span>
+      </div>
+
+      {/* Weather chat */}
+      <WeatherChatCard coords={coords} />
 
       {/* Favourites */}
       <div className={`${GLASS} rounded-2xl overflow-hidden`}>
@@ -2889,7 +2977,7 @@ export default function MobileApp() {
               )}
 
               {activeTab === 'profile' && (
-                <ProfileView onNavigateToSol={() => changeTab('sol')} motifs={allMotifs} />
+                <ProfileView onNavigateToSol={() => changeTab('sol')} motifs={allMotifs} coords={coords} />
               )}
 
             </div>

@@ -361,6 +361,16 @@ export async function deleteTerrace(id) {
   return res.json()
 }
 
+export async function askWeatherChat({ q, lat, lon } = {}) {
+  const res = await fetch(`${BASE}/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ q, lat: lat ?? 57.7089, lon: lon ?? 11.9746 }),
+  })
+  if (!res.ok) throw new Error(await res.text())
+  return res.json()
+}
+
 export async function deriveArcFromPolygon(id) {
   const res = await fetch(`${BASE}/sun-terraces/${id}/derive-arc`, { method: 'POST' })
   if (!res.ok) throw new Error(await res.text())
