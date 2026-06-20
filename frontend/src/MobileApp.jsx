@@ -2041,7 +2041,7 @@ function formatGeneratedAt(iso) {
   return `kl ${d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
+function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
   const [period, setPeriod] = useState('today')
   const prefetched = period === 'today' ? prefetchedToday : prefetchedTomorrow
   const [summary, setSummary] = useState(prefetched ?? null)
@@ -2249,6 +2249,8 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow }) {
           </>
         )
       })()}
+
+      <WeatherChatCard coords={coords} />
     </div>
   )
 }
@@ -2359,11 +2361,6 @@ function WeatherChatCard({ coords }) {
 
   return (
     <div className={`${GLASS} rounded-2xl overflow-hidden`}>
-      <div className="px-5 pt-4 pb-3 border-b border-slate-700 flex items-center gap-2">
-        <Crown size={13} className="text-amber-400 shrink-0" />
-        <span className="text-white text-sm font-medium">Fråga om vädret</span>
-      </div>
-
       {history.length > 0 && (
         <div className="px-5 py-3 space-y-3 max-h-72 overflow-y-auto">
           {history.map((entry, i) => (
@@ -2396,7 +2393,7 @@ function WeatherChatCard({ coords }) {
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKey}
-          placeholder="Fråga om vädret…"
+          placeholder="Chatta om vädret…"
           className="flex-1 bg-white/5 text-white text-sm placeholder-slate-600 rounded-xl px-3 py-2 outline-none focus:bg-white/8 transition-colors"
           disabled={loading}
         />
@@ -2531,9 +2528,6 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
         <Crown size={16} className="text-amber-400" />
         <span className="text-amber-400 text-sm font-semibold tracking-widest">PREMIUM</span>
       </div>
-
-      {/* Weather chat */}
-      <WeatherChatCard coords={coords} />
 
       {/* Favourites */}
       <div className={`${GLASS} rounded-2xl overflow-hidden`}>
@@ -2965,7 +2959,7 @@ export default function MobileApp() {
               )}
 
               {activeTab === 'analysis' && (
-                <AnalysView prefetchedToday={summaryToday} prefetchedTomorrow={summaryTomorrow} />
+                <AnalysView prefetchedToday={summaryToday} prefetchedTomorrow={summaryTomorrow} coords={coords} />
               )}
 
               {activeTab === 'sources' && (
