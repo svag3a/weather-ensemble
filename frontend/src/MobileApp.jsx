@@ -2128,6 +2128,8 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
               )}
             </div>
 
+            <WeatherChatCard coords={coords} />
+
             {/* Practical advice — moved up for quick access */}
             {summary.practical_advice?.main && (
               <div className="bg-slate-700/50 rounded-2xl p-4 space-y-2">
@@ -2250,7 +2252,6 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
         )
       })()}
 
-      <WeatherChatCard coords={coords} />
     </div>
   )
 }
