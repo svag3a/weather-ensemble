@@ -1967,9 +1967,6 @@ function EnsembleView({ ensembleFc, prefetchedSources, prefetchedWeights }) {
       {/* Divergence chart */}
       {sources && <ForecastDivergenceChart sources={sources} ensembleFcs={ensembleFcs ?? []} />}
 
-      {/* Manual collect trigger */}
-      <CollectButton />
-
       {/* Weight explanation */}
       {weightsAt1.length > 0 && (
         <div className={`${GLASS} rounded-2xl p-5 space-y-3`}>
