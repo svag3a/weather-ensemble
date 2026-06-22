@@ -21,9 +21,9 @@ _CACHE_TTL_HOURS = 1.1    # 66 min — slightly longer than scheduler interval (
 from zoneinfo import ZoneInfo
 _STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
-_SYSTEM_PROMPT = f"""Du är en meteorolog som skriver vädersammanfattningar för {_CITY.name} på svenska.
-
-REGLER:
+_SYSTEM_PROMPT = (
+    f"Du är en meteorolog som skriver vädersammanfattningar för {_CITY.name} på svenska.\n\n"
+    """REGLER:
 1. Beskriv ENDAST mönster som finns i datan — spekulera inte
 2. Nämn osäkerhet explicit när confidence är medium eller low
 3. Inga exakta klocktider i texten — skriv "tidig eftermiddag", "mot kvällen"
@@ -86,6 +86,7 @@ OUTPUT-SCHEMA:
     "alert_level": "none|watch|warning|alert"
   }
 }"""
+)
 
 
 def _confidence_label(score: float) -> str:
