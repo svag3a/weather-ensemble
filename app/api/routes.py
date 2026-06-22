@@ -10,6 +10,7 @@ from pydantic import BaseModel
 import math as _math
 
 import app.sources.opening_hours as _opening_hours
+from app.city_config import CITY as _CITY
 from app.database import get_db
 from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace, TerraceReport, Hashtag, TerraceHashtag
 from app.api.auth import get_current_user
@@ -192,8 +193,8 @@ def get_weights_history(
 
 @router.get("/forecast/local", response_model=list[ForecastOut])
 async def get_local_forecast(
-    lat: float = Query(default=57.7089),
-    lon: float = Query(default=11.9746),
+    lat: float = Query(default=_CITY.lat),
+    lon: float = Query(default=_CITY.lon),
     hours_ahead: int = Query(default=48, ge=1, le=168),
     db: Session = Depends(get_db),
 ):
@@ -278,8 +279,8 @@ async def get_local_forecast(
 
 @router.get("/radar/now")
 async def radar_now(
-    lat: float = Query(default=57.7089),
-    lon: float = Query(default=11.9746),
+    lat: float = Query(default=_CITY.lat),
+    lon: float = Query(default=_CITY.lon),
 ):
     """Real-time radar rain check + CAPE instability at an arbitrary lat/lon."""
     import httpx
@@ -295,8 +296,8 @@ async def radar_now(
 
 @router.get("/radar/nowcast")
 async def radar_nowcast(
-    lat: float = Query(default=57.7089),
-    lon: float = Query(default=11.9746),
+    lat: float = Query(default=_CITY.lat),
+    lon: float = Query(default=_CITY.lon),
 ):
     """30-minute rain timeline in 5-min steps using Lagrangian radar extrapolation."""
     import httpx
@@ -1191,8 +1192,8 @@ def area_tag_status(_user: str = Depends(get_current_user)):
 
 @router.get("/sun-terraces/top")
 def get_top_terraces(
-    lat: float = Query(default=57.7089),
-    lon: float = Query(default=11.9746),
+    lat: float = Query(default=_CITY.lat),
+    lon: float = Query(default=_CITY.lon),
     radius: float = Query(default=3.0, ge=0.1, le=10.0),
     limit: int = Query(default=3, ge=1, le=10),
     db: Session = Depends(get_db),
@@ -1333,8 +1334,8 @@ def get_top_terraces(
 
 @router.get("/sun-terraces")
 def get_sun_terraces(
-    lat: float = Query(default=57.7089),
-    lon: float = Query(default=11.9746),
+    lat: float = Query(default=_CITY.lat),
+    lon: float = Query(default=_CITY.lon),
     radius: float = Query(default=2.0, ge=0.1, le=20.0),
     type: str = Query(default="all"),
     min_score: int = Query(default=0, ge=0, le=100),
@@ -1492,8 +1493,8 @@ def get_sun_terraces(
 
 @router.get("/planner")
 def get_planner(
-    lat: float = 57.7089,
-    lon: float = 11.9746,
+    lat: float = _CITY.lat,
+    lon: float = _CITY.lon,
     radius: float = 5.0,
     date: Optional[str] = Query(None),   # YYYY-MM-DD in Europe/Stockholm local time
     from_hour: int = Query(16, ge=0, le=23),
@@ -1645,8 +1646,8 @@ def get_planner(
 
 class PlannerAskRequest(BaseModel):
     q: str
-    lat: float = 57.7089
-    lon: float = 11.9746
+    lat: float = _CITY.lat
+    lon: float = _CITY.lon
     radius: float = 5.0
 
 
@@ -2177,7 +2178,7 @@ def update_report_status(
 
 
 @router.get("/uv")
-async def get_uv(lat: float = Query(default=57.7089), lon: float = Query(default=11.9746)):
+async def get_uv(lat: float = Query(default=_CITY.lat), lon: float = Query(default=_CITY.lon)):
     """Fetch hourly UV index for today from Open-Meteo."""
     import httpx as _httpx
     from datetime import date as _date
@@ -2207,8 +2208,8 @@ async def get_uv(lat: float = Query(default=57.7089), lon: float = Query(default
 
 class ChatRequest(BaseModel):
     q: str
-    lat: float = 57.7089
-    lon: float = 11.9746
+    lat: float = _CITY.lat
+    lon: float = _CITY.lon
 
 
 @router.post("/chat")

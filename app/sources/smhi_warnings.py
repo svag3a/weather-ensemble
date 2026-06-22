@@ -8,13 +8,12 @@ from datetime import datetime, timezone
 from typing import Optional
 import httpx
 
+from app.city_config import CITY as _CITY
+
 _URL = "https://opendata-download-warnings.smhi.se/ibww/api/version/1/warning.json"
 
-# County id for Västra Götalands län
-_COUNTY_ID = 14
-
-# Göteborg city centre coordinates
-_GBG_LON, _GBG_LAT = 11.967, 57.707
+_COUNTY_ID = _CITY.smhi_county_id
+_GBG_LON, _GBG_LAT = _CITY.lon, _CITY.lat
 
 # Weather-relevant event codes for an urban Göteborg weather app.
 # Excludes non-weather events (water shortage) and sea/mountain-specific events.

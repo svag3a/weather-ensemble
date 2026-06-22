@@ -14,6 +14,8 @@ import threading
 from datetime import datetime, timezone
 from typing import Optional
 
+from app.city_config import CITY as _CITY
+
 logger = logging.getLogger(__name__)
 
 # ── Sync cache (for use in sync FastAPI routes) ───────────────────────────────
@@ -36,7 +38,7 @@ def get_cached_metar_cloud() -> Optional[float]:
         if cached and (now - cached["fetched_at"]).total_seconds() < _CACHE_TTL:
             return cached["cloud_cover"]
 
-        url = "https://aviationweather.gov/api/data/metar?ids=ESGG&format=geojson&taf=false"
+        url = f"https://aviationweather.gov/api/data/metar?ids={_CITY.metar_code}&format=geojson&taf=false"
         try:
             with httpx.Client(timeout=6.0) as client:
                 resp = client.get(url)
@@ -52,7 +54,7 @@ def get_cached_metar_cloud() -> Optional[float]:
                 cover = _COVER_PCT.get(top)
             if cover is not None:
                 _cache["data"] = {"cloud_cover": cover, "fetched_at": now}
-                logger.debug("METAR ESGG (sync): %s → %.0f%%", props.get("rawOb", ""), cover)
+                logger.debug(f"METAR {_CITY.metar_code} (sync): %s → %.0f%%", props.get("rawOb", ""), cover)
                 return cover
         except Exception as exc:
             logger.warning("METAR sync fetch failed: %s", exc)
@@ -130,7 +132,7 @@ async def fetch_metar_cloud(client) -> Optional[dict]:
       {"cloud_cover": float, "observed_at": datetime, "raw": str}
     Returns None on any error.
     """
-    url = "https://aviationweather.gov/api/data/metar?ids=ESGG&format=geojson&taf=false"
+    url = f"https://aviationweather.gov/api/data/metar?ids={_CITY.metar_code}&format=geojson&taf=false"
     try:
         resp = await client.get(url, timeout=8.0)
         resp.raise_for_status()
@@ -163,7 +165,7 @@ async def fetch_metar_cloud(client) -> Optional[dict]:
                 pass
 
         raw_ob = props.get("rawOb", "")
-        logger.debug("METAR ESGG: %s → cloud_cover=%.0f%%", raw_ob, cover)
+        logger.debug(f"METAR {_CITY.metar_code}: %s → cloud_cover=%.0f%%", raw_ob, cover)
         return {
             "cloud_cover": cover,
             "observed_at": observed_at,

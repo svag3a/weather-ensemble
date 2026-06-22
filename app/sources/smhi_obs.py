@@ -19,22 +19,20 @@ import httpx
 from datetime import datetime, timezone
 from typing import Optional
 
+from app.city_config import CITY as _CITY
+
 _BASE = "https://opendata-download-metobs.smhi.se/api/version/latest"
 
-STATIONS = [
-    {"id": 71420, "name": "Göteborg A", "lat": 57.7156, "lon": 11.9924},
-    {"id": 71380, "name": "Vinga A",    "lat": 57.6322, "lon": 11.6048},
-    {"id": 72420, "name": "Landvetter", "lat": 57.6764, "lon": 12.2919},
-]
+STATIONS = [{"id": s.id, "name": s.name, "lat": s.lat, "lon": s.lon} for s in _CITY.smhi_stations]
 
 _PARAM_TEMP   = 1
 _PARAM_WIND   = 4
 _PARAM_PRECIP = 7
 
 # Composite weights — must sum to ≤ 1.0; missing stations are re-normalised automatically
-_TEMP_WEIGHTS   = {71420: 0.80, 72420: 0.20, 71380: 0.00}
-_WIND_WEIGHTS   = {71420: 0.50, 71380: 0.30, 72420: 0.20}
-_PRECIP_WEIGHTS = {71420: 0.60, 71380: 0.25, 72420: 0.15}
+_TEMP_WEIGHTS   = _CITY.smhi_temp_weights
+_WIND_WEIGHTS   = _CITY.smhi_wind_weights
+_PRECIP_WEIGHTS = _CITY.smhi_precip_weights
 
 
 async def _fetch_latest_value(

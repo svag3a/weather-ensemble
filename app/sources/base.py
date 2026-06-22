@@ -1,8 +1,10 @@
 from dataclasses import dataclass
 from datetime import datetime
 
-GOTHENBURG_LAT = 57.7089
-GOTHENBURG_LON = 11.9746
+from app.city_config import CITY
+
+GOTHENBURG_LAT = CITY.lat
+GOTHENBURG_LON = CITY.lon
 
 
 @dataclass
