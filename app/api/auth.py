@@ -13,9 +13,11 @@ import httpx
 from fastapi import APIRouter, Cookie, HTTPException
 from fastapi.responses import RedirectResponse, JSONResponse
 
+from app.city_config import CITY as _CITY
+
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
-REDIRECT_URI = os.environ.get("REDIRECT_URI", "https://gbgsol.se/auth/callback")
+REDIRECT_URI = os.environ.get("REDIRECT_URI", f"https://{_CITY.domain}/auth/callback")
 
 SESSION_COOKIE = "session"
 SESSION_MAX_AGE = 86400 * 7  # 7 days in seconds

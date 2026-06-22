@@ -1670,7 +1670,7 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
     # ── Step 1: extract structured params from query ──────────────────────────
     client = _anthropic.AsyncAnthropic(api_key=os.getenv("ANTHROPIC_API_KEY", ""))
     system_prompt = (
-        f"Du tolkar utevistelsefrågor för gbgsol.se — en app om sol på uteserveringar i Göteborg. "
+        f"Du tolkar utevistelsefrågor för {_CITY.domain} — en app om sol på uteserveringar i {_CITY.name}. "
         f"Idag: {today.isoformat()} ({weekdays[today.weekday()]}).\n"
         "query_type 'specific': frågan anger specifikt datum/tid. "
         "'best_in_window': öppen fråga ('när är bäst', 'vilken dag', 'bäst i veckan').\n"
@@ -1732,7 +1732,7 @@ async def planner_ask(body: PlannerAskRequest, db: Session = Depends(get_db)):
                     resp = await hc.get(
                         "https://nominatim.openstreetmap.org/search",
                         params={"q": area, "format": "json", "limit": 1},
-                        headers={"User-Agent": "gbgsol/1.0"},
+                        headers={"User-Agent": f"{_CITY.domain}/1.0"},
                     )
                 hits = resp.json()
                 if hits:
@@ -2275,7 +2275,7 @@ async def weather_chat(body: ChatRequest, db: Session = Depends(get_db)):
         if dbz >= 25: return f"regn (dBZ {round(dbz)})"
         return f"svagt regn (dBZ {round(dbz)})"
 
-    ctx_lines = [f"Göteborg, {now_local.strftime('%A %d %B %H:%M')} (Europe/Stockholm)"]
+    ctx_lines = [f"{_CITY.name}, {now_local.strftime('%A %d %B %H:%M')} ({_CITY.timezone})"]
     ctx_lines.append(f"Position: {body.lat:.4f}N {body.lon:.4f}E")
 
     # Radar now
@@ -2306,7 +2306,7 @@ async def weather_chat(body: ChatRequest, db: Session = Depends(get_db)):
     weather_context = "\n".join(ctx_lines)
 
     system_prompt = (
-        "Du är en väderassistent för Göteborg inbyggd i appen gbgsol.se. "
+        f"Du är en väderassistent för {_CITY.name} inbyggd i appen {_CITY.domain}. "
         "Svara kortfattat och naturligt på svenska. "
         "Prioritera regnradardata för frågor om närtid (0–30 min) och timarprognosen för längre sikt. "
         "VIKTIG REGEL: Om användarens fråga inte alls handlar om väder, aktiviteter utomhus "

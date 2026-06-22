@@ -19,6 +19,8 @@ import os
 from datetime import datetime, timezone
 from typing import Optional
 
+from app.city_config import CITY as _CITY
+
 import httpx
 from sqlalchemy.orm import Session
 
@@ -75,8 +77,7 @@ def get_osm_state() -> dict:
     return dict(_osm_state)
 
 
-# Göteborg bounding box for bulk road fetch
-GBG_BBOX = (57.60, 11.70, 57.85, 12.10)
+GBG_BBOX = _CITY.bbox
 # Grid cell size in degrees for spatial index
 GRID_CELL = 0.005  # ~500 m
 
@@ -98,7 +99,7 @@ out geom;
     ]
     for url in endpoints:
         try:
-            logger.info("Fetching all Göteborg roads from %s …", url)
+            logger.info("Fetching all %s roads from %s …", _CITY.name, url)
             r = await client.post(
                 url, content=encoded.encode(),
                 headers={
@@ -279,8 +280,8 @@ _ai_state: dict = {
 
 AI_BATCH = 20   # venues per Claude call
 
-AI_SYSTEM = """\
-You are a local knowledge expert for Göteborg, Sweden.
+AI_SYSTEM = f"""\
+You are a local knowledge expert for {_CITY.name}, Sweden.
 Given a list of restaurants, cafés, and bars, estimate two things for each:
 
 1. outdoor_type — one of:
@@ -298,9 +299,9 @@ No other text — only the JSON array.
 """
 
 AI_USER_TMPL = """\
-Venues (Göteborg, Sweden):
-{venues_text}
-"""
+Venues ({city}, Sweden):
+{{venues_text}}
+""".format(city=_CITY.name, venues_text="{venues_text}")
 
 
 def get_ai_state() -> dict:

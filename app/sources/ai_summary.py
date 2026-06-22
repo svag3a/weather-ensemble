@@ -11,6 +11,7 @@ import logging
 from datetime import datetime, timezone, date
 from typing import Optional
 from sqlalchemy.orm import Session
+from app.city_config import CITY as _CITY
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,7 @@ _CACHE_TTL_HOURS = 1.1    # 66 min — slightly longer than scheduler interval (
 from zoneinfo import ZoneInfo
 _STOCKHOLM = ZoneInfo("Europe/Stockholm")
 
-_SYSTEM_PROMPT = """Du är en meteorolog som skriver vädersammanfattningar för Göteborg på svenska.
+_SYSTEM_PROMPT = f"""Du är en meteorolog som skriver vädersammanfattningar för {_CITY.name} på svenska.
 
 REGLER:
 1. Beskriv ENDAST mönster som finns i datan — spekulera inte
@@ -253,7 +254,7 @@ async def generate_summary(db: Session, target_date: date, period: str) -> Optio
     weekday_sv = _WEEKDAYS_SV[target_date.weekday()]
 
     input_data = {
-        "location": "Göteborg",
+        "location": _CITY.name,
         "date": target_date.isoformat(),
         "weekday": weekday_sv,   # explicit — do not infer day name from the date
         "confidence_score": round(sum(confs) / len(confs), 2) if confs else 0.5,

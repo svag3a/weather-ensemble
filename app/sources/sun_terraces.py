@@ -14,6 +14,7 @@ from typing import Optional
 from sqlalchemy.orm import Session
 
 from app.models import SunTerrace
+from app.city_config import CITY as _CITY
 
 logger = logging.getLogger(__name__)
 
@@ -550,15 +551,16 @@ async def fetch_from_overpass(client) -> list[dict]:
     Fetches nodes, ways AND relations so venues mapped as building polygons
     are included.  Uses `out center` to get centroid coordinates for ways/relations.
     """
-    query = """
+    lat_min, lon_min, lat_max, lon_max = _CITY.bbox
+    query = f"""
 [out:json][timeout:90];
 (
   node["amenity"~"^(restaurant|cafe|bar|pub|biergarten)$"]
-    (57.60,11.70,57.85,12.10);
+    ({lat_min},{lon_min},{lat_max},{lon_max});
   way["amenity"~"^(restaurant|cafe|bar|pub|biergarten)$"]
-    (57.60,11.70,57.85,12.10);
+    ({lat_min},{lon_min},{lat_max},{lon_max});
   relation["amenity"~"^(restaurant|cafe|bar|pub|biergarten)$"]
-    (57.60,11.70,57.85,12.10);
+    ({lat_min},{lon_min},{lat_max},{lon_max});
 );
 out center;
 """

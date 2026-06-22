@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models import Hashtag, SunTerrace, TerraceHashtag
+from app.city_config import CITY as _CITY
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +97,7 @@ def _arc_tags(
 # ── Strategy 3: Claude Haiku batch AI ────────────────────────────────────────
 
 _SYSTEM_PROMPT = (
-    "You are a local expert for Göteborg, Sweden. "
+    f"You are a local expert for {_CITY.name}, Sweden. "
     "Given a venue name, type and address, pick 1–3 hashtags from the provided list "
     "that are CLEARLY AND DISTINCTIVELY associated with this venue. "
     "Do NOT add generic tags that could apply to almost any venue. "

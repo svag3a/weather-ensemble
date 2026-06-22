@@ -15,11 +15,12 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.models import Hashtag, SunTerrace, TerraceHashtag
+from app.city_config import CITY as _CITY
 
 logger = logging.getLogger(__name__)
 
 _NOMINATIM_URL = "https://nominatim.openstreetmap.org/reverse"
-_HEADERS = {"User-Agent": "gbgsol/1.0 (area-tagging)"}
+_HEADERS = {"User-Agent": f"{_CITY.domain}/1.0 (area-tagging)"}
 
 _state: dict = {
     "running": False,

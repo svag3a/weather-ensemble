@@ -16,6 +16,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from app.models import SunTerrace
 from app.database import SessionLocal
+from app.city_config import CITY as _CITY
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +46,17 @@ def _build_grid() -> list[tuple]:
                 lon += lon_step
             lat += lat_step
 
+    lat_min, lon_min, lat_max, lon_max = _CITY.bbox
+
     # Level 1: full urban area
-    _add_layer(57.61, 57.82, 11.78, 12.10,
+    _add_layer(lat_min, lat_max, lon_min, lon_max,
                lat_step=0.018,   # ≈ 2.0 km
                lon_step=0.033,   # ≈ 2.0 km at lat 57.7°
                radius_m=1500)
 
     # Level 2: dense centre — finer mesh to beat the 60-result cap
-    _add_layer(57.685, 57.725, 11.945, 11.995,
+    _add_layer(_CITY.lat - 0.020, _CITY.lat + 0.020,
+               _CITY.lon - 0.025, _CITY.lon + 0.025,
                lat_step=0.009,   # ≈ 1.0 km
                lon_step=0.017,   # ≈ 1.0 km
                radius_m=750)
