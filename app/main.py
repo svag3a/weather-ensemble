@@ -174,6 +174,8 @@ async def immutable_assets_headers(request: Request, call_next):
     elif p.startswith("/city-images/"):
         # UUID-based filenames never reuse; safe to cache aggressively
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif p in ("/lejon.webp", "/lejon.png"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 
 app.include_router(router, prefix="/api/v1")

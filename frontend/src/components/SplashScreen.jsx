@@ -118,7 +118,7 @@ export default function SplashScreen({ onDone }) {
 
         {/* Lion */}
         <img
-          src="/lejon.png"
+          src="/lejon.webp"
           alt=""
           draggable={false}
           style={{

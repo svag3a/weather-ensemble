@@ -8,6 +8,22 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>gbgsol.se</title>
+  <script>
+    try {
+      var _ci = JSON.parse(localStorage.getItem('city_images_v1') || '{}');
+      if (_ci.d && _ci.d.length) {
+        var _hour = new Date().getHours();
+        var _slot = _hour >= 5 && _hour < 10 ? 'morning' : _hour >= 10 && _hour < 18 ? 'day' : _hour >= 18 && _hour < 22 ? 'evening' : 'night';
+        var _bg = _ci.d.filter(function(i){ return i.image_type === 'motif'; });
+        var _img = _bg[0];
+        if (_img) {
+          var _l = document.createElement('link');
+          _l.rel = 'preload'; _l.as = 'image'; _l.fetchPriority = 'high'; _l.href = _img.url;
+          document.head.appendChild(_l);
+        }
+      }
+    } catch(e) {}
+  </script>
   </head>
   <body>
     <div id="root"></div>

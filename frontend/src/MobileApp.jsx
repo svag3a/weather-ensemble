@@ -1079,6 +1079,7 @@ function CurrentCard({ fc, radar, allForecasts, motifImage, skyGradient, skyThem
         <img
           src={motifImage.url}
           alt={motifImage.label}
+          fetchPriority="high"
           style={{
             position: 'absolute',
             bottom: 0,
