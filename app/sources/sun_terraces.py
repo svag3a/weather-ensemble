@@ -371,7 +371,7 @@ def compute_day_score(
         ws = weather_score(fc)
         alt_factor = max(0.0, min(1.0, (alt - 5.0) / 20.0))  # 0 at ≤5°, 1 at ≥25°
         combined = (geo / 100.0) * (ws["combined"] / 100.0) * alt_factor * 100.0
-        if ws["precip"] < 60:
+        if ws["precip"] < 10:
             combined = 0.0
         return max(0.0, min(100.0, combined))
 
@@ -463,7 +463,7 @@ def compute_scores(
         if is_rooftop:
             total = int(0.50 * ws["cloud"] + 0.35 * ws["precip"] + 0.10 * ws["temp"] + 0.05 * ws["wind"])
             total = min(100, total + 10)
-            if ws["precip"] < 60:
+            if ws["precip"] < 10:
                 total = 0
             total = int(total * alt_factor)
             result[key] = {
