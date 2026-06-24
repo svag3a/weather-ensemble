@@ -2,7 +2,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 from dotenv import load_dotenv
-from fastapi import FastAPI, Cookie
+from fastapi import FastAPI, Cookie, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from starlette.responses import RedirectResponse
@@ -161,6 +162,15 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+@app.middleware("http")
+async def immutable_assets_headers(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
 
 app.include_router(router, prefix="/api/v1")
 app.include_router(auth_router)

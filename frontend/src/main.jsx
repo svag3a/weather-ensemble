@@ -1,11 +1,12 @@
-import { StrictMode, useState, useEffect } from 'react'
+import { StrictMode, useState, useEffect, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
-import App from './App.jsx'
-import MobileApp from './MobileApp.jsx'
-import DesktopApp from './DesktopApp.jsx'
 import SplashScreen from './components/SplashScreen.jsx'
+
+const App        = lazy(() => import('./App.jsx'))
+const MobileApp  = lazy(() => import('./MobileApp.jsx'))
+const DesktopApp = lazy(() => import('./DesktopApp.jsx'))
 
 function useIsDesktop() {
   const mq = window.matchMedia('(min-width: 1024px)')
@@ -24,12 +25,14 @@ function Root() {
   return (
     <>
       {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
-      <Routes>
-        <Route path="/" element={isDesktop ? <DesktopApp /> : <MobileApp />} />
-        <Route path="/mobile" element={<MobileApp />} />
-        <Route path="/desktop" element={<DesktopApp />} />
-        <Route path="/admin" element={<App />} />
-      </Routes>
+      <Suspense fallback={null}>
+        <Routes>
+          <Route path="/" element={isDesktop ? <DesktopApp /> : <MobileApp />} />
+          <Route path="/mobile" element={<MobileApp />} />
+          <Route path="/desktop" element={<DesktopApp />} />
+          <Route path="/admin" element={<App />} />
+        </Routes>
+      </Suspense>
     </>
   )
 }

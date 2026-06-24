@@ -57,10 +57,23 @@ export async function fetchWarnings() {
   return res.json()
 }
 
+const _SUM_TTL = 30 * 60 * 1000
+function _loadCachedSummary(period) {
+  try { const { ts, d } = JSON.parse(localStorage.getItem(`summary_v1_${period}`) || '{}'); if (d && Date.now() - ts < _SUM_TTL) return d } catch {}
+  return null
+}
+function _saveSummaryCache(period, data) {
+  try { localStorage.setItem(`summary_v1_${period}`, JSON.stringify({ ts: Date.now(), d: data })) } catch {}
+}
+
 export async function fetchSummary(period = 'today') {
+  const cached = _loadCachedSummary(period)
+  if (cached) return cached
   const res = await fetch(`${BASE}/summary?period=${period}`)
   if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  const data = await res.json()
+  _saveSummaryCache(period, data)
+  return data
 }
 
 export async function triggerCollect() {
