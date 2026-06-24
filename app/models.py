@@ -1,5 +1,5 @@
 from datetime import datetime, date
-from sqlalchemy import Float, Integer, String, DateTime, Date, UniqueConstraint, Text, Boolean
+from sqlalchemy import Float, Integer, String, DateTime, Date, UniqueConstraint, Text, Boolean, Index
 from sqlalchemy.orm import Mapped, mapped_column
 from typing import Optional
 from app.database import Base
@@ -185,6 +185,10 @@ class SunTerrace(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_sun_terraces_lat_lon_active", "lat", "lon", "active"),
+    )
 
 
 class TerraceReport(Base):

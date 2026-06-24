@@ -4,7 +4,7 @@ import asyncio
 import json as _json
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Body, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -1259,6 +1259,7 @@ def get_top_terraces(
     radius: float = Query(default=3.0, ge=0.1, le=10.0),
     limit: int = Query(default=3, ge=1, le=10),
     db: Session = Depends(get_db),
+    response: Response = None,
 ):
     """Top sun venues near the user right now + today's sun window."""
     import pytz
@@ -1370,6 +1371,8 @@ def get_top_terraces(
         and (now_fc.get("precip_probability") or 100) < 25
     )
 
+    if response is not None:
+        response.headers["Cache-Control"] = "public, max-age=180, stale-while-revalidate=900"
     return {
         "venues":      venues,
         "sun_window":  sun_window,
@@ -1388,6 +1391,7 @@ def get_sun_terraces(
     name: str = Query(default=""),
     tags: str = Query(default=""),
     db: Session = Depends(get_db),
+    response: Response = None,
 ):
     """Get sun terraces within radius, scored by current solar conditions.
     When `name` is provided, radius is ignored and all active terraces matching
@@ -1521,6 +1525,8 @@ def get_sun_terraces(
 
     # Sort: day_score desc (rest-of-day sun exposure), then distance asc on tie
     results.sort(key=lambda x: (-x["day_score"], x["distance_km"]))
+    if response is not None:
+        response.headers["Cache-Control"] = "public, max-age=180, stale-while-revalidate=900"
     return results
 
 

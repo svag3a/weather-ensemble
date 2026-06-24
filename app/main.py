@@ -101,6 +101,7 @@ async def lifespan(app: FastAPI):
             "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('vegetariskt', 1, datetime('now'))",
             "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('vegan', 1, datetime('now'))",
             "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('livemusik', 1, datetime('now'))",
+            "CREATE INDEX IF NOT EXISTS ix_sun_terraces_lat_lon_active ON sun_terraces(lat, lon, active)",
         ]:
             try:
                 conn.execute(text(stmt))
