@@ -168,7 +168,11 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 @app.middleware("http")
 async def immutable_assets_headers(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/assets/"):
+    p = request.url.path
+    if p.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif p.startswith("/city-images/"):
+        # UUID-based filenames never reuse; safe to cache aggressively
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     return response
 

@@ -837,10 +837,21 @@ def cleanup_test_ensemble_rows(db: Session = Depends(get_db), _user: str = Depen
     return {"deleted": deleted_times}
 
 
+import io as _io
 import uuid as _uuid
 from pathlib import Path as _Path
+from PIL import Image as _PILImage
 
 IMAGE_DIR = _Path("/data/city_images")
+
+
+def _to_webp(content: bytes, quality: int = 82) -> bytes:
+    img = _PILImage.open(_io.BytesIO(content))
+    if img.mode not in ("RGB", "RGBA"):
+        img = img.convert("RGBA" if (img.mode == "P" and "transparency" in img.info) else "RGB")
+    buf = _io.BytesIO()
+    img.save(buf, format="WEBP", quality=quality, method=4)
+    return buf.getvalue()
 
 
 class CityImageOut(BaseModel):
@@ -893,11 +904,15 @@ async def upload_city_image(
     db: Session = Depends(get_db),
     _user: str = Depends(get_current_user),
 ):
-    ext = _Path(file.filename).suffix if file.filename else ""
-    filename = f"{_uuid.uuid4()}{ext}"
-    dest = IMAGE_DIR / filename
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     content = await file.read()
+    try:
+        content = _to_webp(content)
+        filename = f"{_uuid.uuid4()}.webp"
+    except Exception:
+        ext = _Path(file.filename).suffix if file.filename else ""
+        filename = f"{_uuid.uuid4()}{ext}"
+    dest = IMAGE_DIR / filename
     dest.write_bytes(content)
     row = CityImage(filename=filename, label=label, lat=lat, lon=lon, time_slot=time_slot, image_type=image_type)
     db.add(row)
@@ -935,12 +950,16 @@ async def replace_city_image(
     row = db.query(CityImage).filter(CityImage.id == image_id).first()
     if row is None:
         raise HTTPException(status_code=404, detail="Image not found")
-    # Save new file
-    ext = _Path(file.filename).suffix if file.filename else ""
-    new_filename = f"{_uuid.uuid4()}{ext}"
-    dest = IMAGE_DIR / new_filename
+    # Save new file as WebP
     IMAGE_DIR.mkdir(parents=True, exist_ok=True)
     content = await file.read()
+    try:
+        content = _to_webp(content)
+        new_filename = f"{_uuid.uuid4()}.webp"
+    except Exception:
+        ext = _Path(file.filename).suffix if file.filename else ""
+        new_filename = f"{_uuid.uuid4()}{ext}"
+    dest = IMAGE_DIR / new_filename
     dest.write_bytes(content)
     # Delete old file
     old_path = IMAGE_DIR / row.filename
@@ -963,6 +982,32 @@ def delete_city_image(image_id: int, db: Session = Depends(get_db), _user: str =
         file_path.unlink()
     db.delete(row)
     db.commit()
+
+
+@router.post("/city-images/migrate-webp")
+def migrate_city_images_webp(db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
+    """Convert all existing non-WebP city images to WebP in place."""
+    converted, skipped, failed = 0, 0, 0
+    for row in db.query(CityImage).all():
+        if row.filename.endswith(".webp"):
+            skipped += 1
+            continue
+        src = IMAGE_DIR / row.filename
+        if not src.exists():
+            skipped += 1
+            continue
+        try:
+            webp_bytes = _to_webp(src.read_bytes())
+            stem = row.filename.rsplit(".", 1)[0]
+            new_filename = f"{stem}.webp"
+            (IMAGE_DIR / new_filename).write_bytes(webp_bytes)
+            src.unlink()
+            row.filename = new_filename
+            converted += 1
+        except Exception:
+            failed += 1
+    db.commit()
+    return {"converted": converted, "skipped": skipped, "failed": failed}
 
 
 @router.get("/status")

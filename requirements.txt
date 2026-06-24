@@ -12,3 +12,4 @@ pyproj
 numpy
 anthropic
 python-multipart
+Pillow
