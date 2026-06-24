@@ -68,8 +68,12 @@ function useRadarLocation() {
   const timerRef = useRef(null)
 
   const poll = useCallback(async (lat, lon) => {
-    try { setRadar(await fetchRadarNow(lat, lon)) } catch {}
-    try { const r = await fetchRainNowcast(lat, lon); setRainTimeline(r.timeline) } catch {}
+    const [radarResult, nowcastResult] = await Promise.allSettled([
+      fetchRadarNow(lat, lon),
+      fetchRainNowcast(lat, lon),
+    ])
+    if (radarResult.status === 'fulfilled') setRadar(radarResult.value)
+    if (nowcastResult.status === 'fulfilled') setRainTimeline(nowcastResult.value?.timeline)
   }, [])
 
   const locate = useCallback(() => {
@@ -2851,24 +2855,23 @@ export default function MobileApp() {
   }, [])
 
   const load = useCallback(async () => {
-    try {
-      setForecast(coords
-        ? await fetchLocalForecast(coords.lat, coords.lon, 168)
-        : await fetchEnsemble(168))
-    } catch {}
-    if (coords) {
-      try { setTopTerraces(await fetchTopTerraces({ lat: coords.lat, lon: coords.lon })) } catch {}
-      try {
-        const terraces = await fetchSunTerraces({
-          lat: coords.lat, lon: coords.lon,
-          radius: loadRadiusPref(),
-          type: 'all',
-          tags: [...loadTimePrefP()].join(','),
-          min_score: 25,
-        })
-        setPrefetchedTerraces(terraces)
-      } catch {}
-    }
+    const c = coords ?? { lat: 57.7089, lon: 11.9746 }
+    const [fcResult, topResult, terrResult] = await Promise.allSettled([
+      coords
+        ? fetchLocalForecast(coords.lat, coords.lon, 168)
+        : fetchEnsemble(168),
+      fetchTopTerraces({ lat: c.lat, lon: c.lon }),
+      fetchSunTerraces({
+        lat: c.lat, lon: c.lon,
+        radius: loadRadiusPref(),
+        type: 'all',
+        tags: [...loadTimePrefP()].join(','),
+        min_score: 25,
+      }),
+    ])
+    if (fcResult.status === 'fulfilled')   setForecast(fcResult.value)
+    if (topResult.status === 'fulfilled')  setTopTerraces(topResult.value)
+    if (terrResult.status === 'fulfilled') setPrefetchedTerraces(terrResult.value)
   }, [coords])
 
   useEffect(() => { load() }, [load])

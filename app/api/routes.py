@@ -1206,11 +1206,23 @@ def get_top_terraces(
     now = datetime.now(timezone.utc)
     cutoff = now + timedelta(hours=18)
 
-    all_terraces = db.query(SunTerrace).filter(SunTerrace.active == True).all()  # noqa: E712
+    lat_delta = radius / 111.0
+    lon_delta = radius / (111.0 * _math.cos(_math.radians(lat)))
+    all_terraces = (
+        db.query(SunTerrace)
+        .filter(
+            SunTerrace.active == True,  # noqa: E712
+            SunTerrace.outdoor_type != "none",
+            SunTerrace.lat >= lat - lat_delta,
+            SunTerrace.lat <= lat + lat_delta,
+            SunTerrace.lon >= lon - lon_delta,
+            SunTerrace.lon <= lon + lon_delta,
+        )
+        .all()
+    )
     nearby = [
         t for t in all_terraces
-        if (t.outdoor_type or "") != "none"
-        and _haversine_km(lat, lon, t.lat, t.lon) <= radius
+        if _haversine_km(lat, lon, t.lat, t.lon) <= radius
     ]
 
     latest_run = (
@@ -1351,7 +1363,24 @@ def get_sun_terraces(
     any of those tags are returned."""
     from app.sources.sun_terraces import compute_scores
 
-    all_terraces = db.query(SunTerrace).filter(SunTerrace.active == True).all()  # noqa: E712
+    # For name search load all; otherwise pre-filter with a SQL bounding box
+    # to avoid fetching the entire table into Python.
+    if name.strip():
+        all_terraces = db.query(SunTerrace).filter(SunTerrace.active == True).all()  # noqa: E712
+    else:
+        lat_delta = radius / 111.0
+        lon_delta = radius / (111.0 * _math.cos(_math.radians(lat)))
+        all_terraces = (
+            db.query(SunTerrace)
+            .filter(
+                SunTerrace.active == True,  # noqa: E712
+                SunTerrace.lat >= lat - lat_delta,
+                SunTerrace.lat <= lat + lat_delta,
+                SunTerrace.lon >= lon - lon_delta,
+                SunTerrace.lon <= lon + lon_delta,
+            )
+            .all()
+        )
 
     # Build hashtag lookup: terrace_id -> [{id, name, count}]
     all_th = (
