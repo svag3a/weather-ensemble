@@ -499,8 +499,10 @@ def compute_scores(
         total = int(100 * orientation_factor * weather_factor * alt_factor)
         if outdoor_seating:
             total = min(100, total + 5)
-        # Rain veto: any detectable rain (precip_probability > ~27%) → score = 0
-        if ws["precip"] < 60:
+        # Hard veto only when it's actually raining (precip_probability > ~60%)
+        # Lower threshold was too aggressive — ensemble often shows 25-35% on clear days.
+        # The multiplicative weather_factor already handles moderate rain gracefully.
+        if ws["precip"] < 10:
             total = 0
         # Shadow veto: nearby building blocks the sun at this moment
         shadowed = False

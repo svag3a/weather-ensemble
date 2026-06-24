@@ -801,7 +801,7 @@ export default function SolView({ coords, initialData }) {
       type:      typeParam,
       name:      debouncedSearch,
       tags:      tagsParam,
-      min_score: 25,
+      min_score: debouncedSearch ? 0 : 25,
     })
       .then(setData)
       .catch(e => setError(e.message))
