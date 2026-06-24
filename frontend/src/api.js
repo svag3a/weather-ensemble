@@ -75,10 +75,13 @@ export async function fetchStatus() {
   return res.json()
 }
 
+let _cityImagesPromise = null
 export async function fetchCityImages() {
-  const res = await fetch(`${BASE}/city-images`)
-  if (!res.ok) throw new Error(await res.text())
-  return res.json()
+  if (_cityImagesPromise) return _cityImagesPromise
+  _cityImagesPromise = fetch(`${BASE}/city-images`)
+    .then(res => { if (!res.ok) throw new Error(); return res.json() })
+    .catch(err => { _cityImagesPromise = null; throw err })
+  return _cityImagesPromise
 }
 
 export async function uploadCityImage(formData) {

@@ -5,6 +5,16 @@ import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRig
 
 const GLASS = 'bg-black/20 backdrop-blur-sm border border-white/10'
 
+const _HT_KEY = 'sol_hashtags_v1'
+const _HT_TTL = 3600 * 1000  // 1 hour
+function _loadCachedHashtags() {
+  try { const { ts, d } = JSON.parse(localStorage.getItem(_HT_KEY) || '{}'); if (d && Date.now() - ts < _HT_TTL) return d } catch {}
+  return null
+}
+function _saveHashtagsCache(data) {
+  try { localStorage.setItem(_HT_KEY, JSON.stringify({ ts: Date.now(), d: data })) } catch {}
+}
+
 function UVChip({ uv }) {
   const val = Math.round(uv)
   const [color, label] =
@@ -751,9 +761,11 @@ export default function SolView({ coords, initialData }) {
     })
   }
 
-  // Fetch all hashtags once on mount
+  // Fetch all hashtags once on mount (localStorage-cached for 1 hour)
   useEffect(() => {
-    fetchHashtags().then(setAllHashtags).catch(() => {})
+    const cached = _loadCachedHashtags()
+    if (cached) { setAllHashtags(cached); return }
+    fetchHashtags().then(data => { setAllHashtags(data); _saveHashtagsCache(data) }).catch(() => {})
   }, [])
 
   useEffect(() => {

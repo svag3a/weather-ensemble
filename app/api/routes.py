@@ -17,6 +17,67 @@ from app.api.auth import get_current_user
 
 router = APIRouter()
 
+# ── In-process caches (auto-invalidate when forecast run changes) ─────────────
+_fcast_cache: dict = {"computed_at": None, "hours": []}
+_scores_cache: dict = {}  # (venue_id, computed_at) -> scores dict
+
+
+def _get_forecast_hours(db: Session, now: datetime, cutoff: datetime) -> list:
+    """Return cached forecast hours; re-queries DB only when computed_at changes."""
+    from app.sources.metar import apply_metar_cloud_correction
+    latest_run = (
+        db.query(EnsembleForecast.computed_at)
+        .order_by(EnsembleForecast.computed_at.desc())
+        .first()
+    )
+    if latest_run is None:
+        return []
+    computed_at = latest_run[0]
+    if _fcast_cache["computed_at"] == computed_at and _fcast_cache["hours"]:
+        return _fcast_cache["hours"]
+    rows = (
+        db.query(EnsembleForecast)
+        .filter(
+            EnsembleForecast.computed_at == computed_at,
+            EnsembleForecast.valid_for >= now,
+            EnsembleForecast.valid_for <= cutoff,
+        )
+        .order_by(EnsembleForecast.valid_for)
+        .all()
+    )
+    hours = [
+        {
+            "temperature": r.temperature,
+            "precip_probability": r.precip_probability,
+            "wind_speed": r.wind_speed,
+            "cloud_cover": r.cloud_cover,
+            "valid_for_ts": (
+                r.valid_for.replace(tzinfo=timezone.utc).timestamp()
+                if r.valid_for.tzinfo is None
+                else r.valid_for.timestamp()
+            ),
+        }
+        for r in rows
+    ]
+    hours = apply_metar_cloud_correction(hours, now)
+    _fcast_cache["computed_at"] = computed_at
+    _fcast_cache["hours"] = hours
+    return hours
+
+
+def _cached_compute_scores(venue_id: int, *args, **kwargs) -> dict:
+    """Cache compute_scores per (venue_id, forecast_run); evicts stale runs."""
+    from app.sources.sun_terraces import compute_scores
+    computed_at = _fcast_cache["computed_at"]
+    key = (venue_id, computed_at)
+    if key in _scores_cache:
+        return _scores_cache[key]
+    result = compute_scores(*args, **kwargs)
+    for k in [k for k in _scores_cache if k[1] != computed_at]:
+        del _scores_cache[k]
+    _scores_cache[key] = result
+    return result
+
 
 class ForecastOut(BaseModel):
     valid_for: datetime
@@ -1200,7 +1261,6 @@ def get_top_terraces(
 ):
     """Top sun venues near the user right now + today's sun window."""
     import pytz
-    from app.sources.sun_terraces import compute_scores
 
     tz = pytz.timezone("Europe/Stockholm")
     now = datetime.now(timezone.utc)
@@ -1225,43 +1285,11 @@ def get_top_terraces(
         if _haversine_km(lat, lon, t.lat, t.lon) <= radius
     ]
 
-    latest_run = (
-        db.query(EnsembleForecast.computed_at)
-        .order_by(EnsembleForecast.computed_at.desc())
-        .first()
-    )
-    forecast_hours: list = []
-    if latest_run:
-        rows = (
-            db.query(EnsembleForecast)
-            .filter(
-                EnsembleForecast.computed_at == latest_run[0],
-                EnsembleForecast.valid_for >= now,
-                EnsembleForecast.valid_for <= cutoff,
-            )
-            .order_by(EnsembleForecast.valid_for)
-            .all()
-        )
-        forecast_hours = [
-            {
-                "temperature": r.temperature,
-                "precip_probability": r.precip_probability,
-                "wind_speed": r.wind_speed,
-                "cloud_cover": r.cloud_cover,
-                "valid_for_ts": (
-                    r.valid_for.replace(tzinfo=timezone.utc).timestamp()
-                    if r.valid_for.tzinfo is None
-                    else r.valid_for.timestamp()
-                ),
-            }
-            for r in rows
-        ]
-        from app.sources.metar import apply_metar_cloud_correction
-        forecast_hours = apply_metar_cloud_correction(forecast_hours, now)
+    forecast_hours = _get_forecast_hours(db, now, cutoff)
 
     venues = []
     for t in nearby:
-        scores = compute_scores(
+        scores = _cached_compute_scores(t.id,
             t.lat, t.lon,
             t.street_orientation,
             t.orientation_confidence,
@@ -1361,8 +1389,6 @@ def get_sun_terraces(
     the name are returned (sorted by distance).
     When `tags` (comma-separated hashtag names) is provided, only venues with
     any of those tags are returned."""
-    from app.sources.sun_terraces import compute_scores
-
     # For name search load all; otherwise pre-filter with a SQL bounding box
     # to avoid fetching the entire table into Python.
     if name.strip():
@@ -1427,40 +1453,9 @@ def get_sun_terraces(
             if any(ht["name"] in tag_names for ht in terrace_hashtags.get(t.id, []))
         ]
 
-    # Get latest ensemble forecast hours for next 3h
     now = datetime.now(timezone.utc)
-    cutoff = now + timedelta(hours=18)   # extend to cover full remaining day
-    latest_run = (
-        db.query(EnsembleForecast.computed_at)
-        .order_by(EnsembleForecast.computed_at.desc())
-        .first()
-    )
-    forecast_hours: list = []
-    if latest_run:
-        rows = (
-            db.query(EnsembleForecast)
-            .filter(
-                EnsembleForecast.computed_at == latest_run[0],
-                EnsembleForecast.valid_for >= now,
-                EnsembleForecast.valid_for <= cutoff,
-            )
-            .order_by(EnsembleForecast.valid_for)
-            .all()
-        )
-        forecast_hours = [
-            {
-                "temperature": r.temperature,
-                "precip_probability": r.precip_probability,
-                "wind_speed": r.wind_speed,
-                "cloud_cover": r.cloud_cover,
-                "valid_for_ts": r.valid_for.replace(tzinfo=timezone.utc).timestamp()
-                if r.valid_for.tzinfo is None
-                else r.valid_for.timestamp(),
-            }
-            for r in rows
-        ]
-        from app.sources.metar import apply_metar_cloud_correction
-        forecast_hours = apply_metar_cloud_correction(forecast_hours, now)
+    cutoff = now + timedelta(hours=18)
+    forecast_hours = _get_forecast_hours(db, now, cutoff)
 
     results = []
     for t in nearby:
@@ -1468,7 +1463,7 @@ def get_sun_terraces(
         # Skip venues explicitly marked as having no outdoor seating
         if outdoor_type == "none":
             continue
-        scores = compute_scores(
+        scores = _cached_compute_scores(t.id,
             t.lat, t.lon,
             t.street_orientation,
             t.orientation_confidence,
