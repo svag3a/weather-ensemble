@@ -127,6 +127,28 @@ async def lifespan(app: FastAPI):
     finally:
         _db.close()
 
+    # Warm DB score-cache in background so first request is fast
+    import threading
+    import logging as _logging
+    _log = _logging.getLogger(__name__)
+    def _startup_precompute():
+        try:
+            from sqlalchemy import desc as _desc
+            from app.database import SessionLocal as _SL
+            from app.models import EnsembleForecast as _EF
+            from app.scheduler import _precompute_terrace_scores
+            _db = _SL()
+            try:
+                latest = _db.query(_EF.computed_at).order_by(_desc(_EF.computed_at)).first()
+                if latest:
+                    _precompute_terrace_scores(_db, latest[0])
+                    _log.info("startup precompute done")
+            finally:
+                _db.close()
+        except Exception as _exc:
+            _log.error("startup precompute failed: %s", _exc, exc_info=True)
+    threading.Thread(target=_startup_precompute, daemon=True).start()
+
     scheduler = create_scheduler()
     scheduler.start()
     yield
