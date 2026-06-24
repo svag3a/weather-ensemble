@@ -5,6 +5,7 @@ import './index.css'
 import App from './App.jsx'
 import MobileApp from './MobileApp.jsx'
 import DesktopApp from './DesktopApp.jsx'
+import SplashScreen from './components/SplashScreen.jsx'
 
 function useIsDesktop() {
   const mq = window.matchMedia('(min-width: 1024px)')
@@ -19,13 +20,17 @@ function useIsDesktop() {
 
 function Root() {
   const isDesktop = useIsDesktop()
+  const [showSplash, setShowSplash] = useState(true)
   return (
-    <Routes>
-      <Route path="/" element={isDesktop ? <DesktopApp /> : <MobileApp />} />
-      <Route path="/mobile" element={<MobileApp />} />
-      <Route path="/desktop" element={<DesktopApp />} />
-      <Route path="/admin" element={<App />} />
-    </Routes>
+    <>
+      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      <Routes>
+        <Route path="/" element={isDesktop ? <DesktopApp /> : <MobileApp />} />
+        <Route path="/mobile" element={<MobileApp />} />
+        <Route path="/desktop" element={<DesktopApp />} />
+        <Route path="/admin" element={<App />} />
+      </Routes>
+    </>
   )
 }
 
