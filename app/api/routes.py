@@ -893,6 +893,32 @@ def list_city_images(db: Session = Depends(get_db)):
     return [_img_out(r) for r in rows]
 
 
+@router.post("/city-images/migrate-webp")
+def migrate_city_images_webp(db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
+    """Convert all existing non-WebP city images to WebP in place."""
+    converted, skipped, failed = 0, 0, 0
+    for row in db.query(CityImage).all():
+        if row.filename.endswith(".webp"):
+            skipped += 1
+            continue
+        src = IMAGE_DIR / row.filename
+        if not src.exists():
+            skipped += 1
+            continue
+        try:
+            webp_bytes = _to_webp(src.read_bytes())
+            stem = row.filename.rsplit(".", 1)[0]
+            new_filename = f"{stem}.webp"
+            (IMAGE_DIR / new_filename).write_bytes(webp_bytes)
+            src.unlink()
+            row.filename = new_filename
+            converted += 1
+        except Exception:
+            failed += 1
+    db.commit()
+    return {"converted": converted, "skipped": skipped, "failed": failed}
+
+
 @router.post("/city-images", response_model=CityImageOut, status_code=201)
 async def upload_city_image(
     file: UploadFile = File(...),
@@ -982,32 +1008,6 @@ def delete_city_image(image_id: int, db: Session = Depends(get_db), _user: str =
         file_path.unlink()
     db.delete(row)
     db.commit()
-
-
-@router.post("/city-images/migrate-webp")
-def migrate_city_images_webp(db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
-    """Convert all existing non-WebP city images to WebP in place."""
-    converted, skipped, failed = 0, 0, 0
-    for row in db.query(CityImage).all():
-        if row.filename.endswith(".webp"):
-            skipped += 1
-            continue
-        src = IMAGE_DIR / row.filename
-        if not src.exists():
-            skipped += 1
-            continue
-        try:
-            webp_bytes = _to_webp(src.read_bytes())
-            stem = row.filename.rsplit(".", 1)[0]
-            new_filename = f"{stem}.webp"
-            (IMAGE_DIR / new_filename).write_bytes(webp_bytes)
-            src.unlink()
-            row.filename = new_filename
-            converted += 1
-        except Exception:
-            failed += 1
-    db.commit()
-    return {"converted": converted, "skipped": skipped, "failed": failed}
 
 
 @router.get("/status")
