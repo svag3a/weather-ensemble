@@ -1288,11 +1288,10 @@ def get_top_terraces(
     ]
 
     forecast_hours = _get_forecast_hours(db, now, cutoff)
-    _run = _fcast_cache["computed_at"]
 
     venues = []
     for t in nearby:
-        if t.score_cache_json and t.score_cache_run == _run:
+        if t.score_cache_json:
             scores = _json.loads(t.score_cache_json)
         else:
             scores = _cached_compute_scores(t.id,
@@ -1465,7 +1464,6 @@ def get_sun_terraces(
     now = datetime.now(timezone.utc)
     cutoff = now + timedelta(hours=18)
     forecast_hours = _get_forecast_hours(db, now, cutoff)
-    _run = _fcast_cache["computed_at"]
 
     results = []
     for t in nearby:
@@ -1473,7 +1471,7 @@ def get_sun_terraces(
         # Skip venues explicitly marked as having no outdoor seating
         if outdoor_type == "none":
             continue
-        if t.score_cache_json and t.score_cache_run == _run:
+        if t.score_cache_json:
             scores = _json.loads(t.score_cache_json)
         else:
             scores = _cached_compute_scores(t.id,
