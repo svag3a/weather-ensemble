@@ -280,23 +280,20 @@ _ai_state: dict = {
 
 AI_BATCH = 20   # venues per Claude call
 
-AI_SYSTEM = f"""\
-You are a local knowledge expert for {_CITY.name}, Sweden.
-Given a list of restaurants, cafés, and bars, estimate two things for each:
-
-1. outdoor_type — one of:
-   "terrace"  = has regular outdoor seating (patio/terrace on street level)
-   "rooftop"  = rooftop bar or roof terrace
-   "none"     = no outdoor seating at all (only if you're quite confident)
-   "unknown"  = you don't know
-
-2. orientation — which compass direction the outdoor seating primarily faces:
-   N / NE / E / SE / S / SW / W / NW  or  "UNKNOWN"
-
-Respond with a JSON array, one object per venue, in the same order as the input.
-Each object: {"id": <int>, "outdoor_type": "...", "orientation": "..."}
-No other text — only the JSON array.
-"""
+AI_SYSTEM = (
+    f"You are a local knowledge expert for {_CITY.name}, Sweden.\n"
+    'Given a list of restaurants, cafés, and bars, estimate two things for each:\n\n'
+    '1. outdoor_type — one of:\n'
+    '   "terrace"  = has regular outdoor seating (patio/terrace on street level)\n'
+    '   "rooftop"  = rooftop bar or roof terrace\n'
+    '   "none"     = no outdoor seating at all (only if you\'re quite confident)\n'
+    '   "unknown"  = you don\'t know\n\n'
+    '2. orientation — which compass direction the outdoor seating primarily faces:\n'
+    '   N / NE / E / SE / S / SW / W / NW  or  "UNKNOWN"\n\n'
+    'Respond with a JSON array, one object per venue, in the same order as the input.\n'
+    'Each object: {"id": <int>, "outdoor_type": "...", "orientation": "..."}\n'
+    'No other text — only the JSON array.\n'
+)
 
 AI_USER_TMPL = """\
 Venues ({city}, Sweden):
