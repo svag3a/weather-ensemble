@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json as _json
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Body
@@ -1286,21 +1287,25 @@ def get_top_terraces(
     ]
 
     forecast_hours = _get_forecast_hours(db, now, cutoff)
+    _run = _fcast_cache["computed_at"]
 
     venues = []
     for t in nearby:
-        scores = _cached_compute_scores(t.id,
-            t.lat, t.lon,
-            t.street_orientation,
-            t.orientation_confidence,
-            forecast_hours,
-            outdoor_seating=t.outdoor_seating,
-            is_rooftop=(t.outdoor_type == "rooftop"),
-            polygon_coords_json=t.polygon_coords,
-            sun_arc_from=getattr(t, "sun_arc_from", None),
-            sun_arc_to=getattr(t, "sun_arc_to", None),
-            shadow_buildings_json=getattr(t, "shadow_buildings_json", None),
-        )
+        if t.score_cache_json and t.score_cache_run == _run:
+            scores = _json.loads(t.score_cache_json)
+        else:
+            scores = _cached_compute_scores(t.id,
+                t.lat, t.lon,
+                t.street_orientation,
+                t.orientation_confidence,
+                forecast_hours,
+                outdoor_seating=t.outdoor_seating,
+                is_rooftop=(t.outdoor_type == "rooftop"),
+                polygon_coords_json=t.polygon_coords,
+                sun_arc_from=getattr(t, "sun_arc_from", None),
+                sun_arc_to=getattr(t, "sun_arc_to", None),
+                shadow_buildings_json=getattr(t, "shadow_buildings_json", None),
+            )
         now_score  = scores.get("now", {}).get("total_score", 0)
         score_1h   = scores.get("1h",  {}).get("total_score", 0)
         score_2h   = scores.get("2h",  {}).get("total_score", 0)
@@ -1456,6 +1461,7 @@ def get_sun_terraces(
     now = datetime.now(timezone.utc)
     cutoff = now + timedelta(hours=18)
     forecast_hours = _get_forecast_hours(db, now, cutoff)
+    _run = _fcast_cache["computed_at"]
 
     results = []
     for t in nearby:
@@ -1463,18 +1469,21 @@ def get_sun_terraces(
         # Skip venues explicitly marked as having no outdoor seating
         if outdoor_type == "none":
             continue
-        scores = _cached_compute_scores(t.id,
-            t.lat, t.lon,
-            t.street_orientation,
-            t.orientation_confidence,
-            forecast_hours,
-            outdoor_seating=t.outdoor_seating,
-            is_rooftop=(outdoor_type == "rooftop"),
-            polygon_coords_json=t.polygon_coords,
-            sun_arc_from=getattr(t, 'sun_arc_from', None),
-            sun_arc_to=getattr(t, 'sun_arc_to', None),
-            shadow_buildings_json=getattr(t, 'shadow_buildings_json', None),
-        )
+        if t.score_cache_json and t.score_cache_run == _run:
+            scores = _json.loads(t.score_cache_json)
+        else:
+            scores = _cached_compute_scores(t.id,
+                t.lat, t.lon,
+                t.street_orientation,
+                t.orientation_confidence,
+                forecast_hours,
+                outdoor_seating=t.outdoor_seating,
+                is_rooftop=(outdoor_type == "rooftop"),
+                polygon_coords_json=t.polygon_coords,
+                sun_arc_from=getattr(t, 'sun_arc_from', None),
+                sun_arc_to=getattr(t, 'sun_arc_to', None),
+                shadow_buildings_json=getattr(t, 'shadow_buildings_json', None),
+            )
         now_score = scores.get("now", {}).get("total_score", 0)
         best_score = max(
             scores.get("now", {}).get("total_score", 0),

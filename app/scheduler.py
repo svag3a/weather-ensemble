@@ -152,6 +152,10 @@ async def collect_and_update() -> None:
             logger.error("build_ensemble failed: %s", exc, exc_info=True)
             db.rollback()
         _maybe_snapshot_weights(db, issued_at.date())
+        try:
+            _precompute_terrace_scores(db, issued_at)
+        except Exception as exc:
+            logger.error("_precompute_terrace_scores failed: %s", exc, exc_info=True)
         await _pregen_ai_summaries(db)
         # Seed sun terraces on first run if table is empty
         terrace_count = db.query(SunTerrace).count()
@@ -162,6 +166,75 @@ async def collect_and_update() -> None:
         logger.info("Collection run complete.")
     finally:
         db.close()
+
+
+def _precompute_terrace_scores(db: Session, computed_at: datetime) -> None:
+    """Pre-compute sun scores for all active venues after each forecast update.
+
+    Stores results in sun_terraces.score_cache_json / score_cache_run so that
+    API requests can serve pre-computed scores without CPU-bound solar calculations.
+    """
+    import json
+    from app.models import EnsembleForecast, SunTerrace
+    from app.sources.sun_terraces import compute_scores
+    from app.sources.metar import apply_metar_cloud_correction
+
+    now = datetime.now(timezone.utc)
+    cutoff = now + timedelta(hours=18)
+    rows = (
+        db.query(EnsembleForecast)
+        .filter(
+            EnsembleForecast.computed_at == computed_at,
+            EnsembleForecast.valid_for >= now,
+            EnsembleForecast.valid_for <= cutoff,
+        )
+        .order_by(EnsembleForecast.valid_for)
+        .all()
+    )
+    forecast_hours = [
+        {
+            "temperature": r.temperature,
+            "precip_probability": r.precip_probability,
+            "wind_speed": r.wind_speed,
+            "cloud_cover": r.cloud_cover,
+            "valid_for_ts": (
+                r.valid_for.replace(tzinfo=timezone.utc).timestamp()
+                if r.valid_for.tzinfo is None
+                else r.valid_for.timestamp()
+            ),
+        }
+        for r in rows
+    ]
+    forecast_hours = apply_metar_cloud_correction(forecast_hours, now)
+
+    terraces = (
+        db.query(SunTerrace)
+        .filter(SunTerrace.active == True, SunTerrace.outdoor_type != "none")  # noqa: E712
+        .all()
+    )
+    run_ts = computed_at.replace(tzinfo=None)
+    updated = 0
+    for t in terraces:
+        try:
+            scores = compute_scores(
+                t.lat, t.lon,
+                t.street_orientation,
+                t.orientation_confidence,
+                forecast_hours,
+                outdoor_seating=t.outdoor_seating,
+                is_rooftop=(t.outdoor_type == "rooftop"),
+                polygon_coords_json=t.polygon_coords,
+                sun_arc_from=getattr(t, "sun_arc_from", None),
+                sun_arc_to=getattr(t, "sun_arc_to", None),
+                shadow_buildings_json=getattr(t, "shadow_buildings_json", None),
+            )
+            t.score_cache_json = json.dumps(scores)
+            t.score_cache_run = run_ts
+            updated += 1
+        except Exception as exc:
+            logger.warning("precompute venue %d failed: %s", t.id, exc)
+    db.commit()
+    logger.info("precompute_terrace_scores: %d venues cached", updated)
 
 
 def _maybe_snapshot_weights(db: Session, today) -> None:

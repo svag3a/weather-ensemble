@@ -180,6 +180,8 @@ class SunTerrace(Base):
     google_place_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     opening_hours_json: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # JSON {periods:[{open:{day,time},close:{day,time}},...]}
     active: Mapped[bool] = mapped_column(Boolean, default=True)
+    score_cache_json: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    score_cache_run: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
