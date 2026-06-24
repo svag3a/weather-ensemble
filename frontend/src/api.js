@@ -75,11 +75,24 @@ export async function fetchStatus() {
   return res.json()
 }
 
+const _CI_KEY = 'city_images_v1'
+const _CI_TTL = 30 * 60 * 1000
+function _loadCachedCityImages() {
+  try { const { ts, d } = JSON.parse(localStorage.getItem(_CI_KEY) || '{}'); if (d && Date.now() - ts < _CI_TTL) return d } catch {}
+  return null
+}
+function _saveCityImagesCache(data) {
+  try { localStorage.setItem(_CI_KEY, JSON.stringify({ ts: Date.now(), d: data })) } catch {}
+}
+
 let _cityImagesPromise = null
 export async function fetchCityImages() {
   if (_cityImagesPromise) return _cityImagesPromise
+  const cached = _loadCachedCityImages()
+  if (cached) return cached
   _cityImagesPromise = fetch(`${BASE}/city-images`)
     .then(res => { if (!res.ok) throw new Error(); return res.json() })
+    .then(data => { _saveCityImagesCache(data); return data })
     .catch(err => { _cityImagesPromise = null; throw err })
   return _cityImagesPromise
 }
