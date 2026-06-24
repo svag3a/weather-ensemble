@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { fetchSunTerraces, fetchHashtags, addHashtag, removeHashtag, reportTerrace, createTerrace, fetchUV } from '../api'
+import { TerraceListSkeleton } from './Skeleton'
 import { sunTimesUTC } from '../weatherSymbol'
 import { Moon, Sun, Parasol, MessageCircleWarning, Cloud, CloudRain, TriangleRight, Spline, Hash, Martini, Beer, Coffee, Utensils, AlarmClock } from 'lucide-react'
 
@@ -944,11 +945,7 @@ export default function SolView({ coords, initialData }) {
       </div>
 
       {/* Loading — only shown when no data yet */}
-      {loading && !data && (
-        <div className={`${GLASS} rounded-2xl p-8 text-slate-500 text-center text-sm`}>
-          Beräknar sollägen…
-        </div>
-      )}
+      {loading && !data && <TerraceListSkeleton count={4} />}
 
       {/* Error */}
       {error && !data && (

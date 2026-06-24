@@ -19,6 +19,7 @@ function JacketIcon({ size = 24, color = 'currentColor' }) {
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 import { fetchLocalForecast, fetchEnsemble, fetchRadarNow, fetchRainNowcast, fetchSources, fetchWeights, fetchWarnings, triggerCollect, fetchSummary, fetchCityImages, fetchSunTerraces, fetchTopTerraces, askWeatherChat } from './api'
 import SolView from './components/SolView'
+import { WeekForecastSkeleton, SummaryCardSkeleton, AnalysViewSkeleton } from './components/Skeleton'
 import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
 import { getWeatherMomentum } from './weatherMomentum'
 import WeatherSymbol from './components/WeatherSymbol'
@@ -1401,9 +1402,7 @@ function WeekView({ warnings }) {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return (
-    <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>Hämtar prognos…</div>
-  )
+  if (loading) return <WeekForecastSkeleton />
   if (!weekForecast) return (
     <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm`}>Kunde inte hämta prognos.</div>
   )
@@ -1867,12 +1866,7 @@ function EnsembleView({ ensembleFc, prefetchedSources, prefetchedWeights }) {
       .finally(() => setLoading(false))
   }, [prefetchedSources, prefetchedWeights])
 
-  if (loading) return (
-    <div className={`${GLASS} rounded-2xl p-6 text-slate-500 text-center`}>
-      Hämtar källor…
-    </div>
-  )
-
+  if (loading) return <AnalysViewSkeleton />
   if (!sources) return (
     <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm`}>
       Kunde inte hämta källdata.
@@ -2083,11 +2077,7 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
         ))}
       </div>
 
-      {loading && (
-        <div className={`${GLASS} rounded-2xl p-8 text-slate-500 text-center text-sm`}>
-          Hämtar analys…
-        </div>
-      )}
+      {loading && <SummaryCardSkeleton />}
 
       {error && (
         <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm`}>
