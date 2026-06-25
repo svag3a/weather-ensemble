@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { Capacitor } from '@capacitor/core'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Moon, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin, Bell, Crown, Send } from 'lucide-react'
@@ -2792,7 +2793,7 @@ export default function MobileApp() {
   const motifImage = useCityMotif(coords)
   const allMotifs = useCityMotifs()
 
-  // Award location badges when user is within BADGE_RADIUS_M of a motif.
+  // Award location badges when user is within BADGE_RADIUS_M of a motif (foreground).
   useEffect(() => {
     if (!coords || !allMotifs.length) return
     const current = loadBadges()
@@ -2805,6 +2806,45 @@ export default function MobileApp() {
     }
     if (changed) { saveBadges(current); window.dispatchEvent(new Event('badges-updated')) }
   }, [coords, allMotifs])
+
+  // Award badges in the background (native iOS only).
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !allMotifs.length) return
+    let watcherId = null
+    const checkLocation = (lat, lon) => {
+      const current = loadBadges()
+      let changed = false
+      for (const m of allMotifs) {
+        if (!current.has(m.label) && distanceM(lat, lon, m.lat, m.lon) <= BADGE_RADIUS_M) {
+          current.add(m.label)
+          changed = true
+        }
+      }
+      if (changed) { saveBadges(current); window.dispatchEvent(new Event('badges-updated')) }
+    }
+    import('@capacitor-community/background-geolocation').then(({ BackgroundGeolocation }) => {
+      BackgroundGeolocation.addWatcher(
+        {
+          backgroundMessage: 'gbgsol kollar om du är nära ett Göteborgsmotiv.',
+          backgroundTitle: 'gbgsol — platsmärken',
+          requestPermissions: true,
+          stale: false,
+          distanceFilter: 50,
+        },
+        (location, error) => {
+          if (error || !location) return
+          checkLocation(location.latitude, location.longitude)
+        },
+      ).then(id => { watcherId = id })
+    })
+    return () => {
+      if (watcherId) {
+        import('@capacitor-community/background-geolocation').then(({ BackgroundGeolocation }) => {
+          BackgroundGeolocation.removeWatcher({ id: watcherId })
+        })
+      }
+    }
+  }, [allMotifs])
 
   const [tabBarVisible, setTabBarVisible] = useState(true)
   const lastScrollY = useRef(0)

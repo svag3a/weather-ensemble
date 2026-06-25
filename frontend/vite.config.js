@@ -10,4 +10,11 @@ export default defineConfig({
       '/api': 'http://localhost:8002',
     },
   },
+  build: {
+    rollupOptions: {
+      // Capacitor native plugins are injected by the native bridge at runtime;
+      // they must not be bundled into the web build.
+      external: ['@capacitor-community/background-geolocation'],
+    },
+  },
 })

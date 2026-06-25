@@ -18,3 +18,9 @@ frontend/dist/
 # macOS / IDE
 .DS_Store
 .claude/
+
+# Capacitor iOS — generated build artifacts
+frontend/ios/App/Pods/
+frontend/ios/App/App.xcworkspace/xcuserdata/
+frontend/ios/App/DerivedData/
+frontend/ios/.DS_Store
