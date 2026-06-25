@@ -2806,12 +2806,25 @@ export default function MobileApp() {
     if (changed) { saveBadges(current); window.dispatchEvent(new Event('badges-updated')) }
   }, [coords, allMotifs])
 
+  const [tabBarVisible, setTabBarVisible] = useState(true)
+  const lastScrollY = useRef(0)
+
+  const handleContentScroll = useCallback((e) => {
+    const y = e.currentTarget.scrollTop
+    if (y < 10) { setTabBarVisible(true); lastScrollY.current = y; return }
+    if (y > lastScrollY.current + 8) setTabBarVisible(false)
+    else if (y < lastScrollY.current - 8) setTabBarVisible(true)
+    lastScrollY.current = y
+  }, [])
+
   // Direction-aware tab change: drives the slide animation
   const changeTab = useCallback((newTab) => {
     const curIdx = TAB_ORDER.indexOf(activeTab)
     const newIdx = TAB_ORDER.indexOf(newTab)
     setSlideDir(newIdx >= curIdx ? 1 : -1)
     setActiveTab(newTab)
+    setTabBarVisible(true)
+    lastScrollY.current = 0
   }, [activeTab])
 
   const swipeHandlers = useSwipeNav(activeTab, changeTab)
@@ -2901,6 +2914,7 @@ export default function MobileApp() {
             exit="exit"
             transition={{ type: 'tween', duration: 0.28, ease: 'easeInOut' }}
             className="absolute inset-0 overflow-y-auto z-10"
+            onScroll={handleContentScroll}
           >
             <div className="px-4 pt-10 pb-4 space-y-3 max-w-lg mx-auto">
 
@@ -2975,7 +2989,10 @@ export default function MobileApp() {
       </div>
 
       {/* Bottom tab bar */}
-      <div className="bg-slate-800/95 backdrop-blur border-t border-slate-700 safe-bottom">
+      <div
+        className="bg-slate-800/95 backdrop-blur border-t border-slate-700 safe-bottom transition-transform duration-300 ease-in-out"
+        style={{ transform: tabBarVisible ? 'translateY(0)' : 'translateY(100%)' }}
+      >
         <div className="flex max-w-lg mx-auto">
           <button
             onClick={() => changeTab('now')}
