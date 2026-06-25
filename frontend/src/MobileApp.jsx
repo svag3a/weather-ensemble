@@ -1321,7 +1321,7 @@ function WeekDaysAccordion({ visibleDays, summaries, wMin, wMax, cutoff48, warni
   }
 
   return (
-    <div className={`${GLASS} rounded-2xl overflow-hidden`}>
+    <div className={`${GLASS} rounded-2xl overflow-hidden`} style={{ minHeight: '288px' }}>
       {visibleDays.map((hours, i) => {
         const { minTemp, maxTemp, symbol, totalPrecipMm, maxWind } = summaries[i]
         return (
