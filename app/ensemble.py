@@ -220,15 +220,21 @@ def update_weights(db: Session, valid_for: datetime) -> None:
         # Auto-exclusion: only after enough samples and not manually overridden
         if not weight_row.manual_override and weight_row.sample_count >= 20:
             bias_t = abs(weight_row.bias_temperature or 0.0)
-            if bias_t > 3.0 and not weight_row.excluded:
-                weight_row.excluded = True
+            excl_t = bool(getattr(weight_row, "excluded_temperature", False))
+            if bias_t > 3.0 and not excl_t:
+                weight_row.excluded_temperature = True
                 weight_row.excluded_reason = f"Auto: temperaturbia {weight_row.bias_temperature:+.1f}°C > 3°C"
                 weight_row.excluded_since = datetime.now(timezone.utc)
-            elif bias_t < 1.5 and weight_row.excluded and not weight_row.manual_override:
-                # Bias has normalized — auto-reinstate
-                weight_row.excluded = False
-                weight_row.excluded_reason = None
-                weight_row.excluded_since = None
+            elif bias_t < 1.5 and excl_t:
+                # Bias has normalized — auto-reinstate temperature
+                weight_row.excluded_temperature = False
+                if not any([
+                    getattr(weight_row, "excluded_wind", False),
+                    getattr(weight_row, "excluded_precip", False),
+                    getattr(weight_row, "excluded_cloud", False),
+                ]):
+                    weight_row.excluded_reason = None
+                    weight_row.excluded_since = None
 
     db.commit()
 
@@ -273,16 +279,24 @@ def _get_weights(db: Session, lead_hours: int) -> dict[str, dict]:
         "cloud":  1.0 / (r.mae_cloud       + 5.0),   # ±5 % floor
     } for r in rows}
 
-    w_temp  = _independence_scale({s: v["temp"]  for s, v in raw.items()})
-    w_wind  = _independence_scale({s: v["wind"]  for s, v in raw.items()})
-    w_cloud = _independence_scale({s: v["cloud"] for s, v in raw.items()})
+    # Per-parameter exclusion flags (graceful fallback for pre-migration rows)
+    excl = {r.source: {
+        "temp":   bool(getattr(r, "excluded_temperature", False)),
+        "wind":   bool(getattr(r, "excluded_wind", False)),
+        "precip": bool(getattr(r, "excluded_precip", False)),
+        "cloud":  bool(getattr(r, "excluded_cloud", False)),
+    } for r in rows}
+
+    w_temp  = _independence_scale({s: v["temp"]  for s, v in raw.items() if not excl[s]["temp"]})
+    w_wind  = _independence_scale({s: v["wind"]  for s, v in raw.items() if not excl[s]["wind"]})
+    w_cloud = _independence_scale({s: v["cloud"] for s, v in raw.items() if not excl[s]["cloud"]})
 
     # Precip: apply radar boost then short-range tier adjustment on NWP.
     radar_fraction = RADAR_PRECIP_WEIGHT.get(bucket, 0.0)
     tier = PRECIP_LEAD_BOOST.get(bucket, {})  # empty dict = no prior at 12h+
     nwp_precip = {
         s: v["precip"] * tier.get(s, 1.0)
-        for s, v in raw.items() if s != "radar_nowcast"
+        for s, v in raw.items() if s != "radar_nowcast" and not excl[s]["precip"]
     }
     nwp_scaled = _independence_scale(nwp_precip) if nwp_precip else {}
     w_precip: dict[str, float] = {}
@@ -293,6 +307,7 @@ def _get_weights(db: Session, lead_hours: int) -> dict[str, dict]:
     else:
         w_precip = _independence_scale({
             s: v["precip"] * tier.get(s, 1.0) for s, v in raw.items()
+            if not excl[s]["precip"]
         })
 
     # Also surface bias values so build_ensemble can apply bias correction

@@ -491,20 +491,38 @@ def get_ensemble_health(db: Session = Depends(get_db)):
     }
 
 
+_PARAM_EXCL_MAP = {
+    "temperature": "excluded_temperature",
+    "wind":        "excluded_wind",
+    "precip":      "excluded_precip",
+    "cloud":       "excluded_cloud",
+}
+
+
 @router.post("/ensemble/sources/{source}/exclude", status_code=200)
-def exclude_source(source: str, db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
-    """Manually exclude a source from the ensemble."""
+def exclude_source(
+    source: str,
+    parameter: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Manually exclude a source from the ensemble, optionally for a single parameter."""
     rows = db.query(SourceWeight).filter(SourceWeight.source == source).all()
     if not rows:
         raise HTTPException(status_code=404, detail=f"Source '{source}' not found")
+    if parameter and parameter not in _PARAM_EXCL_MAP:
+        raise HTTPException(status_code=400, detail=f"Unknown parameter '{parameter}'. Valid: {list(_PARAM_EXCL_MAP)}")
     now = datetime.now(timezone.utc)
     for row in rows:
-        row.excluded = True
-        row.manual_override = True
-        row.excluded_reason = "Manuellt exkluderad"
+        if parameter:
+            setattr(row, _PARAM_EXCL_MAP[parameter], True)
+        else:
+            row.excluded = True
+            row.manual_override = True
+        row.excluded_reason = f"Manuellt exkluderad{f' ({parameter})' if parameter else ''}"
         row.excluded_since = now
     db.commit()
-    return {"status": "excluded", "source": source}
+    return {"status": "excluded", "source": source, "parameter": parameter}
 
 
 @router.get("/ensemble/trend")
@@ -593,18 +611,37 @@ def get_ensemble_trend(
 
 
 @router.post("/ensemble/sources/{source}/include", status_code=200)
-def include_source(source: str, db: Session = Depends(get_db), _user: str = Depends(get_current_user)):
-    """Manually re-include a previously excluded source."""
+def include_source(
+    source: str,
+    parameter: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+    _user: str = Depends(get_current_user),
+):
+    """Manually re-include a previously excluded source, optionally for a single parameter."""
     rows = db.query(SourceWeight).filter(SourceWeight.source == source).all()
     if not rows:
         raise HTTPException(status_code=404, detail=f"Source '{source}' not found")
+    if parameter and parameter not in _PARAM_EXCL_MAP:
+        raise HTTPException(status_code=400, detail=f"Unknown parameter '{parameter}'. Valid: {list(_PARAM_EXCL_MAP)}")
     for row in rows:
-        row.excluded = False
-        row.manual_override = False
-        row.excluded_reason = None
-        row.excluded_since = None
+        if parameter:
+            setattr(row, _PARAM_EXCL_MAP[parameter], False)
+            # Clear reason/since only if no exclusion flags remain active
+            still_excluded = row.excluded or any(
+                getattr(row, col, False) for col in _PARAM_EXCL_MAP.values()
+            )
+            if not still_excluded:
+                row.excluded_reason = None
+                row.excluded_since = None
+        else:
+            row.excluded = False
+            row.manual_override = False
+            row.excluded_reason = None
+            row.excluded_since = None
+            for col in _PARAM_EXCL_MAP.values():
+                setattr(row, col, False)
     db.commit()
-    return {"status": "included", "source": source}
+    return {"status": "included", "source": source, "parameter": parameter}
 
 
 

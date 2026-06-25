@@ -103,6 +103,10 @@ async def lifespan(app: FastAPI):
             "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('vegan', 1, datetime('now'))",
             "INSERT OR IGNORE INTO hashtags (name, active, created_at) VALUES ('livemusik', 1, datetime('now'))",
             "CREATE INDEX IF NOT EXISTS ix_sun_terraces_lat_lon_active ON sun_terraces(lat, lon, active)",
+            "ALTER TABLE source_weights ADD COLUMN excluded_temperature INTEGER DEFAULT 0",
+            "ALTER TABLE source_weights ADD COLUMN excluded_wind INTEGER DEFAULT 0",
+            "ALTER TABLE source_weights ADD COLUMN excluded_precip INTEGER DEFAULT 0",
+            "ALTER TABLE source_weights ADD COLUMN excluded_cloud INTEGER DEFAULT 0",
         ]:
             try:
                 conn.execute(text(stmt))

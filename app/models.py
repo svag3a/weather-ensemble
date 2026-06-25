@@ -44,11 +44,15 @@ class SourceWeight(Base):
     bias_wind: Mapped[Optional[float]] = mapped_column(Float, nullable=True, default=0.0)
     sample_count: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    # Auto-exclusion fields
+    # Exclusion fields — global or per-parameter
     excluded: Mapped[bool] = mapped_column(Boolean, default=False)
     excluded_reason: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     excluded_since: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     manual_override: Mapped[bool] = mapped_column(Boolean, default=False)
+    excluded_temperature: Mapped[bool] = mapped_column(Boolean, default=False)
+    excluded_wind: Mapped[bool] = mapped_column(Boolean, default=False)
+    excluded_precip: Mapped[bool] = mapped_column(Boolean, default=False)
+    excluded_cloud: Mapped[bool] = mapped_column(Boolean, default=False)
 
     __table_args__ = (
         UniqueConstraint("source", "lead_hours", name="uq_weight"),
