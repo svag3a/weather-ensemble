@@ -2041,7 +2041,7 @@ function formatGeneratedAt(iso) {
   return `kl ${d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-function AnalysView({ prefetchedToday, prefetchedTomorrow, coords, chatHistory, chatLoading }) {
+function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
   const [period, setPeriod] = useState('today')
   const prefetched = period === 'today' ? prefetchedToday : prefetchedTomorrow
   const [summary, setSummary] = useState(prefetched ?? null)
@@ -2124,7 +2124,6 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow, coords, chatHistory, 
               )}
             </div>
 
-            <WeatherChatHistory history={chatHistory} loading={chatLoading} />
 
             {/* Practical advice — moved up for quick access */}
             {summary.practical_advice?.main && (
@@ -2332,42 +2331,52 @@ function loadRadiusPref() { try { return parseFloat(localStorage.getItem(SOL_RAD
 function loadTimePrefP()  { try { return new Set(JSON.parse(localStorage.getItem(SOL_TIME_KEY) || '[]')) } catch { return new Set() } }
 function loadActPref()    { try { const s = localStorage.getItem(SOL_ACT_KEY); return s ? new Set(JSON.parse(s)) : null } catch { return null } }
 
-function WeatherChatHistory({ history, loading }) {
-  if (!history.length && !loading) return null
+function ChatPopup({ entry, loading, onDismiss }) {
+  if (!entry && !loading) return null
   return (
-    <div className={`${GLASS} rounded-2xl overflow-hidden`}>
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/40">
-        <Sparkles size={13} className="text-sky-400" />
-        <span className="text-slate-300 text-xs font-medium">Väderchatt</span>
-      </div>
-      <div className="px-5 py-3 space-y-3 max-h-72 overflow-y-auto">
-        {history.map((entry, i) => (
-          <div key={i} className="space-y-1.5">
-            <div className="flex justify-end">
-              <span className="bg-white/10 text-white text-xs px-3 py-1.5 rounded-2xl rounded-br-sm max-w-[85%]">{entry.q}</span>
-            </div>
-            <div className="flex justify-start">
-              {entry.error ? (
-                <span className="text-red-400 text-xs px-3 py-1.5">Något gick fel, försök igen.</span>
-              ) : !entry.relevant ? (
-                <span className="text-slate-500 text-xs px-3 py-1.5">Jag svarar bara på väderrelaterade frågor 🌤</span>
+    <AnimatePresence>
+      {(entry || loading) && (
+        <motion.div
+          key="chat-popup"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 8 }}
+          transition={{ type: 'tween', duration: 0.2 }}
+          className="px-3 pb-1 max-w-lg mx-auto w-full"
+        >
+          <div className="bg-slate-800/95 backdrop-blur-md border border-sky-500/25 rounded-2xl shadow-xl shadow-sky-900/20 overflow-hidden">
+            {entry && (
+              <div className="flex justify-end px-3 pt-3">
+                <span className="bg-white/10 text-white text-xs px-3 py-1.5 rounded-2xl rounded-br-sm max-w-[85%]">{entry.q}</span>
+              </div>
+            )}
+            <div className="px-3 pt-2 pb-3">
+              {loading ? (
+                <span className="text-sky-400/70 text-xs px-1 animate-pulse">Tänker…</span>
+              ) : entry?.error ? (
+                <span className="text-red-400 text-xs px-1">Något gick fel, försök igen.</span>
+              ) : !entry?.relevant ? (
+                <span className="text-slate-400 text-xs px-1">Jag svarar bara på väderrelaterade frågor 🌤</span>
               ) : (
-                <span className="bg-sky-900/40 text-slate-200 text-xs px-3 py-1.5 rounded-2xl rounded-bl-sm max-w-[85%] leading-relaxed">{entry.answer}</span>
+                <p className="text-slate-200 text-sm leading-relaxed px-1">{entry.answer}</p>
               )}
             </div>
+            {!loading && (
+              <button
+                onClick={onDismiss}
+                className="w-full py-2 border-t border-slate-700/50 text-slate-500 text-xs active:text-slate-300 transition-colors touch-manipulation"
+              >
+                Stäng
+              </button>
+            )}
           </div>
-        ))}
-        {loading && (
-          <div className="flex justify-start">
-            <span className="text-slate-500 text-xs px-3 py-1.5 animate-pulse">Tänker…</span>
-          </div>
-        )}
-      </div>
-    </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 
-function FloatingChatInput({ coords, onHistory, loading, setLoading }) {
+function FloatingChatInput({ coords, onResponse, loading, setLoading }) {
   const [input, setInput] = useState('')
 
   async function handleSend() {
@@ -2377,9 +2386,9 @@ function FloatingChatInput({ coords, onHistory, loading, setLoading }) {
     setLoading(true)
     try {
       const res = await askWeatherChat({ q, lat: coords?.lat, lon: coords?.lon })
-      onHistory({ q, answer: res.answer, relevant: res.relevant })
+      onResponse({ q, answer: res.answer, relevant: res.relevant })
     } catch {
-      onHistory({ q, answer: null, relevant: false, error: true })
+      onResponse({ q, answer: null, relevant: false, error: true })
     } finally {
       setLoading(false)
     }
@@ -2792,7 +2801,7 @@ export default function MobileApp() {
   const [summaryToday, setSummaryToday]       = useState(null)
   const [summaryTomorrow, setSummaryTomorrow] = useState(null)
   const [topTerraces, setTopTerraces]         = useState(null)
-  const [chatHistory, setChatHistory] = useState([])
+  const [chatPopup, setChatPopup] = useState(null)
   const [chatLoading, setChatLoading] = useState(false)
   const [prefetchedTerraces, setPrefetchedTerraces] = useState(null)
   const [activeTab, setActiveTab] = useState('now')
@@ -3018,7 +3027,7 @@ export default function MobileApp() {
               )}
 
               {activeTab === 'analysis' && (
-                <AnalysView prefetchedToday={summaryToday} prefetchedTomorrow={summaryTomorrow} coords={coords} chatHistory={chatHistory} chatLoading={chatLoading} />
+                <AnalysView prefetchedToday={summaryToday} prefetchedTomorrow={summaryTomorrow} coords={coords} />
               )}
 
               {activeTab === 'sources' && (
@@ -3038,14 +3047,21 @@ export default function MobileApp() {
         </AnimatePresence>
       </div>
 
-      {/* Floating chat input — analysis tab only */}
+      {/* Floating chat — analysis tab only */}
       {activeTab === 'analysis' && (
-        <FloatingChatInput
-          coords={coords}
-          onHistory={entry => setChatHistory(h => [...h, entry])}
-          loading={chatLoading}
-          setLoading={setChatLoading}
-        />
+        <div className="max-w-lg mx-auto w-full flex flex-col">
+          <ChatPopup
+            entry={chatPopup}
+            loading={chatLoading}
+            onDismiss={() => setChatPopup(null)}
+          />
+          <FloatingChatInput
+            coords={coords}
+            onResponse={entry => setChatPopup(entry)}
+            loading={chatLoading}
+            setLoading={setChatLoading}
+          />
+        </div>
       )}
 
       {/* Bottom tab bar */}
