@@ -872,7 +872,7 @@ export default function SolView({ coords, initialData }) {
           </button>
       }
 
-      {/* Filter bar: Sol/Skugga | clock | star | rooftop | type toggles */}
+      {/* Filter row 1: läge/villkor */}
       <div className="flex items-center gap-1.5">
         {[{m:'sol', Icon:Sun}, {m:'skugga', Icon:Parasol}].map(({m, Icon}) => (
           <button key={m} onClick={() => setMode(m)}
@@ -902,17 +902,21 @@ export default function SolView({ coords, initialData }) {
           }`}>
           <span className="text-[8px] font-semibold text-center leading-tight">ROOF<br/>TOP</span>
         </button>
-        <div className="w-px h-5 bg-slate-700 shrink-0"/>
+      </div>
+
+      {/* Filter row 2: typ */}
+      <div className="flex items-center gap-1.5">
         {ALL_TYPES.map(t => {
           const Icon = VENUE_ICONS[t]
           return (
             <button key={t} onClick={() => toggleType(t)}
-              className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
+              className={`shrink-0 flex items-center gap-1.5 h-9 px-3 rounded-xl transition-colors ${
                 selectedTypes.has(t)
                   ? 'bg-white/20 text-white ring-1 ring-white/30'
                   : 'bg-black/20 text-slate-500'
               }`}>
-              {Icon && <Icon size={16} strokeWidth={1.5}/>}
+              {Icon && <Icon size={14} strokeWidth={1.5}/>}
+              <span className="text-xs">{TYPE_LABELS[t]}</span>
             </button>
           )
         })}
