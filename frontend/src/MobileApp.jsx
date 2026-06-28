@@ -2041,7 +2041,7 @@ function formatGeneratedAt(iso) {
   return `kl ${d.toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit' })}`
 }
 
-function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
+function AnalysView({ prefetchedToday, prefetchedTomorrow, coords, chatHistory, chatLoading }) {
   const [period, setPeriod] = useState('today')
   const prefetched = period === 'today' ? prefetchedToday : prefetchedTomorrow
   const [summary, setSummary] = useState(prefetched ?? null)
@@ -2124,7 +2124,7 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
               )}
             </div>
 
-            <WeatherChatCard coords={coords} />
+            <WeatherChatHistory history={chatHistory} loading={chatLoading} />
 
             {/* Practical advice — moved up for quick access */}
             {summary.practical_advice?.main && (
@@ -2332,10 +2332,43 @@ function loadRadiusPref() { try { return parseFloat(localStorage.getItem(SOL_RAD
 function loadTimePrefP()  { try { return new Set(JSON.parse(localStorage.getItem(SOL_TIME_KEY) || '[]')) } catch { return new Set() } }
 function loadActPref()    { try { const s = localStorage.getItem(SOL_ACT_KEY); return s ? new Set(JSON.parse(s)) : null } catch { return null } }
 
-function WeatherChatCard({ coords }) {
-  const [input, setInput]     = useState('')
-  const [history, setHistory] = useState([])  // [{q, answer, relevant}]
-  const [loading, setLoading] = useState(false)
+function WeatherChatHistory({ history, loading }) {
+  if (!history.length && !loading) return null
+  return (
+    <div className={`${GLASS} rounded-2xl overflow-hidden`}>
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700/40">
+        <Sparkles size={13} className="text-sky-400" />
+        <span className="text-slate-300 text-xs font-medium">Väderchatt</span>
+      </div>
+      <div className="px-5 py-3 space-y-3 max-h-72 overflow-y-auto">
+        {history.map((entry, i) => (
+          <div key={i} className="space-y-1.5">
+            <div className="flex justify-end">
+              <span className="bg-white/10 text-white text-xs px-3 py-1.5 rounded-2xl rounded-br-sm max-w-[85%]">{entry.q}</span>
+            </div>
+            <div className="flex justify-start">
+              {entry.error ? (
+                <span className="text-red-400 text-xs px-3 py-1.5">Något gick fel, försök igen.</span>
+              ) : !entry.relevant ? (
+                <span className="text-slate-500 text-xs px-3 py-1.5">Jag svarar bara på väderrelaterade frågor 🌤</span>
+              ) : (
+                <span className="bg-sky-900/40 text-slate-200 text-xs px-3 py-1.5 rounded-2xl rounded-bl-sm max-w-[85%] leading-relaxed">{entry.answer}</span>
+              )}
+            </div>
+          </div>
+        ))}
+        {loading && (
+          <div className="flex justify-start">
+            <span className="text-slate-500 text-xs px-3 py-1.5 animate-pulse">Tänker…</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function FloatingChatInput({ coords, onHistory, loading, setLoading }) {
+  const [input, setInput] = useState('')
 
   async function handleSend() {
     const q = input.trim()
@@ -2344,9 +2377,9 @@ function WeatherChatCard({ coords }) {
     setLoading(true)
     try {
       const res = await askWeatherChat({ q, lat: coords?.lat, lon: coords?.lon })
-      setHistory(h => [...h, { q, answer: res.answer, relevant: res.relevant }])
+      onHistory({ q, answer: res.answer, relevant: res.relevant })
     } catch {
-      setHistory(h => [...h, { q, answer: null, relevant: false, error: true }])
+      onHistory({ q, answer: null, relevant: false, error: true })
     } finally {
       setLoading(false)
     }
@@ -2357,49 +2390,24 @@ function WeatherChatCard({ coords }) {
   }
 
   return (
-    <div className={`${GLASS} rounded-2xl overflow-hidden`}>
-      {history.length > 0 && (
-        <div className="px-5 py-3 space-y-3 max-h-72 overflow-y-auto">
-          {history.map((entry, i) => (
-            <div key={i} className="space-y-1.5">
-              <div className="flex justify-end">
-                <span className="bg-white/10 text-white text-xs px-3 py-1.5 rounded-2xl rounded-br-sm max-w-[85%]">{entry.q}</span>
-              </div>
-              <div className="flex justify-start">
-                {entry.error ? (
-                  <span className="text-red-400 text-xs px-3 py-1.5">Något gick fel, försök igen.</span>
-                ) : !entry.relevant ? (
-                  <span className="text-slate-500 text-xs px-3 py-1.5">Jag svarar bara på väderrelaterade frågor 🌤</span>
-                ) : (
-                  <span className="bg-sky-900/40 text-slate-200 text-xs px-3 py-1.5 rounded-2xl rounded-bl-sm max-w-[85%] leading-relaxed">{entry.answer}</span>
-                )}
-              </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex justify-start">
-              <span className="text-slate-500 text-xs px-3 py-1.5 animate-pulse">Tänker…</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="flex items-center gap-2 px-4 py-3 border-t border-slate-700/50">
+    <div className="px-3 py-2 bg-slate-900/80 backdrop-blur-md border-t border-sky-500/20">
+      <div className="flex items-center gap-2 max-w-lg mx-auto bg-slate-800/80 border border-sky-500/30 rounded-2xl px-4 py-2.5 shadow-lg shadow-sky-900/20">
+        <Sparkles size={14} className="text-sky-400 shrink-0 animate-pulse" />
         <input
           type="text"
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKey}
-          placeholder="Chatta om vädret…"
-          className="flex-1 bg-white/5 text-white text-sm placeholder-slate-600 rounded-xl px-3 py-2 outline-none focus:bg-white/8 transition-colors"
+          placeholder="Fråga om dagens väder…"
+          className="flex-1 bg-transparent text-white text-sm placeholder-sky-400/50 outline-none"
           disabled={loading}
         />
         <button
           onClick={handleSend}
           disabled={!input.trim() || loading}
-          className="shrink-0 p-2 rounded-xl bg-sky-600/40 text-sky-300 disabled:opacity-30 disabled:cursor-not-allowed active:bg-sky-600/60 transition-colors touch-manipulation"
+          className="shrink-0 p-1.5 rounded-xl bg-sky-500/80 text-white disabled:opacity-30 disabled:cursor-not-allowed active:bg-sky-500 transition-all touch-manipulation"
         >
-          <Send size={15} />
+          <Send size={14} />
         </button>
       </div>
     </div>
@@ -2784,6 +2792,8 @@ export default function MobileApp() {
   const [summaryToday, setSummaryToday]       = useState(null)
   const [summaryTomorrow, setSummaryTomorrow] = useState(null)
   const [topTerraces, setTopTerraces]         = useState(null)
+  const [chatHistory, setChatHistory] = useState([])
+  const [chatLoading, setChatLoading] = useState(false)
   const [prefetchedTerraces, setPrefetchedTerraces] = useState(null)
   const [activeTab, setActiveTab] = useState('now')
   const [slideDir, setSlideDir] = useState(1)
@@ -2956,7 +2966,7 @@ export default function MobileApp() {
             className="absolute inset-0 overflow-y-auto z-10"
             onScroll={handleContentScroll}
           >
-            <div className="px-4 pt-10 pb-4 space-y-3 max-w-lg mx-auto">
+            <div className={`px-4 pt-10 space-y-3 max-w-lg mx-auto ${activeTab === 'analysis' ? 'pb-20' : 'pb-4'}`}>
 
               {activeTab === 'now' && (
                 <>
@@ -3008,7 +3018,7 @@ export default function MobileApp() {
               )}
 
               {activeTab === 'analysis' && (
-                <AnalysView prefetchedToday={summaryToday} prefetchedTomorrow={summaryTomorrow} coords={coords} />
+                <AnalysView prefetchedToday={summaryToday} prefetchedTomorrow={summaryTomorrow} coords={coords} chatHistory={chatHistory} chatLoading={chatLoading} />
               )}
 
               {activeTab === 'sources' && (
@@ -3027,6 +3037,16 @@ export default function MobileApp() {
           </motion.div>
         </AnimatePresence>
       </div>
+
+      {/* Floating chat input — analysis tab only */}
+      {activeTab === 'analysis' && (
+        <FloatingChatInput
+          coords={coords}
+          onHistory={entry => setChatHistory(h => [...h, entry])}
+          loading={chatLoading}
+          setLoading={setChatLoading}
+        />
+      )}
 
       {/* Bottom tab bar */}
       <div
