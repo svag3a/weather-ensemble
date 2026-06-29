@@ -8,6 +8,13 @@ body {
   font-family: system-ui, sans-serif;
 }
 
+/* ── Prevent iOS zoom on input focus (requires font-size >= 16px) ─────────── */
+input:not([type="range"]):not([type="checkbox"]),
+textarea,
+select {
+  font-size: 16px !important;
+}
+
 /* ── Skeleton shimmer ────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }

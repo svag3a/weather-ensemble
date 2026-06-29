@@ -2957,7 +2957,7 @@ export default function MobileApp() {
   const days = groupByDay(future)
 
   return (
-    <div className="fixed inset-0 bg-slate-900 text-slate-100 flex flex-col">
+    <div className="fixed inset-0 bg-slate-900 text-slate-100 flex flex-col" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
 
       {/* Animated content area */}
       <div className="flex-1 relative overflow-x-hidden min-h-0" {...swipeHandlers}>
@@ -3100,7 +3100,7 @@ export default function MobileApp() {
             }`}
           >
             <Sparkles size={22} strokeWidth={1.5} />
-            <span>Analys</span>
+            <span>AI</span>
           </button>
           <button
             onClick={() => changeTab('sources')}
