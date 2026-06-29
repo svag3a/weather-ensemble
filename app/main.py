@@ -180,6 +180,11 @@ async def immutable_assets_headers(request: Request, call_next):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
     elif p in ("/lejon.webp", "/lejon.png"):
         response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    elif p == "/" or p.endswith(".html"):
+        # index.html must never be cached — it references hashed asset filenames
+        # that change on every deploy. A stale index.html loads the wrong JS.
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
     return response
 
 app.include_router(router, prefix="/api/v1")
