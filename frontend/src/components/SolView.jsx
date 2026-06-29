@@ -805,7 +805,6 @@ export default function SolView({ coords, initialData }) {
   const tagsParam = tagFilter.size > 0 ? [...tagFilter].join(',') : ''
 
   useEffect(() => {
-    if (!coords && !debouncedSearch) return
     if (skipFirstFetch.current) { skipFirstFetch.current = false; return }
     if (!data) setLoading(true)
     setError(null)
