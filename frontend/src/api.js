@@ -391,11 +391,16 @@ export async function deleteTerrace(id) {
 }
 
 export async function askWeatherChat({ q, lat, lon } = {}) {
+  const token = localStorage.getItem('gbgsol_app_token') || ''
   const res = await fetch(`${BASE}/chat`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     body: JSON.stringify({ q, lat: lat ?? 57.7089, lon: lon ?? 11.9746 }),
   })
+  if (res.status === 401 || res.status === 403) throw new Error('premium_required')
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }

@@ -4,7 +4,7 @@ import asyncio
 import json as _json
 from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, Body, Response
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, UploadFile, File, Form, Body, Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
@@ -15,6 +15,8 @@ from app.city_config import CITY as _CITY
 from app.database import get_db
 from app.models import EnsembleForecast, Forecast, SourceWeight, SourceWeightHistory, Observation, AiSummary, CityImage, SunTerrace, TerraceReport, Hashtag, TerraceHashtag
 from app.api.auth import get_current_user
+from app.api.apple_auth import verify_app_token
+from app.models import AppUser
 
 router = APIRouter()
 
@@ -2332,7 +2334,18 @@ class ChatRequest(BaseModel):
 
 
 @router.post("/chat")
-async def weather_chat(body: ChatRequest, db: Session = Depends(get_db)):
+async def weather_chat(
+    body: ChatRequest,
+    db: Session = Depends(get_db),
+    authorization: Optional[str] = Header(None),
+):
+    token = authorization[7:] if (authorization or "").startswith("Bearer ") else ""
+    user_id = verify_app_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="premium_required")
+    user = db.query(AppUser).filter(AppUser.id == user_id).first()
+    if not user or not user.is_premium:
+        raise HTTPException(status_code=403, detail="premium_required")
     """Premium: answer a weather question using local forecast + radar nowcast as context."""
     import anthropic as _anthropic
     import os

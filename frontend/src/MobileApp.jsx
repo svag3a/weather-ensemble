@@ -2348,6 +2348,8 @@ function ChatPopup({ entry, loading, onDismiss }) {
             <div className="px-3 pt-2 pb-3">
               {loading ? (
                 <span className="text-sky-400/70 text-xs px-1 animate-pulse">Tänker…</span>
+              ) : entry?.premiumRequired ? (
+                <span className="text-amber-400 text-xs px-1">Chat är en premiumfunktion. Logga in och aktivera premium under Profil.</span>
               ) : entry?.error ? (
                 <span className="text-red-400 text-xs px-1">Något gick fel, försök igen.</span>
               ) : !entry?.relevant ? (
@@ -2382,8 +2384,12 @@ function FloatingChatInput({ coords, onResponse, loading, setLoading }) {
     try {
       const res = await askWeatherChat({ q, lat: coords?.lat, lon: coords?.lon })
       onResponse({ q, answer: res.answer, relevant: res.relevant })
-    } catch {
-      onResponse({ q, answer: null, relevant: false, error: true })
+    } catch (e) {
+      if (e.message === 'premium_required') {
+        onResponse({ q, answer: null, relevant: false, premiumRequired: true })
+      } else {
+        onResponse({ q, answer: null, relevant: false, error: true })
+      }
     } finally {
       setLoading(false)
     }
