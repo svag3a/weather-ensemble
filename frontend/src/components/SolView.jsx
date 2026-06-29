@@ -688,8 +688,8 @@ function removeFavData(id) {
 // ── Main view ─────────────────────────────────────────────────────────────────
 export default function SolView({ coords, initialData }) {
   const [data, setData]           = useState(initialData ?? null)
-  const [loading, setLoading]     = useState(!initialData)
-  const skipFirstFetch            = useRef(!!initialData)
+  const [loading, setLoading]     = useState(false)
+  const skipFirstFetch            = useRef(false)
   const [error, setError]         = useState(null)
   const [selectedTypes, setSelectedTypes] = useState(new Set(ALL_TYPES))
   const [radius, setRadius]       = useState(loadSavedRadius)

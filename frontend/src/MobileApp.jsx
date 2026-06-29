@@ -2311,12 +2311,6 @@ const NOTIF_SUN_KEY   = 'notif_sun_window'
 const NOTIF_UV_KEY    = 'notif_uv'
 const VENUE_ICONS_P   = { cafe: Coffee, bar: Martini, pub: Beer, restaurant: Utensils }
 
-const TIME_SLOTS = [
-  { key: 'förmiddag',  label: 'Förmiddag',  hint: '6–12'  },
-  { key: 'eftermiddag', label: 'Eftermiddag', hint: '12–18' },
-  { key: 'kväll',      label: 'Kväll',       hint: '18–24' },
-]
-
 const ALL_ACTIVITIES = [
   { key: 'badliv',        label: 'Badliv',         Icon: Waves         },
   { key: 'uteservering',  label: 'Uteservering',    Icon: UtensilsCrossed },
@@ -2485,7 +2479,6 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
   const [uvThreshold, setUvThreshold] = useState(
     () => { try { return parseInt(localStorage.getItem(UV_PREF_KEY) || '6') } catch { return 6 } }
   )
-  const [timePref, setTimePref] = useState(loadTimePrefP)
   const [radius, setRadius]     = useState(loadRadiusPref)
   const [actPref, setActPref]   = useState(() => loadActPref() ?? new Set(ALL_ACTIVITIES.map(a => a.key)))
   const [notifSun, setNotifSun] = useState(() => localStorage.getItem(NOTIF_SUN_KEY) === 'true')
@@ -2496,15 +2489,6 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
   function handleUv(v) {
     setUvThreshold(v)
     localStorage.setItem(UV_PREF_KEY, String(v))
-  }
-
-  function toggleTime(key) {
-    setTimePref(prev => {
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      localStorage.setItem(SOL_TIME_KEY, JSON.stringify([...next]))
-      return next
-    })
   }
 
   function handleRadius(v) {
@@ -2585,34 +2569,6 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
 
       {/* Platsmärken */}
       <BadgesCard motifs={motifs} />
-
-      {/* Solpreferenser */}
-      <div className={`${GLASS} rounded-2xl px-5 py-4 space-y-3`}>
-        <div className="flex items-center gap-2">
-          <Clock size={13} className="text-amber-400 shrink-0" />
-          <span className="text-white text-sm font-medium">Solpreferens</span>
-          {timePref.size === 0 && <span className="text-slate-500 text-xs ml-auto">Ingen inställd</span>}
-        </div>
-        <div className="flex gap-2">
-          {TIME_SLOTS.map(({ key, label, hint }) => {
-            const active = timePref.has(key)
-            return (
-              <button
-                key={key}
-                onPointerUp={() => toggleTime(key)}
-                className={`flex-1 py-2 rounded-xl text-xs font-medium transition-colors touch-manipulation select-none ${
-                  active ? 'bg-amber-500/25 text-amber-300 border border-amber-500/40'
-                         : 'bg-white/5 text-slate-400 border border-white/5'
-                }`}
-              >
-                <div>{label}</div>
-                <div className="text-[10px] opacity-60 mt-0.5">{hint}</div>
-              </button>
-            )
-          })}
-        </div>
-        <p className="text-slate-500 text-xs">Förmarkerar tidsfilter när du öppnar sol-vyn.</p>
-      </div>
 
       {/* Standardradius */}
       <div className={`${GLASS} rounded-2xl px-5 py-4 space-y-3`}>
@@ -2928,7 +2884,6 @@ export default function MobileApp() {
         lat: c.lat, lon: c.lon,
         radius: loadRadiusPref(),
         type: 'all',
-        tags: [...loadTimePrefP()].join(','),
         min_score: 25,
       }),
     ])
