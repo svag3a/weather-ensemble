@@ -13,3 +13,4 @@ numpy
 anthropic
 python-multipart
 Pillow
+PyJWT[crypto]

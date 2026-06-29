@@ -14,6 +14,7 @@ from app.database import init_db
 from app.scheduler import create_scheduler
 from app.api.routes import router
 from app.api.auth import auth_router, verify_session_token
+from app.api.apple_auth import apple_auth_router
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
@@ -107,6 +108,17 @@ async def lifespan(app: FastAPI):
             "ALTER TABLE source_weights ADD COLUMN excluded_wind INTEGER DEFAULT 0",
             "ALTER TABLE source_weights ADD COLUMN excluded_precip INTEGER DEFAULT 0",
             "ALTER TABLE source_weights ADD COLUMN excluded_cloud INTEGER DEFAULT 0",
+            """CREATE TABLE IF NOT EXISTS app_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                apple_user_id TEXT UNIQUE NOT NULL,
+                email TEXT,
+                full_name TEXT,
+                is_premium INTEGER DEFAULT 0,
+                premium_expires_at DATETIME,
+                created_at DATETIME NOT NULL,
+                last_seen_at DATETIME NOT NULL
+            )""",
+            "CREATE INDEX IF NOT EXISTS ix_app_users_apple_user_id ON app_users(apple_user_id)",
         ]:
             try:
                 conn.execute(text(stmt))
@@ -189,6 +201,7 @@ async def immutable_assets_headers(request: Request, call_next):
 
 app.include_router(router, prefix="/api/v1")
 app.include_router(auth_router)
+app.include_router(apple_auth_router)
 
 
 @app.get("/health")

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Capacitor } from '@capacitor/core'
+import { SignInWithApple } from '@capacitor-community/apple-sign-in'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Moon, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin, Bell, Crown, Send, Heart } from 'lucide-react'
@@ -2473,6 +2474,105 @@ function BadgesCard({ motifs }) {
   )
 }
 
+const APP_TOKEN_KEY = 'gbgsol_app_token'
+const APP_USER_KEY  = 'gbgsol_app_user'
+
+function loadAppSession() {
+  try {
+    const token = localStorage.getItem(APP_TOKEN_KEY)
+    const user  = JSON.parse(localStorage.getItem(APP_USER_KEY) || 'null')
+    return { token, user }
+  } catch { return { token: null, user: null } }
+}
+
+function UserSection() {
+  const [session, setSession] = useState(loadAppSession)
+  const [loading, setLoading] = useState(false)
+  const [error,   setError]   = useState(null)
+
+  async function handleSignIn() {
+    setLoading(true)
+    setError(null)
+    try {
+      const result = await SignInWithApple.authorize({
+        scopes: 'email name',
+      })
+      const r = result.response
+      const fullName = [r.givenName, r.familyName].filter(Boolean).join(' ') || null
+
+      const resp = await fetch('/api/v1/auth/apple-signin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identity_token: r.identityToken, full_name: fullName }),
+      })
+      if (!resp.ok) throw new Error('server')
+      const data = await resp.json()
+
+      const user = { display_name: data.display_name, is_premium: data.is_premium }
+      localStorage.setItem(APP_TOKEN_KEY, data.token)
+      localStorage.setItem(APP_USER_KEY, JSON.stringify(user))
+      setSession({ token: data.token, user })
+    } catch (e) {
+      if (!String(e).includes('cancel') && !String(e).includes('Cancel')) {
+        setError('Inloggning misslyckades. Försök igen.')
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  function handleSignOut() {
+    localStorage.removeItem(APP_TOKEN_KEY)
+    localStorage.removeItem(APP_USER_KEY)
+    setSession({ token: null, user: null })
+  }
+
+  return (
+    <div className={`${GLASS} rounded-2xl px-5 py-4 space-y-3`}>
+      <div className="flex items-center gap-2">
+        <User size={13} className="text-slate-400 shrink-0" />
+        <span className="text-white text-sm font-medium">Konto</span>
+        {session.user?.is_premium && (
+          <span className="ml-auto flex items-center gap-1 text-xs text-amber-300 bg-amber-400/10 border border-amber-400/20 rounded-full px-2 py-0.5">
+            <Crown size={10} /> Premium
+          </span>
+        )}
+      </div>
+
+      {session.user ? (
+        <>
+          <p className="text-slate-300 text-sm">{session.user.display_name}</p>
+          {!session.user.is_premium && (
+            <p className="text-slate-500 text-xs leading-relaxed">
+              Chat-funktionen ingår i premium — vi återkommer med hur du aktiverar det.
+            </p>
+          )}
+          <button onPointerUp={handleSignOut} className="text-slate-500 text-xs underline touch-manipulation">
+            Logga ut
+          </button>
+        </>
+      ) : (
+        <>
+          <p className="text-slate-400 text-xs leading-relaxed">
+            Logga in för att komma åt premiumfunktioner som chat.
+          </p>
+          {error && <p className="text-red-400 text-xs">{error}</p>}
+          <button
+            onPointerUp={handleSignIn}
+            disabled={loading}
+            className="w-full py-3 rounded-xl bg-white text-black text-sm font-semibold flex items-center justify-center gap-2 active:opacity-80 transition-opacity disabled:opacity-50 touch-manipulation select-none"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+              <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.7 9.05 7.42c1.27.07 2.13.74 2.86.8.97-.2 1.9-.89 2.93-.84 2 .16 3.5 1.17 4.41 2.97-3.91 2.32-3.25 7.3.73 8.99-.37.85-.74 1.67-1.93 2.94zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z" />
+            </svg>
+            {loading ? 'Loggar in…' : 'Sign in with Apple'}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 const SWISH_NUMBER = '46708949877'
 const PRESET_AMOUNTS = [20, 50, 100]
 
@@ -2694,6 +2794,9 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
         />
         <p className="text-slate-500 text-xs">Varna mig i sol-vyn när UV-index överstiger detta värde.</p>
       </div>
+
+      {/* Konto */}
+      <UserSection />
 
       {/* Donation */}
       <DonateSection />
