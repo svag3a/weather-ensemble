@@ -808,17 +808,20 @@ export default function SolView({ coords, initialData }) {
     if (skipFirstFetch.current) { skipFirstFetch.current = false; return }
     if (!data) setLoading(true)
     setError(null)
+    const lat = coords?.lat ?? 57.7089
+    const lon = coords?.lon ?? 11.9746
+    console.log('[SolView] fetch', { lat, lon, radius: debouncedRadius, type: typeParam })
     fetchSunTerraces({
-      lat:       coords?.lat ?? 57.7089,
-      lon:       coords?.lon ?? 11.9746,
+      lat,
+      lon,
       radius:    debouncedRadius,
       type:      typeParam,
       name:      debouncedSearch,
       tags:      tagsParam,
       min_score: debouncedSearch ? 0 : 25,
     })
-      .then(setData)
-      .catch(e => setError(e.message))
+      .then(d => { console.log('[SolView] got', d?.length, 'venues'); setData(d) })
+      .catch(e => { console.log('[SolView] error', e.message); setError(e.message) })
       .finally(() => setLoading(false))
   }, [coords, typeParam, debouncedRadius, debouncedSearch, tagsParam])
 
@@ -954,8 +957,13 @@ export default function SolView({ coords, initialData }) {
 
       {/* Error */}
       {error && !data && (
-        <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm`}>
-          Kunde inte hämta uteserveringar.
+        <div className={`${GLASS} rounded-2xl p-6 text-slate-400 text-center text-sm space-y-3`}>
+          <p>Kunde inte hämta uteserveringar.</p>
+          <p className="text-xs text-slate-600 break-all">{error}</p>
+          <button
+            onClick={() => { setError(null); setLoading(true); fetchSunTerraces({ lat: coords?.lat ?? 57.7089, lon: coords?.lon ?? 11.9746, radius: debouncedRadius, type: typeParam, name: debouncedSearch, tags: tagsParam, min_score: 0 }).then(d => setData(d)).catch(e => setError(e.message)).finally(() => setLoading(false)) }}
+            className="px-4 py-1.5 rounded-xl bg-white/10 text-white text-xs"
+          >Försök igen</button>
         </div>
       )}
 
@@ -980,6 +988,15 @@ export default function SolView({ coords, initialData }) {
           <p className="text-slate-500 text-xs px-1">
             {data.length} uteserveringar{debouncedSearch ? '' : ` inom ${debouncedRadius} km`}
           </p>
+          {sortedData.length === 0 && !showClosed && (
+            <div className={`${GLASS} rounded-2xl p-5 text-center space-y-2`}>
+              <p className="text-slate-400 text-sm">Alla uteserveringar är stängda just nu.</p>
+              <button onClick={() => setShowClosed(true)}
+                className="px-4 py-1.5 rounded-xl bg-white/10 text-white text-xs">
+                Visa stängda
+              </button>
+            </div>
+          )}
           {sortedData.map(t => (
             <TerraceCard key={t.id} terrace={t}
               isFav={favs.has(t.id)} onToggleFav={(id) => toggleFav(id, t)}
