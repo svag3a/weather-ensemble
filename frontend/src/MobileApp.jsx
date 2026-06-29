@@ -2648,6 +2648,7 @@ function DonateSection() {
 }
 
 function ProfileView({ onNavigateToSol, motifs, coords }) {
+  const [appSession]   = useState(loadAppSession)
   const [favs]         = useState(loadFavsP)
   const [favData]      = useState(loadFavDataP)
   const [uvThreshold, setUvThreshold] = useState(
@@ -2696,10 +2697,12 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
     <div className="px-4 pt-10 pb-8 space-y-3 max-w-lg mx-auto">
 
       {/* Premium badge */}
-      <div className="flex items-center justify-center gap-2 py-2">
-        <Crown size={16} className="text-amber-400" />
-        <span className="text-amber-400 text-sm font-semibold tracking-widest">PREMIUM</span>
-      </div>
+      {appSession.user?.is_premium && (
+        <div className="flex items-center justify-center gap-2 py-2">
+          <Crown size={16} className="text-amber-400" />
+          <span className="text-amber-400 text-sm font-semibold tracking-widest">PREMIUM</span>
+        </div>
+      )}
 
       {/* Favourites */}
       <div className={`${GLASS} rounded-2xl overflow-hidden`}>
