@@ -2473,7 +2473,7 @@ function BadgesCard({ motifs }) {
   )
 }
 
-const SWISH_NUMBER = '0706016007'
+const SWISH_NUMBER = '46708949877'
 const PRESET_AMOUNTS = [20, 50, 100]
 
 function DonateSection() {
