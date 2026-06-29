@@ -836,6 +836,13 @@ export default function SolView({ coords, initialData }) {
 
   return (
     <div className="space-y-3">
+      {/* Debug band — remove after iOS investigation */}
+      <div className="bg-yellow-900/60 border border-yellow-700/50 rounded-xl px-3 py-2 text-[11px] font-mono text-yellow-300 space-y-0.5">
+        <div>coords: {coords ? `${coords.lat.toFixed(4)},${coords.lon.toFixed(4)}` : 'null'}</div>
+        <div>loading: {loading ? 'true' : 'false'} | data: {data == null ? 'null' : data.length} | sortedData: {sortedData.length}</div>
+        {error && <div className="text-red-300 break-all">err: {error}</div>}
+      </div>
+
       {/* Header */}
       <div className="px-1 flex items-start justify-between">
         <div>
