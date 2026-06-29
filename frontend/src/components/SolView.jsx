@@ -660,10 +660,10 @@ function AddVenueForm({ coords, onSaved, onCancel }) {
 }
 
 // ── Radius + time-pref localStorage ──────────────────────────────────────────
-const RADIUS_KEY    = 'sol_radius'
-const TIME_PREF_KEY = 'sol_time_pref'
+const RADIUS_KEY     = 'sol_radius'
+const TAG_FILTER_KEY = 'sol_tag_filter_v1'
 function loadSavedRadius()   { try { return parseFloat(localStorage.getItem(RADIUS_KEY)) || 2.0 } catch { return 2.0 } }
-function loadSavedTimePref() { try { return new Set(JSON.parse(localStorage.getItem(TIME_PREF_KEY) || '[]')) } catch { return new Set() } }
+function loadSavedTimePref() { try { return new Set(JSON.parse(localStorage.getItem(TAG_FILTER_KEY) || '[]')) } catch { return new Set() } }
 
 // ── Votes localStorage ────────────────────────────────────────────────────────
 const VOTES_KEY = 'sol_votes'
