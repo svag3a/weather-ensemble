@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Moon, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin, Bell, Crown, Send } from 'lucide-react'
+import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Moon, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin, Bell, Crown, Send, Heart } from 'lucide-react'
 
 function JacketIcon({ size = 24, color = 'currentColor' }) {
   return (
@@ -2473,6 +2473,74 @@ function BadgesCard({ motifs }) {
   )
 }
 
+const SWISH_NUMBER = '0706016007'
+const PRESET_AMOUNTS = [20, 50, 100]
+
+function DonateSection() {
+  const [amount, setAmount] = useState(null)
+  const [custom, setCustom] = useState('')
+
+  const finalAmount = custom ? parseInt(custom, 10) : amount
+  const valid = finalAmount > 0 && finalAmount <= 99999
+
+  function handlePreset(v) {
+    setAmount(v)
+    setCustom('')
+  }
+
+  function handleCustom(e) {
+    setCustom(e.target.value.replace(/\D/g, ''))
+    setAmount(null)
+  }
+
+  function handleSwish() {
+    if (!valid) return
+    const data = JSON.stringify({
+      version: 1,
+      payee: { value: SWISH_NUMBER, editable: false },
+      amount: { value: finalAmount, editable: false },
+      message: { value: 'gbgsol', editable: false },
+    })
+    window.location.href = `swish://payment?data=${encodeURIComponent(data)}`
+  }
+
+  return (
+    <div className={`${GLASS} rounded-2xl px-5 py-4 space-y-4`}>
+      <div className="flex items-center gap-2">
+        <Heart size={13} className="text-rose-400 shrink-0" />
+        <span className="text-white text-sm font-medium">Stöd gbgsol</span>
+      </div>
+      <p className="text-slate-400 text-xs leading-relaxed">
+        gbgsol är gratis och reklamfri. En liten slant håller appen vid liv. 🌞
+      </p>
+      <div className="flex gap-2">
+        {PRESET_AMOUNTS.map(v => (
+          <button key={v} onPointerUp={() => handlePreset(v)}
+            className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors touch-manipulation select-none ${
+              amount === v && !custom
+                ? 'bg-rose-500/30 text-rose-200 border border-rose-500/50'
+                : 'bg-white/5 text-slate-300 border border-white/5'
+            }`}>
+            {v} kr
+          </button>
+        ))}
+      </div>
+      <input
+        type="number" inputMode="numeric" placeholder="Annat belopp (kr)"
+        value={custom} onChange={handleCustom}
+        className="w-full bg-black/20 text-white text-sm rounded-xl px-3 py-2 border border-white/10 placeholder-slate-500 focus:outline-none focus:border-white/30"
+      />
+      <button
+        onPointerUp={handleSwish}
+        disabled={!valid}
+        className="w-full py-2.5 rounded-xl text-sm font-semibold bg-[#003781] text-white disabled:opacity-30 active:opacity-80 transition-opacity flex items-center justify-center gap-2"
+      >
+        <span>Swisha {valid ? `${finalAmount} kr` : ''}</span>
+      </button>
+    </div>
+  )
+}
+
 function ProfileView({ onNavigateToSol, motifs, coords }) {
   const [favs]         = useState(loadFavsP)
   const [favData]      = useState(loadFavDataP)
@@ -2626,6 +2694,9 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
         />
         <p className="text-slate-500 text-xs">Varna mig i sol-vyn när UV-index överstiger detta värde.</p>
       </div>
+
+      {/* Donation */}
+      <DonateSection />
 
       {/* Notiser */}
       <div className={`${GLASS} rounded-2xl overflow-hidden`}>
