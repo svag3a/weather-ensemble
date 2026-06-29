@@ -836,13 +836,6 @@ export default function SolView({ coords, initialData }) {
 
   return (
     <div className="space-y-3">
-      {/* Debug band — remove after iOS investigation */}
-      <div className="bg-yellow-900/60 border border-yellow-700/50 rounded-xl px-3 py-2 text-[11px] font-mono text-yellow-300 space-y-0.5">
-        <div>coords: {coords ? `${coords.lat.toFixed(4)},${coords.lon.toFixed(4)}` : 'null'}</div>
-        <div>loading: {loading ? 'true' : 'false'} | data: {data == null ? 'null' : data.length} | sortedData: {sortedData.length}</div>
-        {error && <div className="text-red-300 break-all">err: {error}</div>}
-      </div>
-
       {/* Header */}
       <div className="px-1 flex items-start justify-between">
         <div>
@@ -985,8 +978,16 @@ export default function SolView({ coords, initialData }) {
       {data && data.length === 0 && (
         <div className={`${GLASS} rounded-2xl p-8 flex flex-col items-center gap-3 text-center`}>
           <span className="text-3xl">☀️</span>
-          <p className="text-white font-medium">Inga träffar</p>
-          <p className="text-slate-500 text-sm">Prova ett annat filter eller öka avståndet.</p>
+          <p className="text-white font-medium">Inga träffar inom {debouncedRadius} km</p>
+          <p className="text-slate-500 text-sm">Prova ett större avstånd.</p>
+          <div className="flex gap-2 flex-wrap justify-center">
+            {[5, 10, 20].filter(r => r > debouncedRadius).map(r => (
+              <button key={r} onClick={() => { setRadius(r); localStorage.setItem(RADIUS_KEY, String(r)) }}
+                className="px-4 py-1.5 rounded-xl bg-white/10 text-white text-sm font-medium active:bg-white/20">
+                {r} km
+              </button>
+            ))}
+          </div>
         </div>
       )}
 
