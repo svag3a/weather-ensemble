@@ -2492,7 +2492,7 @@ function loadAppSession() {
 }
 
 const RC_API_KEY = 'test_sEbLPERBqyAtSwhOAWmaomVhbep'
-const RC_ENTITLEMENT = 'GbgSol Pro'
+const RC_ENTITLEMENT = 'se.gbgsol.premium.monthly'
 
 async function rcConfigure(userId) {
   if (Capacitor.getPlatform() !== 'ios') return
