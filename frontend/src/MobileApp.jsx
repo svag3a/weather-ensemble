@@ -2562,8 +2562,9 @@ function UserSection() {
         if (uid) await Purchases.configure({ apiKey: RC_API_KEY, appUserID: String(uid) })
       }
       const result = await Purchases.getOfferings()
-      const current = result?.offerings?.current
-      const pkg = current?.monthly ?? current?.availablePackages?.[0]
+      // Raw bridge returns {all, current} directly (no offerings wrapper)
+      const current = result?.current ?? result?.all?.default
+      const pkg = current?.availablePackages?.[0]
       if (!pkg) throw new Error(`no_package (${JSON.stringify(result).slice(0, 120)})`)
       const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg })
       if (customerInfo?.entitlements?.active?.[RC_ENTITLEMENT]) {
