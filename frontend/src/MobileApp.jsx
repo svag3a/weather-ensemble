@@ -2492,7 +2492,7 @@ function loadAppSession() {
   } catch { return { token: null, user: null } }
 }
 
-const RC_API_KEY = 'test_sEbLPERBqyAtSwhOAWmaomVhbep'
+const RC_API_KEY = 'appl_eSCaxygxSpcMonVMLGssqZwlMAO'
 const RC_ENTITLEMENT = 'se.gbgsol.premium.monthly'
 
 async function rcConfigure(userId) {
