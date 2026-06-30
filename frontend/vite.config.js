@@ -16,7 +16,6 @@ export default defineConfig({
       // they must not be bundled into the web build.
       external: [
         '@capacitor-community/background-geolocation',
-        '@revenuecat/purchases-capacitor',
       ],
     },
   },
