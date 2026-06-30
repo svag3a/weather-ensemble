@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { SignInWithApple } from '@capacitor-community/apple-sign-in'
-import { Purchases } from '@revenuecat/purchases-capacitor'
+import { Purchases } from './purchases'
 import { createNoise2D } from 'simplex-noise'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Thermometer, CalendarDays, ChartSpline, TriangleAlert, Sparkles, Zap, Clock, TrendingUp, Lightbulb, ShieldCheck, Shirt, Umbrella, Glasses, Waves, TreePine, Footprints, Sailboat, Sun, Moon, Droplet, Droplets, UtensilsCrossed, Coffee, Martini, Beer, Utensils, User, Star, MapPin, Bell, Crown, Send, Heart } from 'lucide-react'
@@ -2497,7 +2497,6 @@ const RC_ENTITLEMENT = 'se.gbgsol.premium.monthly'
 
 async function rcConfigure(userId) {
   if (Capacitor.getPlatform() !== 'ios') return
-  await Purchases.setLogLevel({ level: 5 })
   await Purchases.configure({ apiKey: RC_API_KEY, appUserID: String(userId) })
 }
 
