@@ -16,6 +16,7 @@
     "@capacitor/core": "^8.4.1",
     "@capacitor/ios": "^8.4.1",
     "@revenuecat/purchases-capacitor": "^13.2.0",
+    "@revenuecat/purchases-capacitor-ui": "^13.2.0",
     "framer-motion": "^12.40.0",
     "leaflet": "^1.9.4",
     "lottie-react": "^2.4.1",

@@ -2492,7 +2492,7 @@ function loadAppSession() {
 }
 
 const RC_API_KEY = 'test_sEbLPERBqyAtSwhOAWmaomVhbep'
-const RC_ENTITLEMENT = 'premium'
+const RC_ENTITLEMENT = 'GbgSol Pro'
 
 async function rcConfigure(userId) {
   if (Capacitor.getPlatform() !== 'ios') return
@@ -2558,16 +2558,9 @@ function UserSection() {
     setPurchasing(true)
     setPurchaseError(null)
     try {
-      const { Purchases } = await import('@revenuecat/purchases-capacitor')
-      const { offerings } = await Purchases.getOfferings()
-      const offering = offerings.current
-      if (!offering) throw new Error('no_offering')
-      const pkg = offering.monthly ?? offering.availablePackages?.[0]
-      if (!pkg) throw new Error('no_package')
-
-      const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg })
-      const active = customerInfo.entitlements.active[RC_ENTITLEMENT]
-      if (active) {
+      const { RevenueCatUI, PAYWALL_RESULT } = await import('@revenuecat/purchases-capacitor-ui')
+      const { result } = await RevenueCatUI.presentPaywall()
+      if (result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED) {
         const updated = { ...session.user, is_premium: true }
         localStorage.setItem(APP_USER_KEY, JSON.stringify(updated))
         setSession(prev => ({ ...prev, user: updated }))
