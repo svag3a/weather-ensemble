@@ -2847,17 +2847,19 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
         {ALL_ACTIVITIES.map(({ key, label, Icon }) => {
           const on = actPref.has(key)
           return (
-            <button
+            <div
               key={key}
-              onPointerUp={() => toggleActivity(key)}
-              className="w-full flex items-center gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0 touch-manipulation select-none active:bg-white/5 transition-colors"
+              className="w-full flex items-center gap-3 px-5 py-3 border-b border-slate-700/50 last:border-0 select-none"
             >
               <Icon size={14} className={on ? 'text-white shrink-0' : 'text-slate-600 shrink-0'} strokeWidth={1.5} />
               <span className={`flex-1 text-xs text-left ${on ? 'text-white' : 'text-slate-500'}`}>{label}</span>
-              <span className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center text-[10px] ${
-                on ? 'bg-white/20 border-white/40 text-white' : 'border-slate-600 text-transparent'
-              }`}>✓</span>
-            </button>
+              <span
+                onClick={() => toggleActivity(key)}
+                className={`w-6 h-6 rounded border shrink-0 flex items-center justify-center text-[10px] touch-manipulation active:opacity-60 transition-opacity cursor-pointer ${
+                  on ? 'bg-white/20 border-white/40 text-white' : 'border-slate-600 text-transparent'
+                }`}
+              >✓</span>
+            </div>
           )
         })}
         <p className="px-5 py-3 text-slate-500 text-xs">Vilka aktiviteter visas i analysvy under "Under dagen".</p>
