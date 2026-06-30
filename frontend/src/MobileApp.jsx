@@ -2558,9 +2558,12 @@ function UserSection() {
     setPurchasing(true)
     setPurchaseError(null)
     try {
-      const { RevenueCatUI, PAYWALL_RESULT } = await import('@revenuecat/purchases-capacitor-ui')
-      const { result } = await RevenueCatUI.presentPaywall()
-      if (result === PAYWALL_RESULT.PURCHASED || result === PAYWALL_RESULT.RESTORED) {
+      const { Purchases } = await import('@revenuecat/purchases-capacitor')
+      const { offerings } = await Purchases.getOfferings()
+      const pkg = offerings.current?.monthly ?? offerings.current?.availablePackages?.[0]
+      if (!pkg) throw new Error('no_package')
+      const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg })
+      if (customerInfo.entitlements.active[RC_ENTITLEMENT]) {
         const updated = { ...session.user, is_premium: true }
         localStorage.setItem(APP_USER_KEY, JSON.stringify(updated))
         setSession(prev => ({ ...prev, user: updated }))

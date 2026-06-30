@@ -17,7 +17,6 @@ export default defineConfig({
       external: [
         '@capacitor-community/background-geolocation',
         '@revenuecat/purchases-capacitor',
-        '@revenuecat/purchases-capacitor-ui',
       ],
     },
   },
