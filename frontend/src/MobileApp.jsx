@@ -2491,12 +2491,13 @@ function loadAppSession() {
   } catch { return { token: null, user: null } }
 }
 
-const RC_API_KEY = import.meta.env.VITE_REVENUECAT_API_KEY || ''
+const RC_API_KEY = 'test_sEbLPERBqyAtSwhOAWmaomVhbep'
 const RC_ENTITLEMENT = 'premium'
 
 async function rcConfigure(userId) {
-  if (!RC_API_KEY) return
-  const { Purchases } = await import('@revenuecat/purchases-capacitor')
+  if (Capacitor.getPlatform() !== 'ios') return
+  const { Purchases, LOG_LEVEL } = await import('@revenuecat/purchases-capacitor')
+  await Purchases.setLogLevel({ level: LOG_LEVEL.DEBUG })
   await Purchases.configure({ apiKey: RC_API_KEY, appUserID: String(userId) })
 }
 
