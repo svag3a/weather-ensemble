@@ -13,6 +13,8 @@ jobs:
       # Build frontend in CI — avoids OOM on the small EC2 instance
       - name: Build frontend
         working-directory: frontend
+        env:
+          VITE_REVENUECAT_API_KEY: ${{ secrets.REVENUECAT_API_KEY_IOS }}
         run: |
           npm ci
           npm run build
@@ -31,7 +33,7 @@ jobs:
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=20 \
             ubuntu@${{ secrets.EC2_HOST }} \
-            "cd ~/weather-ensemble && git fetch origin && git reset --hard origin/main && echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' > .env && echo 'GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}' >> .env && echo 'GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}' >> .env && echo 'GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }}' >> .env"
+            "cd ~/weather-ensemble && git fetch origin && git reset --hard origin/main && echo 'ANTHROPIC_API_KEY=${{ secrets.ANTHROPIC_API_KEY }}' > .env && echo 'GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}' >> .env && echo 'GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}' >> .env && echo 'GOOGLE_PLACES_API_KEY=${{ secrets.GOOGLE_PLACES_API_KEY }}' >> .env && echo 'REVENUECAT_WEBHOOK_SECRET=${{ secrets.REVENUECAT_WEBHOOK_SECRET }}' >> .env"
 
       # Copy pre-built frontend (dist is gitignored, git pull won't overwrite it)
       - name: Copy frontend dist to server

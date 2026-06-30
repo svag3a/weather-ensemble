@@ -2491,18 +2491,43 @@ function loadAppSession() {
   } catch { return { token: null, user: null } }
 }
 
+const RC_API_KEY = import.meta.env.VITE_REVENUECAT_API_KEY || ''
+const RC_ENTITLEMENT = 'premium'
+
+async function rcConfigure(userId) {
+  if (!RC_API_KEY) return
+  const { Purchases } = await import('@revenuecat/purchases-capacitor')
+  await Purchases.configure({ apiKey: RC_API_KEY, appUserID: String(userId) })
+}
+
 function UserSection() {
-  const [session, setSession] = useState(loadAppSession)
-  const [loading, setLoading] = useState(false)
-  const [error,   setError]   = useState(null)
+  const [session, setSession]       = useState(loadAppSession)
+  const [loading, setLoading]       = useState(false)
+  const [purchasing, setPurchasing] = useState(false)
+  const [error, setError]           = useState(null)
+  const [purchaseError, setPurchaseError] = useState(null)
+
+  // Refresh premium status from backend on mount
+  useEffect(() => {
+    const { token, user } = loadAppSession()
+    if (!token || !user) return
+    fetch('/api/v1/auth/app-me', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (!data?.authenticated) return
+        const updated = { ...user, is_premium: data.is_premium, user_id: data.user_id }
+        localStorage.setItem(APP_USER_KEY, JSON.stringify(updated))
+        setSession({ token, user: updated })
+        if (data.user_id) rcConfigure(data.user_id).catch(() => {})
+      })
+      .catch(() => {})
+  }, [])
 
   async function handleSignIn() {
     setLoading(true)
     setError(null)
     try {
-      const result = await SignInWithApple.authorize({
-        scopes: 'email name',
-      })
+      const result = await SignInWithApple.authorize({ scopes: 'email name' })
       const r = result.response
       const fullName = [r.givenName, r.familyName].filter(Boolean).join(' ') || null
 
@@ -2514,16 +2539,45 @@ function UserSection() {
       if (!resp.ok) throw new Error('server')
       const data = await resp.json()
 
-      const user = { display_name: data.display_name, is_premium: data.is_premium }
+      const user = { display_name: data.display_name, is_premium: data.is_premium, user_id: data.user_id }
       localStorage.setItem(APP_TOKEN_KEY, data.token)
       localStorage.setItem(APP_USER_KEY, JSON.stringify(user))
       setSession({ token: data.token, user })
+      if (data.user_id) rcConfigure(data.user_id).catch(() => {})
     } catch (e) {
       if (!String(e).includes('cancel') && !String(e).includes('Cancel')) {
         setError('Inloggning misslyckades. Försök igen.')
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handlePurchase() {
+    setPurchasing(true)
+    setPurchaseError(null)
+    try {
+      const { Purchases } = await import('@revenuecat/purchases-capacitor')
+      const { offerings } = await Purchases.getOfferings()
+      const offering = offerings.current
+      if (!offering) throw new Error('no_offering')
+      const pkg = offering.monthly ?? offering.availablePackages?.[0]
+      if (!pkg) throw new Error('no_package')
+
+      const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg })
+      const active = customerInfo.entitlements.active[RC_ENTITLEMENT]
+      if (active) {
+        const updated = { ...session.user, is_premium: true }
+        localStorage.setItem(APP_USER_KEY, JSON.stringify(updated))
+        setSession(prev => ({ ...prev, user: updated }))
+      }
+    } catch (e) {
+      const msg = String(e)
+      if (!msg.includes('cancel') && !msg.includes('Cancel') && !msg.includes('USER_CANCELLED')) {
+        setPurchaseError('Köpet misslyckades. Försök igen.')
+      }
+    } finally {
+      setPurchasing(false)
     }
   }
 
@@ -2548,11 +2602,30 @@ function UserSection() {
       {session.user ? (
         <>
           <p className="text-slate-300 text-sm">{session.user.display_name}</p>
-          {!session.user.is_premium && (
+
+          {!session.user.is_premium && RC_API_KEY && (
+            <>
+              <p className="text-slate-500 text-xs leading-relaxed">
+                Chat ingår i premium. Aktivera för att börja använda det direkt.
+              </p>
+              {purchaseError && <p className="text-red-400 text-xs">{purchaseError}</p>}
+              <button
+                onPointerUp={handlePurchase}
+                disabled={purchasing}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold bg-amber-500 text-white disabled:opacity-40 active:opacity-80 transition-opacity flex items-center justify-center gap-2 touch-manipulation select-none"
+              >
+                <Crown size={13} />
+                {purchasing ? 'Öppnar App Store…' : 'Aktivera Premium'}
+              </button>
+            </>
+          )}
+
+          {!session.user.is_premium && !RC_API_KEY && (
             <p className="text-slate-500 text-xs leading-relaxed">
-              Chat-funktionen ingår i premium — vi återkommer med hur du aktiverar det.
+              Chat ingår i premium — kommer snart i App Store.
             </p>
           )}
+
           <button onPointerUp={handleSignOut} className="text-slate-500 text-xs underline touch-manipulation">
             Logga ut
           </button>

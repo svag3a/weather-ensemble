@@ -14,7 +14,10 @@ export default defineConfig({
     rollupOptions: {
       // Capacitor native plugins are injected by the native bridge at runtime;
       // they must not be bundled into the web build.
-      external: ['@capacitor-community/background-geolocation'],
+      external: [
+        '@capacitor-community/background-geolocation',
+        '@revenuecat/purchases-capacitor',
+      ],
     },
   },
 })

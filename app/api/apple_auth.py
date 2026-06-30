@@ -144,6 +144,7 @@ async def apple_signin(body: AppleSignInRequest, db: Session = Depends(get_db)):
     display_name = user.full_name or (user.email.split("@")[0] if user.email else "Användare")
     return {
         "token": token,
+        "user_id": user.id,
         "is_premium": user.is_premium,
         "display_name": display_name,
     }
@@ -164,6 +165,7 @@ def app_me(
     display_name = user.full_name or (user.email.split("@")[0] if user.email else "Användare")
     return {
         "authenticated": True,
+        "user_id": user.id,
         "is_premium": user.is_premium,
         "display_name": display_name,
     }

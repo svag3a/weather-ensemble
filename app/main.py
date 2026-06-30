@@ -15,6 +15,7 @@ from app.scheduler import create_scheduler
 from app.api.routes import router
 from app.api.auth import auth_router, verify_session_token
 from app.api.apple_auth import apple_auth_router
+from app.api.webhooks import webhooks_router
 
 FRONTEND_DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
@@ -202,6 +203,7 @@ async def immutable_assets_headers(request: Request, call_next):
 app.include_router(router, prefix="/api/v1")
 app.include_router(auth_router)
 app.include_router(apple_auth_router)
+app.include_router(webhooks_router)
 
 
 @app.get("/health")
