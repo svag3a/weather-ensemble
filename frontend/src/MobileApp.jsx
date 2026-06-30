@@ -2571,7 +2571,7 @@ function UserSection() {
     } catch (e) {
       const msg = String(e)
       if (!msg.includes('cancel') && !msg.includes('Cancel') && !msg.includes('USER_CANCELLED')) {
-        setPurchaseError('Köpet misslyckades. Försök igen.')
+        setPurchaseError(`Fel: ${msg.slice(0, 120)}`)
       }
     } finally {
       setPurchasing(false)
