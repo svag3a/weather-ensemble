@@ -2564,7 +2564,8 @@ function UserSection() {
       const result = await Purchases.getOfferings()
       // Raw bridge returns {all, current} directly (no offerings wrapper)
       const current = result?.current ?? result?.all?.default
-      const pkg = current?.availablePackages?.[0]
+      const pkg = current?.availablePackages?.find(p => p.packageType === 'MONTHLY')
+        ?? current?.availablePackages?.[0]
       if (!pkg) throw new Error(`no_package (${JSON.stringify(result).slice(0, 120)})`)
       const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg })
       if (customerInfo?.entitlements?.active?.[RC_ENTITLEMENT]) {
