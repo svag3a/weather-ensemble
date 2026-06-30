@@ -2557,11 +2557,16 @@ function UserSection() {
     setPurchasing(true)
     setPurchaseError(null)
     try {
-      const { offerings } = await Purchases.getOfferings()
-      const pkg = offerings.current?.monthly ?? offerings.current?.availablePackages?.[0]
-      if (!pkg) throw new Error('no_package')
+      if (Capacitor.getPlatform() === 'ios') {
+        const uid = session.user?.user_id
+        if (uid) await Purchases.configure({ apiKey: RC_API_KEY, appUserID: String(uid) })
+      }
+      const result = await Purchases.getOfferings()
+      const current = result?.offerings?.current
+      const pkg = current?.monthly ?? current?.availablePackages?.[0]
+      if (!pkg) throw new Error(`no_package (${JSON.stringify(result).slice(0, 120)})`)
       const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg })
-      if (customerInfo.entitlements.active[RC_ENTITLEMENT]) {
+      if (customerInfo?.entitlements?.active?.[RC_ENTITLEMENT]) {
         const updated = { ...session.user, is_premium: true }
         localStorage.setItem(APP_USER_KEY, JSON.stringify(updated))
         setSession(prev => ({ ...prev, user: updated }))
@@ -2569,7 +2574,7 @@ function UserSection() {
     } catch (e) {
       const msg = String(e)
       if (!msg.includes('cancel') && !msg.includes('Cancel') && !msg.includes('USER_CANCELLED')) {
-        setPurchaseError(`Fel: ${msg.slice(0, 120)}`)
+        setPurchaseError(`Fel: ${msg.slice(0, 200)}`)
       }
     } finally {
       setPurchasing(false)
