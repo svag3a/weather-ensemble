@@ -2887,33 +2887,6 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
       {/* Donation */}
       <DonateSection />
 
-      {/* Notiser */}
-      <div className={`${GLASS} rounded-2xl overflow-hidden`}>
-        <div className="px-5 pt-4 pb-3 border-b border-slate-700 flex items-center gap-2">
-          <Bell size={13} className="text-slate-400 shrink-0" />
-          <span className="text-white text-sm font-medium">Notiser</span>
-        </div>
-        {[
-          { key: NOTIF_SUN_KEY,  state: notifSun,  set: setNotifSun,  label: 'Sol-fönster',  desc: 'Påminn när ett bra solläge öppnar sig.' },
-          { key: NOTIF_UV_KEY,   state: notifUv,   set: setNotifUv,   label: 'UV-varning',   desc: `Påminn när UV-index överstiger ${uvThreshold}.` },
-        ].map(({ key, state, set, label, desc }) => (
-          <button
-            key={key}
-            onPointerUp={() => { const next = !state; set(next); localStorage.setItem(key, String(next)) }}
-            className="w-full flex items-center gap-3 px-5 py-3.5 border-b border-slate-700/50 last:border-0 touch-manipulation select-none active:bg-white/5 transition-colors"
-          >
-            <div className="flex-1 text-left">
-              <div className={`text-xs font-medium ${state ? 'text-white' : 'text-slate-400'}`}>{label}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">{desc}</div>
-            </div>
-            {/* iOS-style toggle */}
-            <div className={`relative w-11 h-6 rounded-full transition-colors shrink-0 ${state ? 'bg-amber-500' : 'bg-slate-600'}`}>
-              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${state ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </div>
-          </button>
-        ))}
-        <p className="px-5 py-3 text-slate-600 text-[11px]">Push-notiser aktiveras när appen installeras som native-app.</p>
-      </div>
 
     </div>
   )
