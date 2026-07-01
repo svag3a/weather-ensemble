@@ -154,11 +154,16 @@ function SunTimeline({ scores, coords }) {
   const now = new Date()
   const lat = coords?.lat ?? 57.706
   const lon = coords?.lon ?? 11.967
-  const { sunset } = sunTimesUTC(now, lat, lon)
+  const { sunrise, sunset } = sunTimesUTC(now, lat, lon)
   const tz = -now.getTimezoneOffset() / 60
-  const ssLocal = (sunset + tz + 24) % 24
+  const srLocal = (sunrise + tz + 24) % 24
+  const ssLocal = (sunset  + tz + 24) % 24
   const nowH = now.getHours() + now.getMinutes() / 60
-  const hoursToSunset = Math.max(0.25, ssLocal - nowH)
+
+  // Outside daylight hours — no sun band
+  if (nowH >= ssLocal || nowH < srLocal) return null
+
+  const hoursToSunset = ssLocal - nowH
 
   // Use gradient from backend — sampled every 30 min from now to sunset.
   // Falls back to 3-point estimation if not present.
