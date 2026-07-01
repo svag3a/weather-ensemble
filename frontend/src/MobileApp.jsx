@@ -2140,15 +2140,6 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
               </div>
             )}
 
-            {/* Confidence */}
-            <div className={`${GLASS} rounded-2xl p-4 flex items-start gap-3`}>
-              <ShieldCheck size={15} className={`shrink-0 mt-0.5 ${confStyle.color}`} />
-              <div className="flex-1 min-w-0">
-                <span className={`text-xs font-medium ${confStyle.color}`}>{confStyle.label}</span>
-                <p className="text-slate-400 text-xs leading-relaxed mt-0.5">{summary.confidence?.reason}</p>
-              </div>
-            </div>
-
             {/* Key events */}
             {summary.key_events?.length > 0 && (
               <div className={`${GLASS} rounded-2xl overflow-hidden`}>
@@ -2225,6 +2216,15 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
                 })}
               </div>
             )}
+
+            {/* Confidence */}
+            <div className={`${GLASS} rounded-2xl p-4 flex items-start gap-3`}>
+              <ShieldCheck size={15} className={`shrink-0 mt-0.5 ${confStyle.color}`} />
+              <div className="flex-1 min-w-0">
+                <span className={`text-xs font-medium ${confStyle.color}`}>{confStyle.label}</span>
+                <p className="text-slate-400 text-xs leading-relaxed mt-0.5">{summary.confidence?.reason}</p>
+              </div>
+            </div>
 
             {/* Insights */}
             {summary.insights?.length > 0 && (
