@@ -1,13 +1,10 @@
 import { useEffect, useState } from 'react'
 
-export default function SplashScreen({ onDone }) {
-  const [phase, setPhase] = useState('in')
-
+export default function SplashScreen({ onAnimReady, fading }) {
   useEffect(() => {
-    const fadeOut = setTimeout(() => setPhase('out'), 1700)
-    const done    = setTimeout(() => onDone?.(),       2150)
-    return () => { clearTimeout(fadeOut); clearTimeout(done) }
-  }, [onDone])
+    const t = setTimeout(() => onAnimReady?.(), 1700)
+    return () => clearTimeout(t)
+  }, [onAnimReady])
 
   return (
     <div
@@ -20,8 +17,8 @@ export default function SplashScreen({ onDone }) {
         justifyContent: 'center',
         background:     'linear-gradient(160deg, #003B6F 0%, #005293 55%, #0a1628 100%)',
         transition:     'opacity 0.45s ease-out',
-        opacity:        phase === 'out' ? 0 : 1,
-        pointerEvents:  phase === 'out' ? 'none' : 'auto',
+        opacity:        fading ? 0 : 1,
+        pointerEvents:  fading ? 'none' : 'auto',
       }}
     >
       <style>{`

@@ -1,4 +1,4 @@
-import { StrictMode, useState, useEffect, lazy, Suspense } from 'react'
+import { StrictMode, useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
@@ -22,13 +22,28 @@ function useIsDesktop() {
 function Root() {
   const isDesktop = useIsDesktop()
   const [showSplash, setShowSplash] = useState(true)
+  const [splashFading, setSplashFading] = useState(false)
+  const flags = useRef({ anim: false, data: false })
+  const dismissing = useRef(false)
+
+  const tryDismiss = useCallback(() => {
+    if (flags.current.anim && flags.current.data && !dismissing.current) {
+      dismissing.current = true
+      setSplashFading(true)
+      setTimeout(() => setShowSplash(false), 500)
+    }
+  }, [])
+
+  const handleAnimReady = useCallback(() => { flags.current.anim = true; tryDismiss() }, [tryDismiss])
+  const handleDataReady = useCallback(() => { flags.current.data = true; tryDismiss() }, [tryDismiss])
+
   return (
     <>
-      {showSplash && <SplashScreen onDone={() => setShowSplash(false)} />}
+      {showSplash && <SplashScreen onAnimReady={handleAnimReady} fading={splashFading} />}
       <Suspense fallback={null}>
         <Routes>
-          <Route path="/" element={isDesktop ? <DesktopApp /> : <MobileApp />} />
-          <Route path="/mobile" element={<MobileApp />} />
+          <Route path="/" element={isDesktop ? <DesktopApp /> : <MobileApp onReady={handleDataReady} />} />
+          <Route path="/mobile" element={<MobileApp onReady={handleDataReady} />} />
           <Route path="/desktop" element={<DesktopApp />} />
           <Route path="/admin" element={<App />} />
         </Routes>

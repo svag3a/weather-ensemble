@@ -3009,7 +3009,7 @@ function SolNuCard({ data, onViewAll }) {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function MobileApp() {
+export default function MobileApp({ onReady }) {
   const [forecast, setForecast]   = useState(null)
   const [warnings, setWarnings]   = useState([])
   const [sources, setSources]         = useState(null)
@@ -3159,6 +3159,15 @@ export default function MobileApp() {
   }, [coords])
 
   useEffect(() => { load() }, [load])
+
+  // Signal splash to dismiss once forecast data arrives for the first time
+  const readyCalled = useRef(false)
+  useEffect(() => {
+    if (forecast && !readyCalled.current) {
+      readyCalled.current = true
+      onReady?.()
+    }
+  }, [forecast, onReady])
 
   useEffect(() => {
     const interval = setInterval(load, 10 * 60 * 1000)
