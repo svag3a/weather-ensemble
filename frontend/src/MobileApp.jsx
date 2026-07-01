@@ -3025,8 +3025,14 @@ export default function MobileApp() {
   const { radar, rainTimeline, coords, locate } = useRadarLocation()
   const geoLocation = useReverseGeocode(coords)
   const bgImage = useCityBackground(coords)
-  const motifImage = useCityMotif(coords)
+  const motifImageRaw = useCityMotif(coords)
   const allMotifs = useCityMotifs()
+
+  const GBG_LAT = 57.7089, GBG_LON = 11.9746
+  const GBG_FENCE_M = 30_000
+  const distFromGbg = coords ? distanceM(coords.lat, coords.lon, GBG_LAT, GBG_LON) : 0
+  const outsideGbg = coords ? distFromGbg > GBG_FENCE_M : false
+  const motifImage = outsideGbg ? null : motifImageRaw
 
   // Award location badges when user is within BADGE_RADIUS_M of a motif (foreground).
   useEffect(() => {
@@ -3198,6 +3204,12 @@ export default function MobileApp() {
                     <div className="flex items-center gap-1.5 px-1 text-white/50 text-xs">
                       <span>📍</span>
                       <span>{[geoLocation.suburb, geoLocation.place].filter(Boolean).join(' · ')}</span>
+                    </div>
+                  )}
+                  {outsideGbg && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
+                      <MapPin size={12} className="shrink-0" />
+                      <span>Prognosen gäller Göteborg — du befinner dig {Math.round(distFromGbg / 1000)} km härifrån.</span>
                     </div>
                   )}
                   {(() => {
