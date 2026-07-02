@@ -120,6 +120,7 @@ async def lifespan(app: FastAPI):
                 last_seen_at DATETIME NOT NULL
             )""",
             "CREATE INDEX IF NOT EXISTS ix_app_users_apple_user_id ON app_users(apple_user_id)",
+            "ALTER TABLE app_users ADD COLUMN prefs_json TEXT",
         ]:
             try:
                 conn.execute(text(stmt))

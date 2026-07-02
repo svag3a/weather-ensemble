@@ -232,5 +232,6 @@ class AppUser(Base):
     full_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     is_premium: Mapped[bool] = mapped_column(Boolean, default=False)
     premium_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    prefs_json: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

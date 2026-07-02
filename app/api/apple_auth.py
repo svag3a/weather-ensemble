@@ -109,6 +109,16 @@ class AppleSignInRequest(BaseModel):
     full_name: Optional[str] = None
 
 
+class UserPrefsRequest(BaseModel):
+    radius: Optional[float] = None
+    uvThreshold: Optional[int] = None
+    activities: Optional[list] = None
+    favourites: Optional[list] = None
+    favouritesData: Optional[dict] = None
+    badges: Optional[list] = None
+    timePref: Optional[list] = None
+
+
 apple_auth_router = APIRouter()
 
 
@@ -148,6 +158,26 @@ async def apple_signin(body: AppleSignInRequest, db: Session = Depends(get_db)):
         "is_premium": user.is_premium,
         "display_name": display_name,
     }
+
+
+@apple_auth_router.get("/api/v1/user/prefs")
+def get_user_prefs(user: AppUser = Depends(get_app_user)):
+    prefs = json.loads(user.prefs_json) if user.prefs_json else {}
+    return prefs
+
+
+@apple_auth_router.put("/api/v1/user/prefs")
+def put_user_prefs(
+    body: UserPrefsRequest,
+    user: AppUser = Depends(get_app_user),
+    db: Session = Depends(get_db),
+):
+    existing = json.loads(user.prefs_json) if user.prefs_json else {}
+    update = body.model_dump(exclude_none=True)
+    existing.update(update)
+    user.prefs_json = json.dumps(existing)
+    db.commit()
+    return {"ok": True}
 
 
 @apple_auth_router.get("/api/v1/auth/app-me")

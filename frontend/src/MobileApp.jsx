@@ -2734,6 +2734,47 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
   const [notifSun, setNotifSun] = useState(() => localStorage.getItem(NOTIF_SUN_KEY) === 'true')
   const [notifUv,  setNotifUv]  = useState(() => localStorage.getItem(NOTIF_UV_KEY)  === 'true')
 
+  // Restore prefs from server on mount
+  useEffect(() => {
+    const token = localStorage.getItem(APP_TOKEN_KEY)
+    if (!token) return
+    fetch('/api/v1/user/prefs', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(p => {
+        if (!p) return
+        if (p.radius != null)       { localStorage.setItem(SOL_RADIUS_KEY, String(p.radius)); setRadius(p.radius) }
+        if (p.uvThreshold != null)  { localStorage.setItem(UV_PREF_KEY, String(p.uvThreshold)); setUvThreshold(p.uvThreshold) }
+        if (p.activities)           { localStorage.setItem(SOL_ACT_KEY, JSON.stringify(p.activities)); setActPref(new Set(p.activities)) }
+        if (p.favourites)           { localStorage.setItem(FAVS_KEY_P, JSON.stringify(p.favourites)) }
+        if (p.favouritesData)       { localStorage.setItem(FAV_DATA_KEY_P, JSON.stringify(p.favouritesData)) }
+        if (p.badges)               { localStorage.setItem(BADGES_KEY, JSON.stringify(p.badges)) }
+        if (p.timePref)             { localStorage.setItem(SOL_TIME_KEY, JSON.stringify(p.timePref)) }
+      })
+      .catch(() => {})
+  }, [])
+
+  // Sync prefs to server (debounced 2s) when they change
+  useEffect(() => {
+    const token = localStorage.getItem(APP_TOKEN_KEY)
+    if (!token) return
+    const t = setTimeout(() => {
+      fetch('/api/v1/user/prefs', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          radius,
+          uvThreshold,
+          activities: [...actPref],
+          favourites: [...loadFavsP()],
+          favouritesData: loadFavDataP(),
+          badges: [...loadBadges()],
+          timePref: [...loadTimePrefP()],
+        }),
+      }).catch(() => {})
+    }, 2000)
+    return () => clearTimeout(t)
+  }, [radius, uvThreshold, actPref])
+
   const favorites = [...favs].map(id => favData[id]).filter(Boolean)
 
   function handleUv(v) {
