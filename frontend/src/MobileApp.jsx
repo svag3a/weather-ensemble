@@ -1134,7 +1134,7 @@ function WindGaugeSVG({ windSpeed, windDirection }) {
     : null
 
   return (
-    <svg viewBox="0 0 80 46" width="70" style={{ display: 'block' }}>
+    <svg viewBox="0 0 80 46" width="58" style={{ display: 'block' }}>
       <path d={bgPath} fill="none" stroke="rgba(148,163,184,0.15)" strokeWidth={sw} strokeLinecap="round" />
       {fillPath && (
         <path d={fillPath} fill="none" stroke={color} strokeWidth={sw} strokeLinecap="round" />
@@ -2243,7 +2243,7 @@ function AnalysView({ prefetchedToday, prefetchedTomorrow, coords }) {
             )}
 
             <p className="text-white/50 text-xs px-1">
-              Genererad av Claude Haiku{summary._generated_at ? ` · ${formatGeneratedAt(summary._generated_at)}` : ''} · Uppdateras var 2:e timme
+              AI-genererad analys{summary._generated_at ? ` · ${formatGeneratedAt(summary._generated_at)}` : ''} · Uppdateras var 2:e timme
             </p>
           </>
         )
@@ -2826,7 +2826,7 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
       <div className={`${GLASS} rounded-2xl px-5 py-4 space-y-3`}>
         <div className="flex items-center gap-2">
           <MapPin size={13} className="text-slate-400 shrink-0" />
-          <span className="text-white text-sm font-medium">Standardradius</span>
+          <span className="text-white text-sm font-medium">Standardradie</span>
           <span className="text-slate-400 text-xs ml-auto">{radius} km</span>
         </div>
         <input
