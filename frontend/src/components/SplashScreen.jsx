@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 
 export default function SplashScreen({ onAnimReady, fading }) {
   useEffect(() => {
@@ -15,10 +15,11 @@ export default function SplashScreen({ onAnimReady, fading }) {
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
-        background:     'linear-gradient(160deg, #003B6F 0%, #005293 55%, #0a1628 100%)',
+        background:     'linear-gradient(to bottom, #000d1a 0%, #001e3d 35%, #003470 65%, #005099 100%)',
         transition:     'opacity 0.45s ease-out',
         opacity:        fading ? 0 : 1,
         pointerEvents:  fading ? 'none' : 'auto',
+        overflow:       'hidden',
       }}
     >
       <style>{`
@@ -40,23 +41,18 @@ export default function SplashScreen({ onAnimReady, fading }) {
           85%  { transform: scale(1.06); }
           to   { transform: scale(1);    opacity: 1; }
         }
-        @keyframes sp-lion {
-          from { opacity: 0; transform: translateY(14px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0)    scale(1); }
+        @keyframes sp-bridge {
+          from { opacity: 0; transform: translateY(20px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
         @keyframes sp-pulse {
           0%, 100% { transform: scale(1); }
           50%      { transform: scale(1.07); }
         }
-        @keyframes sp-glare {
-          0%   { opacity: 0;    transform: translate(-34px, 30px)  rotate(-52deg); }
-          25%  { opacity: 0.55; }
-          75%  { opacity: 0.45; }
-          100% { opacity: 0;    transform: translate(36px, -42px)  rotate(-52deg); }
-        }
       `}</style>
 
-      <div style={{ position: 'relative', width: 260, height: 390 }}>
+      {/* Sun elements — centered in screen */}
+      <div style={{ position: 'relative', width: 260, height: 260, flexShrink: 0 }}>
 
         {/* Glow */}
         <div style={{
@@ -67,7 +63,7 @@ export default function SplashScreen({ onAnimReady, fading }) {
           height:       200,
           marginLeft:   -100,
           borderRadius: '50%',
-          background:   'radial-gradient(circle, rgba(255,217,90,0.30) 0%, rgba(255,201,40,0.12) 55%, transparent 75%)',
+          background:   'radial-gradient(circle, rgba(255,217,90,0.35) 0%, rgba(255,201,40,0.14) 55%, transparent 75%)',
           animation:    'sp-rise 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s both, sp-pulse 2.2s ease-in-out 1.1s infinite',
           transformOrigin: 'center center',
         }} />
@@ -112,41 +108,27 @@ export default function SplashScreen({ onAnimReady, fading }) {
           animation:    'sp-pop 0.68s cubic-bezier(0.22,1,0.36,1) 0.28s both, sp-pulse 2.2s ease-in-out 1.1s infinite',
           transformOrigin: 'center center',
         }} />
-
-        {/* Lion */}
-        <img
-          src="/lejon.webp"
-          alt=""
-          draggable={false}
-          style={{
-            position:   'absolute',
-            bottom:     0,
-            left:       '50%',
-            width:      240,
-            marginLeft: -120,
-            animation:  'sp-lion 0.5s cubic-bezier(0.22,1,0.36,1) 0.72s both',
-            filter:     'drop-shadow(0 4px 20px rgba(0,0,0,0.6))',
-            userSelect: 'none',
-            pointerEvents: 'none',
-          }}
-        />
-
-        {/* Sword glare */}
-        <div style={{
-          position:     'absolute',
-          top:          122,
-          left:         '50%',
-          width:        90,
-          height:       8,
-          marginLeft:   -10,
-          borderRadius: 4,
-          background:   'linear-gradient(90deg, transparent, rgba(255,255,255,0.85), transparent)',
-          animation:    'sp-glare 0.55s ease-in-out 1.28s both',
-          transform:    'rotate(-52deg)',
-          pointerEvents: 'none',
-        }} />
-
       </div>
+
+      {/* Bridge — full width, anchored to bottom */}
+      <img
+        src="/lejon.webp"
+        alt=""
+        draggable={false}
+        style={{
+          position:      'absolute',
+          bottom:        0,
+          left:          '50%',
+          transform:     'translateX(-50%)',
+          width:         '100%',
+          maxHeight:     '55vh',
+          objectFit:     'contain',
+          objectPosition:'bottom center',
+          animation:     'sp-bridge 0.6s cubic-bezier(0.22,1,0.36,1) 0.5s both',
+          userSelect:    'none',
+          pointerEvents: 'none',
+        }}
+      />
     </div>
   )
 }
