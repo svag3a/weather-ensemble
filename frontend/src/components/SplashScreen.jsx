@@ -15,7 +15,7 @@ export default function SplashScreen({ onAnimReady, fading }) {
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'center',
-        background:     'linear-gradient(to bottom, #000d1a 0%, #001e3d 35%, #003470 65%, #005099 100%)',
+        background:     'linear-gradient(to bottom, #001a38 0%, #003470 35%, #0060aa 65%, #0088d4 100%)',
         transition:     'opacity 0.45s ease-out',
         opacity:        fading ? 0 : 1,
         pointerEvents:  fading ? 'none' : 'auto',
