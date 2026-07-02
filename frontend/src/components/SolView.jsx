@@ -666,9 +666,11 @@ function AddVenueForm({ coords, onSaved, onCancel }) {
 
 // ── Radius + time-pref localStorage ──────────────────────────────────────────
 const RADIUS_KEY     = 'sol_radius'
-const TAG_FILTER_KEY = 'sol_tag_filter_v1'
+const TAG_FILTER_KEY   = 'sol_tag_filter_v1'
+const TYPES_FILTER_KEY = 'sol_types_filter_v1'
 function loadSavedRadius()   { try { return parseFloat(localStorage.getItem(RADIUS_KEY)) || 2.0 } catch { return 2.0 } }
 function loadSavedTimePref() { try { return new Set(JSON.parse(localStorage.getItem(TAG_FILTER_KEY) || '[]')) } catch { return new Set() } }
+function loadSavedTypes()    { try { const s = localStorage.getItem(TYPES_FILTER_KEY); return s ? new Set(JSON.parse(s)) : new Set(ALL_TYPES) } catch { return new Set(ALL_TYPES) } }
 
 // ── Votes localStorage ────────────────────────────────────────────────────────
 const VOTES_KEY = 'sol_votes'
@@ -696,7 +698,7 @@ export default function SolView({ coords, initialData }) {
   const [loading, setLoading]     = useState(false)
   const skipFirstFetch            = useRef(false)
   const [error, setError]         = useState(null)
-  const [selectedTypes, setSelectedTypes] = useState(new Set(ALL_TYPES))
+  const [selectedTypes, setSelectedTypes] = useState(loadSavedTypes)
   const [radius, setRadius]       = useState(loadSavedRadius)
   const [debouncedRadius, setDebouncedRadius] = useState(loadSavedRadius)
   const [favs, setFavs]           = useState(loadFavs)
@@ -756,6 +758,7 @@ export default function SolView({ coords, initialData }) {
       } else {
         next.add(t)
       }
+      localStorage.setItem(TYPES_FILTER_KEY, JSON.stringify([...next]))
       return next
     })
   }
