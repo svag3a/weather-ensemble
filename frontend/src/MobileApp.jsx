@@ -2492,6 +2492,7 @@ function loadAppSession() {
   } catch { return { token: null, user: null } }
 }
 
+const API_ORIGIN = Capacitor.isNativePlatform() ? 'https://gbgsol.se' : ''
 const RC_API_KEY = 'appl_eSCaxygxSpcMonVMLGssqZwlMAO'
 const RC_ENTITLEMENT = 'se.gbgsol.premium.monthly'
 
@@ -2511,7 +2512,7 @@ function UserSection() {
   useEffect(() => {
     const { token, user } = loadAppSession()
     if (!token || !user) return
-    fetch('/api/v1/auth/app-me', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_ORIGIN}/api/v1/auth/app-me`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (!data?.authenticated) return
@@ -2531,7 +2532,7 @@ function UserSection() {
       const r = result.response
       const fullName = [r.givenName, r.familyName].filter(Boolean).join(' ') || null
 
-      const resp = await fetch('/api/v1/auth/apple-signin', {
+      const resp = await fetch(`${API_ORIGIN}/api/v1/auth/apple-signin`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ identity_token: r.identityToken, full_name: fullName }),
@@ -2738,7 +2739,7 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
   useEffect(() => {
     const token = localStorage.getItem(APP_TOKEN_KEY)
     if (!token) return
-    fetch('/api/v1/user/prefs', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_ORIGIN}/api/v1/user/prefs`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : null)
       .then(p => {
         if (!p) return
@@ -2758,7 +2759,7 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
     const token = localStorage.getItem(APP_TOKEN_KEY)
     if (!token) return
     const t = setTimeout(() => {
-      fetch('/api/v1/user/prefs', {
+      fetch(`${API_ORIGIN}/api/v1/user/prefs`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({

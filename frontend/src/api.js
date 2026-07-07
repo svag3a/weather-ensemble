@@ -1,4 +1,5 @@
-const BASE = '/api/v1'
+import { Capacitor } from '@capacitor/core'
+const BASE = Capacitor.isNativePlatform() ? 'https://gbgsol.se/api/v1' : '/api/v1'
 
 export async function fetchUV({ lat, lon } = {}) {
   const params = new URLSearchParams()
