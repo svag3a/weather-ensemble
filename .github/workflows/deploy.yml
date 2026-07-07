@@ -40,14 +40,14 @@ jobs:
             frontend/dist \
             ubuntu@${{ secrets.EC2_HOST }}:~/weather-ensemble/frontend/
 
-      # Clean dangling images/containers only — preserve volumes (database) and layer cache
+      # Remove stopped containers and dangling images only — preserve build cache and volumes
       - name: Clean Docker disk space
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=20 \
             ubuntu@${{ secrets.EC2_HOST }} \
-            "docker system prune -f || true"
+            "docker container prune -f || true && docker image prune -f || true"
 
       # Rebuild and restart — cache reused unless requirements.txt changes
       - name: Restart app
