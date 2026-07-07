@@ -156,7 +156,10 @@ function useCityBackground(coords) {
 function useCityMotif(coords) {
   const [images, setImages] = useState([])
   useEffect(() => {
-    fetchCityImages().then(imgs => setImages(imgs.filter(i => i.image_type === 'motif'))).catch(() => {})
+    const prefix = Capacitor.isNativePlatform() ? 'https://gbgsol.se' : ''
+    fetchCityImages()
+      .then(imgs => setImages(imgs.filter(i => i.image_type === 'motif').map(i => ({ ...i, url: prefix + i.url }))))
+      .catch(() => {})
   }, [])
   if (!coords || !images.length) return null
   let nearest = null, minDist = Infinity
