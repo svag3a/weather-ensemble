@@ -176,7 +176,8 @@ function useCityMotifs() {
       for (const img of imgs.filter(i => i.image_type === 'motif')) {
         if (!byLabel[img.label] || img.time_slot === 'day') byLabel[img.label] = img
       }
-      setMotifs(Object.values(byLabel))
+      const prefix = Capacitor.isNativePlatform() ? 'https://gbgsol.se' : ''
+      setMotifs(Object.values(byLabel).map(m => ({ ...m, url: prefix + m.url })))
     }).catch(() => {})
   }, [])
   return motifs
