@@ -37,6 +37,12 @@ function Root() {
   const handleAnimReady = useCallback(() => { flags.current.anim = true; tryDismiss() }, [tryDismiss])
   const handleDataReady = useCallback(() => { flags.current.data = true; tryDismiss() }, [tryDismiss])
 
+  // Fallback: dismiss after 8s even if data never arrives
+  useEffect(() => {
+    const t = setTimeout(() => { flags.current.anim = true; flags.current.data = true; tryDismiss() }, 8000)
+    return () => clearTimeout(t)
+  }, [tryDismiss])
+
   return (
     <>
       {showSplash && <SplashScreen onAnimReady={handleAnimReady} fading={splashFading} />}
