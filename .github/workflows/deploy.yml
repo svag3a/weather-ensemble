@@ -40,20 +40,11 @@ jobs:
             frontend/dist \
             ubuntu@${{ secrets.EC2_HOST }}:~/weather-ensemble/frontend/
 
-      # Remove stopped containers and dangling images only — preserve build cache and volumes
-      - name: Clean Docker disk space
-        run: |
-          ssh -i ~/.ssh/deploy_key \
-            -o ServerAliveInterval=30 \
-            -o ServerAliveCountMax=20 \
-            ubuntu@${{ secrets.EC2_HOST }} \
-            "docker container prune -f || true && docker image prune -f || true"
-
-      # Rebuild and restart — cache reused unless requirements.txt changes
+      # Stop container and remove old image to free ~1.4GB before building new one
       - name: Restart app
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=200 \
             ubuntu@${{ secrets.EC2_HOST }} \
-            "cd ~/weather-ensemble && docker compose build && docker compose up -d"
+            "cd ~/weather-ensemble && docker compose down --rmi all && docker builder prune -f && docker compose build && docker compose up -d"
