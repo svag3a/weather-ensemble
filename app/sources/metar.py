@@ -134,7 +134,7 @@ async def fetch_metar_cloud(client) -> Optional[dict]:
     """
     url = f"https://aviationweather.gov/api/data/metar?ids={_CITY.metar_code}&format=geojson&taf=false"
     try:
-        resp = await client.get(url, timeout=8.0)
+        resp = await client.get(url, timeout=4.0)
         resp.raise_for_status()
         data = resp.json()
         features = data.get("features") or []

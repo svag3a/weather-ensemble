@@ -3158,6 +3158,19 @@ export default function MobileApp({ onReady }) {
     return () => clearInterval(interval)
   }, [])
 
+  const FORECAST_CACHE_KEY = 'forecast_cache_v2'
+  const FORECAST_CACHE_TTL = 60 * 60 * 1000 // 1 hour
+
+  // Restore cached forecast on first mount so the splash dismisses instantly
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(FORECAST_CACHE_KEY)
+      if (!raw) return
+      const { ts, data } = JSON.parse(raw)
+      if (data && Date.now() - ts < FORECAST_CACHE_TTL) setForecast(data)
+    } catch {}
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const load = useCallback(async () => {
     const c = coords ?? { lat: 57.7089, lon: 11.9746 }
     const [fcResult, topResult, terrResult] = await Promise.allSettled([
@@ -3172,7 +3185,10 @@ export default function MobileApp({ onReady }) {
         min_score: 25,
       }),
     ])
-    if (fcResult.status === 'fulfilled')   setForecast(fcResult.value)
+    if (fcResult.status === 'fulfilled') {
+      setForecast(fcResult.value)
+      try { localStorage.setItem(FORECAST_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: fcResult.value })) } catch {}
+    }
     if (topResult.status === 'fulfilled')  setTopTerraces(topResult.value)
     if (terrResult.status === 'fulfilled') setPrefetchedTerraces(terrResult.value)
   }, [coords])

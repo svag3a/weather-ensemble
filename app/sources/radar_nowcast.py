@@ -74,7 +74,7 @@ def _image_url(dt: datetime) -> str:
 async def _fetch_tif(client: httpx.AsyncClient, url: str):
     """Download radar TIF. Returns (ndarray, transform) or None."""
     try:
-        resp = await client.get(url, timeout=15)
+        resp = await client.get(url, timeout=4)
         resp.raise_for_status()
         import rasterio
         with rasterio.open(io.BytesIO(resp.content)) as ds:
