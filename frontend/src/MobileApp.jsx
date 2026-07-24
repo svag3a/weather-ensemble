@@ -3171,26 +3171,30 @@ export default function MobileApp({ onReady }) {
     } catch {}
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const load = useCallback(async () => {
+  const load = useCallback(() => {
     const c = coords ?? { lat: 57.7089, lon: 11.9746 }
-    const [fcResult, topResult, terrResult] = await Promise.allSettled([
-      coords
-        ? fetchLocalForecast(coords.lat, coords.lon, 168)
-        : fetchEnsemble(168),
-      fetchTopTerraces({ lat: c.lat, lon: c.lon }),
-      fetchSunTerraces({
-        lat: c.lat, lon: c.lon,
-        radius: loadRadiusPref(),
-        type: 'all',
-        min_score: 25,
-      }),
-    ])
-    if (fcResult.status === 'fulfilled') {
-      setForecast(fcResult.value)
-      try { localStorage.setItem(FORECAST_CACHE_KEY, JSON.stringify({ ts: Date.now(), data: fcResult.value })) } catch {}
-    }
-    if (topResult.status === 'fulfilled')  setTopTerraces(topResult.value)
-    if (terrResult.status === 'fulfilled') setPrefetchedTerraces(terrResult.value)
+
+    // Forecast fires independently — setForecast as soon as it arrives,
+    // not waiting for terraces which can be slow.
+    ;(coords ? fetchLocalForecast(coords.lat, coords.lon, 168) : fetchEnsemble(168))
+      .then(data => {
+        setForecast(data)
+        try { localStorage.setItem(FORECAST_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })) } catch {}
+      })
+      .catch(() => {})
+
+    fetchTopTerraces({ lat: c.lat, lon: c.lon })
+      .then(setTopTerraces)
+      .catch(() => {})
+
+    fetchSunTerraces({
+      lat: c.lat, lon: c.lon,
+      radius: loadRadiusPref(),
+      type: 'all',
+      min_score: 25,
+    })
+      .then(setPrefetchedTerraces)
+      .catch(() => {})
   }, [coords])
 
   useEffect(() => { load() }, [load])
