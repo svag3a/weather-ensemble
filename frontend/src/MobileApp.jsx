@@ -3133,6 +3133,24 @@ export default function MobileApp({ onReady }) {
   const outsideGbg = coords ? distFromGbg > GBG_FENCE_M : false
   const motifImage = outsideGbg ? null : motifImageRaw
 
+  // Preload all motif + background images into Cache API as soon as URLs are known.
+  // Subsequent renders find the images already in cache → instant display.
+  useEffect(() => {
+    if (!allMotifs.length) return
+    if (!('caches' in window)) {
+      // Fallback: plain browser cache preload via Image()
+      allMotifs.forEach(m => { const i = new Image(); i.src = m.url })
+      return
+    }
+    caches.open('city-images-v1').then(cache => {
+      allMotifs.forEach(m => {
+        cache.match(m.url).then(hit => {
+          if (!hit) fetch(m.url).then(r => r.ok && cache.put(m.url, r)).catch(() => {})
+        })
+      })
+    })
+  }, [allMotifs])
+
   // Award location badges when user is within BADGE_RADIUS_M of a motif (foreground).
   useEffect(() => {
     if (!coords || !allMotifs.length) return
