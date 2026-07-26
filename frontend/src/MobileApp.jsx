@@ -27,6 +27,7 @@ import { getWeatherInfo, feelsLike, sunTimesUTC } from './weatherSymbol'
 import { getWeatherMomentum } from './weatherMomentum'
 import WeatherSymbol from './components/WeatherSymbol'
 import { generateSummary, summariseConfidence } from './summary'
+import { timingMark, timingReset, timingSave, timingGetSessions, timingClearSessions } from './timing'
 
 // ── Hooks ────────────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ function useRadarLocation() {
   const [rainTimeline, setRainTimeline] = useState(null)
   const [coords, setCoords] = useState(null)
   const timerRef = useRef(null)
+  const gpsMarked = useRef(false)
 
   const poll = useCallback(async (lat, lon) => {
     const [radarResult, nowcastResult] = await Promise.allSettled([
@@ -91,18 +93,19 @@ function useRadarLocation() {
   }, [poll])
 
   useEffect(() => {
-    const start = (lat, lon) => {
+    const start = (lat, lon, source) => {
+      if (!gpsMarked.current) { timingMark(`gps-${source}`); gpsMarked.current = true }
       setCoords({ lat, lon })
       poll(lat, lon)
       timerRef.current = setInterval(locate, 5 * 60 * 1000)
     }
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        pos => start(pos.coords.latitude, pos.coords.longitude),
-        () => start(57.7089, 11.9746),
+        pos => start(pos.coords.latitude, pos.coords.longitude, 'ok'),
+        () => start(57.7089, 11.9746, 'fallback'),
       )
     } else {
-      start(57.7089, 11.9746)
+      start(57.7089, 11.9746, 'unavailable')
     }
     return () => clearInterval(timerRef.current)
   }, [poll, locate])
@@ -2933,7 +2936,68 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
       {/* Donation */}
       <DonateSection />
 
+      {/* Timing debug panel */}
+      <TimingPanel />
 
+    </div>
+  )
+}
+
+function TimingPanel() {
+  const [sessions, setSessions] = useState(() => timingGetSessions())
+  const [open, setOpen] = useState(false)
+
+  const refresh = () => setSessions(timingGetSessions())
+  const clear = () => { timingClearSessions(); setSessions([]) }
+
+  const fmt = ms => ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
+  const fmtDate = ts => new Date(ts).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+
+  return (
+    <div className="rounded-2xl bg-slate-800/60 border border-slate-700/50 overflow-hidden">
+      <button
+        className="w-full flex items-center justify-between px-5 py-3 text-left active:opacity-60"
+        onClick={() => { refresh(); setOpen(o => !o) }}
+      >
+        <span className="text-slate-400 text-xs font-mono">⏱ Uppstartstider ({sessions.length} sessioner)</span>
+        <span className="text-slate-500 text-xs">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="px-4 pb-4 space-y-3">
+          {sessions.length === 0 && (
+            <p className="text-slate-500 text-xs text-center py-2">Inga sessioner ännu — starta om appen</p>
+          )}
+          {[...sessions].reverse().map((s, i) => {
+            const total = s.marks.at(-1)?.ms ?? 0
+            return (
+              <div key={i} className="bg-slate-900/50 rounded-xl p-3 space-y-1">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-slate-400 text-[10px]">{fmtDate(s.at)}</span>
+                  <span className={`text-[10px] font-bold ${total > 5000 ? 'text-red-400' : total > 2000 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    totalt {fmt(total)}
+                  </span>
+                </div>
+                {s.marks.map((m, j) => {
+                  const prev = j > 0 ? s.marks[j - 1].ms : 0
+                  const delta = m.ms - prev
+                  return (
+                    <div key={j} className="flex justify-between font-mono text-[10px]">
+                      <span className="text-slate-300">{m.label}</span>
+                      <span className="text-slate-400">+{fmt(delta)} <span className="text-slate-600">({fmt(m.ms)})</span></span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+          {sessions.length > 0 && (
+            <button onClick={clear} className="w-full text-center text-red-400/70 text-xs py-1 active:opacity-50">
+              Rensa
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -3029,6 +3093,8 @@ function SolNuCard({ data, onViewAll }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MobileApp({ onReady }) {
+  timingReset()
+  timingMark('app-mount')
   const [forecast, setForecast]   = useState(null)
   const [warnings, setWarnings]   = useState([])
   const [sources, setSources]         = useState(null)
@@ -3165,10 +3231,15 @@ export default function MobileApp({ onReady }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(FORECAST_CACHE_KEY)
-      if (!raw) return
+      if (!raw) { timingMark('cache-miss'); return }
       const { ts, data } = JSON.parse(raw)
-      if (data && Date.now() - ts < FORECAST_CACHE_TTL) setForecast(data)
-    } catch {}
+      if (data && Date.now() - ts < FORECAST_CACHE_TTL) {
+        setForecast(data)
+        timingMark('cache-hit')
+      } else {
+        timingMark('cache-expired')
+      }
+    } catch { timingMark('cache-error') }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = useCallback(() => {
@@ -3176,25 +3247,29 @@ export default function MobileApp({ onReady }) {
 
     // Forecast fires independently — setForecast as soon as it arrives,
     // not waiting for terraces which can be slow.
+    const fcLabel = coords ? 'local-forecast' : 'ensemble'
+    timingMark(`${fcLabel}-start`)
     ;(coords ? fetchLocalForecast(coords.lat, coords.lon, 168) : fetchEnsemble(168))
       .then(data => {
+        timingMark(`${fcLabel}-done`)
         setForecast(data)
         try { localStorage.setItem(FORECAST_CACHE_KEY, JSON.stringify({ ts: Date.now(), data })) } catch {}
       })
-      .catch(() => {})
+      .catch(() => { timingMark(`${fcLabel}-error`) })
 
     fetchTopTerraces({ lat: c.lat, lon: c.lon })
       .then(setTopTerraces)
       .catch(() => {})
 
+    timingMark('terraces-start')
     fetchSunTerraces({
       lat: c.lat, lon: c.lon,
       radius: loadRadiusPref(),
       type: 'all',
       min_score: 25,
     })
-      .then(setPrefetchedTerraces)
-      .catch(() => {})
+      .then(data => { timingMark('terraces-done'); setPrefetchedTerraces(data) })
+      .catch(() => { timingMark('terraces-error') })
   }, [coords])
 
   useEffect(() => { load() }, [load])
@@ -3204,6 +3279,8 @@ export default function MobileApp({ onReady }) {
   useEffect(() => {
     if (forecast && !readyCalled.current) {
       readyCalled.current = true
+      timingMark('on-ready')
+      timingSave()
       onReady?.()
     }
   }, [forecast, onReady])
