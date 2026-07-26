@@ -2946,9 +2946,18 @@ function ProfileView({ onNavigateToSol, motifs, coords }) {
 function TimingPanel() {
   const [sessions, setSessions] = useState(() => timingGetSessions())
   const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
 
   const refresh = () => setSessions(timingGetSessions())
   const clear = () => { timingClearSessions(); setSessions([]) }
+
+  const copy = () => {
+    const text = JSON.stringify(timingGetSessions(), null, 2)
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
 
   const fmt = ms => ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`
   const fmtDate = ts => new Date(ts).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -2992,9 +3001,14 @@ function TimingPanel() {
             )
           })}
           {sessions.length > 0 && (
-            <button onClick={clear} className="w-full text-center text-red-400/70 text-xs py-1 active:opacity-50">
-              Rensa
-            </button>
+            <div className="flex gap-3 pt-1">
+              <button onClick={copy} className="flex-1 text-center text-blue-400/70 text-xs py-1 active:opacity-50">
+                {copied ? '✓ Kopierat' : 'Kopiera JSON'}
+              </button>
+              <button onClick={clear} className="flex-1 text-center text-red-400/70 text-xs py-1 active:opacity-50">
+                Rensa
+              </button>
+            </div>
           )}
         </div>
       )}
