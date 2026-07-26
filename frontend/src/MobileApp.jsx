@@ -3259,17 +3259,19 @@ export default function MobileApp({ onReady }) {
   const FORECAST_CACHE_KEY = 'forecast_cache_v2'
   const FORECAST_CACHE_TTL = 6 * 60 * 60 * 1000 // 6 hours
 
-  // Restore cached forecast on first mount so the splash dismisses instantly
+  // Restore cached forecast on first mount — always show cached data regardless of age,
+  // so the user never sees "Hämtar prognos…" while waiting for the network.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(FORECAST_CACHE_KEY)
       if (!raw) { timingMark('cache-miss'); return }
       const { ts, data } = JSON.parse(raw)
-      if (data && Date.now() - ts < FORECAST_CACHE_TTL) {
+      if (data) {
         setForecast(data)
-        timingMark('cache-hit')
+        const ageH = Math.round((Date.now() - ts) / 36e5)
+        timingMark(ageH < 1 ? 'cache-hit' : `cache-hit-stale-${ageH}h`)
       } else {
-        timingMark('cache-expired')
+        timingMark('cache-empty')
       }
     } catch { timingMark('cache-error') }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

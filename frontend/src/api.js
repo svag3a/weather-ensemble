@@ -1,6 +1,12 @@
 import { Capacitor } from '@capacitor/core'
 const BASE = Capacitor.isNativePlatform() ? 'https://gbgsol.se/api/v1' : '/api/v1'
 
+function fetchWithTimeout(url, opts = {}, ms = 10000) {
+  const ctrl = new AbortController()
+  const t = setTimeout(() => ctrl.abort(), ms)
+  return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t))
+}
+
 export async function fetchUV({ lat, lon } = {}) {
   const params = new URLSearchParams()
   if (lat != null) params.set('lat', lat)
@@ -11,7 +17,7 @@ export async function fetchUV({ lat, lon } = {}) {
 }
 
 export async function fetchEnsemble(hoursAhead = 48) {
-  const res = await fetch(`${BASE}/forecast?hours_ahead=${hoursAhead}`)
+  const res = await fetchWithTimeout(`${BASE}/forecast?hours_ahead=${hoursAhead}`)
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
@@ -35,7 +41,7 @@ export async function fetchWeightsHistory(days = 30) {
 }
 
 export async function fetchLocalForecast(lat, lon, hoursAhead = 48) {
-  const res = await fetch(`${BASE}/forecast/local?lat=${lat}&lon=${lon}&hours_ahead=${hoursAhead}`)
+  const res = await fetchWithTimeout(`${BASE}/forecast/local?lat=${lat}&lon=${lon}&hours_ahead=${hoursAhead}`)
   if (!res.ok) throw new Error(await res.text())
   return res.json()
 }
