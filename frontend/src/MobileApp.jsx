@@ -3257,7 +3257,7 @@ export default function MobileApp({ onReady }) {
   }, [])
 
   const FORECAST_CACHE_KEY = 'forecast_cache_v2'
-  const FORECAST_CACHE_TTL = 60 * 60 * 1000 // 1 hour
+  const FORECAST_CACHE_TTL = 6 * 60 * 60 * 1000 // 6 hours
 
   // Restore cached forecast on first mount so the splash dismisses instantly
   useEffect(() => {
