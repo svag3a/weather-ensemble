@@ -3107,8 +3107,8 @@ function SolNuCard({ data, onViewAll }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function MobileApp({ onReady }) {
-  timingReset()
-  timingMark('app-mount')
+  const _timingInit = useRef(false)
+  if (!_timingInit.current) { _timingInit.current = true; timingReset(); timingMark('app-mount') }
   const [forecast, setForecast]   = useState(null)
   const [warnings, setWarnings]   = useState([])
   const [sources, setSources]         = useState(null)
