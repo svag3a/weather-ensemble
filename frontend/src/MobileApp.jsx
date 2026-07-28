@@ -156,15 +156,14 @@ function useCityBackground(coords) {
   return { ...image, actualSlot: image.time_slot ?? slot }
 }
 
-// LRU cache for motif images — stores last MAX_MOTIF_CACHE base64 data URIs
+// Persistent base64 cache for all motif images — survives URLCache eviction
 const _MOTIF_BLOB_KEY = 'motif_blob_v2'
-const _MAX_MOTIF_CACHE = 5
 function _loadMotifBlobCache() { try { return JSON.parse(localStorage.getItem(_MOTIF_BLOB_KEY) || '[]') } catch { return [] } }
 function _saveMotifBlobCache(entries) { try { localStorage.setItem(_MOTIF_BLOB_KEY, JSON.stringify(entries)) } catch {} }
 function _motifBlobCacheGet(entries, url) { return entries.find(e => e.url === url)?.dataUri ?? null }
 function _motifBlobCacheSet(entries, url, dataUri) {
   const filtered = entries.filter(e => e.url !== url)
-  const updated = [{ url, dataUri }, ...filtered].slice(0, _MAX_MOTIF_CACHE)
+  const updated = [{ url, dataUri }, ...filtered]
   _saveMotifBlobCache(updated)
   return updated
 }
@@ -3171,16 +3170,31 @@ export default function MobileApp({ onReady }) {
   const outsideGbg = coords ? distFromGbg > GBG_FENCE_M : false
   const motifImage = outsideGbg ? null : motifImageRaw
 
-  // Preload other motif images into URLCache after a delay so they don't compete
-  // with the nearest motif (which is handled by useCityMotif's blob cache).
+  // Cache all motif images as base64 in localStorage — staggered so the nearest
+  // (already handled by useCityMotif) gets bandwidth priority.
   useEffect(() => {
     if (!allMotifs.length) return
     const nearestUrl = motifImage?.url
-    const rest = allMotifs.filter(m => !nearestUrl || (!nearestUrl.startsWith('data:') && m.url !== nearestUrl))
-    const t = setTimeout(() => {
-      rest.forEach(m => { const i = new Image(); i.src = m.url })
-    }, 3000)
-    return () => clearTimeout(t)
+    const existing = _loadMotifBlobCache()
+    const missing = allMotifs.filter(m => {
+      const origUrl = m.url.startsWith('data:') ? null : m.url
+      return origUrl && origUrl !== nearestUrl && !_motifBlobCacheGet(existing, origUrl)
+    })
+    const timers = missing.map((m, i) => setTimeout(() => {
+      fetch(m.url)
+        .then(r => r.ok ? r.blob() : null)
+        .then(b => {
+          if (!b) return
+          const reader = new FileReader()
+          reader.onload = () => {
+            const current = _loadMotifBlobCache()
+            _saveMotifBlobCache(_motifBlobCacheSet(current, m.url, reader.result))
+          }
+          reader.readAsDataURL(b)
+        })
+        .catch(() => {})
+    }, 3000 + i * 500))
+    return () => timers.forEach(clearTimeout)
   }, [allMotifs, motifImage?.url])
 
   // Award location badges when user is within BADGE_RADIUS_M of a motif (foreground).
