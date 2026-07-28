@@ -156,20 +156,47 @@ function useCityBackground(coords) {
   return { ...image, actualSlot: image.time_slot ?? slot }
 }
 
+const _MOTIF_BLOB_KEY = 'motif_blob_v1'
+function _loadMotifBlob() { try { return JSON.parse(localStorage.getItem(_MOTIF_BLOB_KEY) || 'null') } catch { return null } }
+function _saveMotifBlob(url, dataUri) { try { localStorage.setItem(_MOTIF_BLOB_KEY, JSON.stringify({ url, dataUri })) } catch {} }
+
 function useCityMotif(coords) {
   const [images, setImages] = useState([])
+  const [blob, setBlob] = useState(_loadMotifBlob)
+
   useEffect(() => {
     const prefix = Capacitor.isNativePlatform() ? 'https://gbgsol.se' : ''
     fetchCityImages()
       .then(imgs => setImages(imgs.filter(i => i.image_type === 'motif').map(i => ({ ...i, url: prefix + i.url }))))
       .catch(() => {})
   }, [])
-  if (!coords || !images.length) return null
-  let nearest = null, minDist = Infinity
-  for (const img of images) {
-    const d = (img.lat - coords.lat) ** 2 + (img.lon - coords.lon) ** 2
-    if (d < minDist) { minDist = d; nearest = img }
+
+  let nearest = null
+  if (coords && images.length) {
+    let minDist = Infinity
+    for (const img of images) {
+      const d = (img.lat - coords.lat) ** 2 + (img.lon - coords.lon) ** 2
+      if (d < minDist) { minDist = d; nearest = img }
+    }
   }
+
+  // Cache nearest image as base64 so it survives URLCache eviction
+  useEffect(() => {
+    if (!nearest?.url || blob?.url === nearest.url) return
+    fetch(nearest.url)
+      .then(r => r.ok ? r.blob() : null)
+      .then(b => {
+        if (!b) return
+        const reader = new FileReader()
+        reader.onload = () => { const d = reader.result; setBlob({ url: nearest.url, dataUri: d }); _saveMotifBlob(nearest.url, d) }
+        reader.readAsDataURL(b)
+      })
+      .catch(() => {})
+  }, [nearest?.url]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!nearest) return null
+  // Serve from localStorage cache for instant display (even if URLCache was cleared)
+  if (blob?.url === nearest.url) return { ...nearest, url: blob.dataUri }
   return nearest
 }
 
@@ -3133,23 +3160,17 @@ export default function MobileApp({ onReady }) {
   const outsideGbg = coords ? distFromGbg > GBG_FENCE_M : false
   const motifImage = outsideGbg ? null : motifImageRaw
 
-  // Preload all motif + background images into Cache API as soon as URLs are known.
-  // Subsequent renders find the images already in cache → instant display.
+  // Preload other motif images into URLCache after a delay so they don't compete
+  // with the nearest motif (which is handled by useCityMotif's blob cache).
   useEffect(() => {
     if (!allMotifs.length) return
-    if (!('caches' in window)) {
-      // Fallback: plain browser cache preload via Image()
-      allMotifs.forEach(m => { const i = new Image(); i.src = m.url })
-      return
-    }
-    caches.open('city-images-v1').then(cache => {
-      allMotifs.forEach(m => {
-        cache.match(m.url).then(hit => {
-          if (!hit) fetch(m.url).then(r => r.ok && cache.put(m.url, r)).catch(() => {})
-        })
-      })
-    })
-  }, [allMotifs])
+    const nearestUrl = motifImage?.url
+    const rest = allMotifs.filter(m => !nearestUrl || (!nearestUrl.startsWith('data:') && m.url !== nearestUrl))
+    const t = setTimeout(() => {
+      rest.forEach(m => { const i = new Image(); i.src = m.url })
+    }, 3000)
+    return () => clearTimeout(t)
+  }, [allMotifs, motifImage?.url])
 
   // Award location badges when user is within BADGE_RADIUS_M of a motif (foreground).
   useEffect(() => {
