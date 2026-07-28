@@ -156,13 +156,22 @@ function useCityBackground(coords) {
   return { ...image, actualSlot: image.time_slot ?? slot }
 }
 
-const _MOTIF_BLOB_KEY = 'motif_blob_v1'
-function _loadMotifBlob() { try { return JSON.parse(localStorage.getItem(_MOTIF_BLOB_KEY) || 'null') } catch { return null } }
-function _saveMotifBlob(url, dataUri) { try { localStorage.setItem(_MOTIF_BLOB_KEY, JSON.stringify({ url, dataUri })) } catch {} }
+// LRU cache for motif images — stores last MAX_MOTIF_CACHE base64 data URIs
+const _MOTIF_BLOB_KEY = 'motif_blob_v2'
+const _MAX_MOTIF_CACHE = 5
+function _loadMotifBlobCache() { try { return JSON.parse(localStorage.getItem(_MOTIF_BLOB_KEY) || '[]') } catch { return [] } }
+function _saveMotifBlobCache(entries) { try { localStorage.setItem(_MOTIF_BLOB_KEY, JSON.stringify(entries)) } catch {} }
+function _motifBlobCacheGet(entries, url) { return entries.find(e => e.url === url)?.dataUri ?? null }
+function _motifBlobCacheSet(entries, url, dataUri) {
+  const filtered = entries.filter(e => e.url !== url)
+  const updated = [{ url, dataUri }, ...filtered].slice(0, _MAX_MOTIF_CACHE)
+  _saveMotifBlobCache(updated)
+  return updated
+}
 
 function useCityMotif(coords) {
   const [images, setImages] = useState([])
-  const [blob, setBlob] = useState(_loadMotifBlob)
+  const [blobCache, setBlobCache] = useState(_loadMotifBlobCache)
 
   useEffect(() => {
     const prefix = Capacitor.isNativePlatform() ? 'https://gbgsol.se' : ''
@@ -180,23 +189,25 @@ function useCityMotif(coords) {
     }
   }
 
-  // Cache nearest image as base64 so it survives URLCache eviction
+  // Cache nearest image as base64 — survives URLCache eviction, up to _MAX_MOTIF_CACHE locations
   useEffect(() => {
-    if (!nearest?.url || blob?.url === nearest.url) return
+    if (!nearest?.url || _motifBlobCacheGet(blobCache, nearest.url)) return
     fetch(nearest.url)
       .then(r => r.ok ? r.blob() : null)
       .then(b => {
         if (!b) return
         const reader = new FileReader()
-        reader.onload = () => { const d = reader.result; setBlob({ url: nearest.url, dataUri: d }); _saveMotifBlob(nearest.url, d) }
+        reader.onload = () => {
+          setBlobCache(prev => _motifBlobCacheSet(prev, nearest.url, reader.result))
+        }
         reader.readAsDataURL(b)
       })
       .catch(() => {})
   }, [nearest?.url]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!nearest) return null
-  // Serve from localStorage cache for instant display (even if URLCache was cleared)
-  if (blob?.url === nearest.url) return { ...nearest, url: blob.dataUri }
+  const cached = _motifBlobCacheGet(blobCache, nearest.url)
+  if (cached) return { ...nearest, url: cached }
   return nearest
 }
 
