@@ -24,22 +24,35 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
 
-      # Free disk space BEFORE anything that writes to disk. A crash-looping
-      # container can fill the volume with its JSON log, which breaks even
-      # `git fetch` and leaves the host unrecoverable without this step.
-      - name: Free disk space on server
+      # Report host health, and clean up ONLY when disk is actually low.
+      # Aggressive cleanup destroys diagnostics — journald holds the OOM
+      # records — so it must not run on every deploy.
+      - name: Server health check
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=20 \
-            ubuntu@${{ secrets.EC2_HOST }} \
-            "echo '--- before ---'; df -h / ; \
-             sudo find /var/lib/docker/containers -name '*-json.log' -exec truncate -s 0 {} \; 2>/dev/null || true ; \
-             docker container prune -f || true ; \
-             docker image prune -af || true ; \
-             docker builder prune -af || true ; \
-             sudo journalctl --vacuum-size=100M 2>/dev/null || true ; \
-             echo '--- after ---'; df -h /"
+            ubuntu@${{ secrets.EC2_HOST }} 'bash -s' <<'REMOTE'
+          echo "--- disk ---"
+          df -h /
+          echo "--- memory ---"
+          free -h
+          echo "--- OOM kills, last 7 days ---"
+          sudo journalctl -k --since '7 days ago' 2>/dev/null \
+            | grep -ci 'oom-kill\|out of memory' || echo 0
+
+          AVAIL=$(df --output=avail -BG / | tail -1 | tr -dc '0-9')
+          if [ "${AVAIL:-0}" -lt 5 ]; then
+            echo "!!! only ${AVAIL}G free — running cleanup"
+            docker container prune -f || true
+            docker image prune -af || true
+            docker builder prune -af || true
+            sudo journalctl --vacuum-size=200M 2>/dev/null || true
+            df -h /
+          else
+            echo "${AVAIL}G free — skipping cleanup, diagnostics preserved"
+          fi
+          REMOTE
 
       # Pull latest code on server (updates Dockerfile etc, won't touch dist/)
       - name: Pull latest code
@@ -57,11 +70,43 @@ jobs:
             frontend/dist \
             ubuntu@${{ secrets.EC2_HOST }}:~/weather-ensemble/frontend/
 
-      # Stop container and remove old image to free ~1.4GB before building new one
-      - name: Restart app
+      # Build the new image BEFORE swapping. A failed build now leaves the
+      # running container untouched, so a broken build can no longer take the
+      # site down — that required disk headroom for two images, which the
+      # 8 GiB volume did not have before 2026-08-04.
+      - name: Build and swap
         run: |
           ssh -i ~/.ssh/deploy_key \
             -o ServerAliveInterval=30 \
             -o ServerAliveCountMax=200 \
-            ubuntu@${{ secrets.EC2_HOST }} \
-            "cd ~/weather-ensemble && docker compose down --rmi all && docker builder prune -f && docker compose build && docker compose up -d"
+            ubuntu@${{ secrets.EC2_HOST }} 'bash -s' <<'REMOTE'
+          set -euo pipefail
+          cd ~/weather-ensemble
+
+          echo "=== building new image (current container keeps serving) ==="
+          docker compose build
+
+          echo "=== swapping to new image ==="
+          docker compose up -d
+
+          if ! command -v curl >/dev/null 2>&1; then
+            echo "curl unavailable — skipping health gate"
+            exit 0
+          fi
+
+          echo "=== waiting for health ==="
+          for i in $(seq 1 20); do
+            if curl -fsS -m 5 http://localhost:8000/health >/dev/null 2>&1; then
+              echo "healthy after $((i * 3))s"
+              docker image prune -f || true
+              df -h /
+              exit 0
+            fi
+            sleep 3
+          done
+
+          echo "!!! app did not become healthy within 60s"
+          docker compose ps
+          docker compose logs --tail 80 app
+          exit 1
+          REMOTE
