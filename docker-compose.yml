@@ -10,6 +10,13 @@ services:
     environment:
       - DATABASE_URL=sqlite:////data/weather.db
     restart: unless-stopped
+    # Without this a crash-looping container grows its JSON log until the
+    # host disk is full, which is what took the service down on 2026-08-04.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   weather_data:

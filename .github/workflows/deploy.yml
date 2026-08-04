@@ -24,6 +24,23 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H "${{ secrets.EC2_HOST }}" >> ~/.ssh/known_hosts
 
+      # Free disk space BEFORE anything that writes to disk. A crash-looping
+      # container can fill the volume with its JSON log, which breaks even
+      # `git fetch` and leaves the host unrecoverable without this step.
+      - name: Free disk space on server
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -o ServerAliveInterval=30 \
+            -o ServerAliveCountMax=20 \
+            ubuntu@${{ secrets.EC2_HOST }} \
+            "echo '--- before ---'; df -h / ; \
+             sudo find /var/lib/docker/containers -name '*-json.log' -exec truncate -s 0 {} \; 2>/dev/null || true ; \
+             docker container prune -f || true ; \
+             docker image prune -af || true ; \
+             docker builder prune -af || true ; \
+             sudo journalctl --vacuum-size=100M 2>/dev/null || true ; \
+             echo '--- after ---'; df -h /"
+
       # Pull latest code on server (updates Dockerfile etc, won't touch dist/)
       - name: Pull latest code
         run: |
